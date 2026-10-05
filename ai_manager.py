@@ -103,8 +103,8 @@ RESPONSE_SCHEMA = {
 # ==========================================
 # CENTRALIZED LOGGING SETUP (NEW)
 # ==========================================
-logger = logging.getLogger("ai_manager")
-logger.setLevel(logging.DEBUG)
+
+log.setLevel(logging.DEBUG)
 
 # Stream logs to app.log instead of cluttering the user terminal
 file_handler = logging.FileHandler("app.log", encoding="utf-8")
@@ -116,8 +116,8 @@ formatter = logging.Formatter(
 )
 file_handler.setFormatter(formatter)
 
-if not logger.handlers:
-    logger.addHandler(file_handler)
+if not log.handlers:
+    log.addHandler(file_handler)
 # --------------------------------------------------------------------------
 # External data gathering
 
