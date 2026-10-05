@@ -126,6 +126,26 @@ def retry_with_smart_delay(
     backoff_factor: float = 2.0,
     jitter: bool = True
 ):
+    #Automatically retries an API request if it temporarily fails,
+    #waiting slightly longer after each attempt to give the server time to recover.
+    def decorator(func: Callable):
+        def wrapper(*args, **kwargs):
+            delay = initial_delay
+            for attempt in range(1, max_retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as exc:
+                    log.warning("Connection attempt %d/%d failed. Retrying shortly...", attempt, max_retries)
+                    if attempt == max_retries:
+                        raise exc
+                    
+                    sleep_duration = delay * (1 + (random.random() if jitter else 0))
+                    time.sleep(sleep_duration)
+                    delay *= backoff_factor
+        return wrapper
+    return decorator
+    
+
 # External data gathering
 
 # Changes Made: 3/10/2026 3AM 
