@@ -10,6 +10,7 @@ import logging
 from typing import Optional, Dict, Any, List, Tuple, Callable
 from datetime import datetime
 import requests
+import random
 
 log = logging.getLogger("ai_manager")
 
@@ -119,6 +120,12 @@ file_handler.setFormatter(formatter)
 if not log.handlers:
     log.addHandler(file_handler)
 # --------------------------------------------------------------------------
+def retry_with_smart_delay(
+    max_retries: int = MAX_RETRIES,
+    initial_delay: float = 1.0,
+    backoff_factor: float = 2.0,
+    jitter: bool = True
+):
 # External data gathering
 
 # Changes Made: 3/10/2026 3AM 
