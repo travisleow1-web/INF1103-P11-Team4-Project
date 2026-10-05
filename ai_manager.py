@@ -7,14 +7,14 @@ import os
 import json
 import time
 import logging
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, List, Tuple, Callable
 from datetime import datetime
 import requests
 
 log = logging.getLogger("ai_manager")
 
 # --------------------------------------------------------------------------
-# Configuration & Constants (Extracted Hardcoded Values)2
+# Configuration & Constants (Extracted Hardcoded Values)
 # --------------------------------------------------------------------------
 MAX_RETRIES = 3
 HTTP_TIMEOUT = 20
@@ -100,6 +100,24 @@ RESPONSE_SCHEMA = {
     ]
 }
 
+# ==========================================
+# CENTRALIZED LOGGING SETUP (NEW)
+# ==========================================
+logger = logging.getLogger("ai_manager")
+logger.setLevel(logging.DEBUG)
+
+# Stream logs to app.log instead of cluttering the user terminal
+file_handler = logging.FileHandler("app.log", encoding="utf-8")
+file_handler.setLevel(logging.DEBUG)
+
+formatter = logging.Formatter(
+    "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+file_handler.setFormatter(formatter)
+
+if not logger.handlers:
+    logger.addHandler(file_handler)
 # --------------------------------------------------------------------------
 # External data gathering
 
