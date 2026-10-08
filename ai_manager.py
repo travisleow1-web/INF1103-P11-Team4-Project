@@ -137,7 +137,7 @@ def retry_with_smart_delay(
                 try:
                     return func(*args, **kwargs)
                 except Exception as exc:
-                    log.warning("Connection attempt %d/%d failed. Retrying shortly...", attempt, max_retries)
+                    log.warning("%s attempt %d/%d failed: %s. Retrying...", func.__name__, attempt, max_retries, exc)
                     if attempt == max_retries:
                         raise exc
                     
