@@ -1,6 +1,7 @@
 """ai_manager: API interaction only, no domain logic.
 
-For now this module only fetches weather from Open-Meteo, which needs no API key.
+For now this module only fetches weather from Open-Meteo, using the port
+coordinates already attached to each shipment. Open-Meteo needs no API key.
 """
 
 import logging
@@ -47,15 +48,14 @@ def build_weather_params(lat, lon, config=WEATHER_CONFIG):
     return params
 
 
-def fetch_weather(config=WEATHER_CONFIG):
-    """Fetch weather for Singapore (hardcoded coordinates) from Open-Meteo.
+def fetch_weather(lat, lon, config=WEATHER_CONFIG):
+    """Fetch weather for one coordinate pair from Open-Meteo.
 
     Returns a dict with the source, the coordinates, and each block the config
     asked for (current, hourly, daily) plus its units. If every attempt fails
     the failure is logged and the dict carries an "error" message instead, so
     callers never see an exception.
     """
-    lat, lon = 1.266667, 103.833333
     result = {"source": "open-meteo.com", "lat": lat, "lon": lon}
     params = build_weather_params(lat, lon, config)
     delay = RETRY_DELAY
@@ -67,7 +67,10 @@ def fetch_weather(config=WEATHER_CONFIG):
             data = response.json()
             break
         except (requests.RequestException, ValueError) as exc:
-            log.warning("weather fetch failed, attempt %d/%d: %s", attempt, MAX_RETRIES, exc)
+            log.warning(
+                "weather fetch for (%s, %s) failed, attempt %d/%d: %s",
+                lat, lon, attempt, MAX_RETRIES, exc,
+            )
             if attempt == MAX_RETRIES:
                 result["error"] = str(exc)
                 return result
@@ -79,3 +82,18 @@ def fetch_weather(config=WEATHER_CONFIG):
             result[block] = data[block]
             result[block + "_units"] = data.get(block + "_units", {})
     return result
+
+
+def fetch_shipment_weather(shipment):
+    """Fetch weather for a shipment's origin and destination ports.
+
+    shipment is a dict or DataFrame row with origin_lat, origin_lon,
+    destination_lat and destination_lon. Returns
+    {"origin": <weather>, "destination": <weather>}.
+    """
+    return {
+        "origin": fetch_weather(shipment["origin_lat"], shipment["origin_lon"]),
+        "destination": fetch_weather(
+            shipment["destination_lat"], shipment["destination_lon"]
+        ),
+    }
