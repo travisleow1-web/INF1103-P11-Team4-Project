@@ -232,7 +232,7 @@ def build_prompt(record: Dict[str, Any], external: Dict[str, Any]) -> str:
         "\n\nEXTERNAL DATA:\n" + json.dumps(external, default=str)
     )
 
-
+@retry_with_smart_delay(max_retries=MAX_RETRIES)
 def _call_gemini(prompt: str) -> Dict[str, Any]:
     body = {
         "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
