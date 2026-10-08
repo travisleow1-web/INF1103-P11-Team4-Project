@@ -97,3 +97,11 @@ def fetch_shipment_weather(shipment):
             shipment["destination_lat"], shipment["destination_lon"]
         ),
     }
+
+
+def fetch_shipments_weather(shipments):
+    """Fetch weather for every shipment in a DataFrame (one row per shipment).
+
+    Returns a list of fetch_shipment_weather results in the same order as the rows.
+    """
+    return [fetch_shipment_weather(row) for _, row in shipments.iterrows()]
