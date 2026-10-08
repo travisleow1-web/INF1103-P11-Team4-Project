@@ -7,14 +7,15 @@ import os
 import json
 import time
 import logging
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, List, Tuple, Callable
 from datetime import datetime
 import requests
+import random
 
 log = logging.getLogger("ai_manager")
 
 # --------------------------------------------------------------------------
-# Configuration & Constants (Extracted Hardcoded Values)2
+# Configuration & Constants (Extracted Hardcoded Values)
 # --------------------------------------------------------------------------
 MAX_RETRIES = 3
 HTTP_TIMEOUT = 20
@@ -101,7 +102,51 @@ RESPONSE_SCHEMA = {
     ]
 }
 
+# ==========================================
+# CENTRALIZED LOGGING SETUP (NEW)
+# ==========================================
+
+log.setLevel(logging.DEBUG)
+
+# Stream logs to app.log instead of cluttering the user terminal
+file_handler = logging.FileHandler("app.log", encoding="utf-8")
+file_handler.setLevel(logging.DEBUG)
+
+formatter = logging.Formatter(
+    "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+file_handler.setFormatter(formatter)
+
+if not log.handlers:
+    log.addHandler(file_handler)
 # --------------------------------------------------------------------------
+def retry_with_smart_delay(
+    max_retries: int = MAX_RETRIES,
+    initial_delay: float = 1.0,
+    backoff_factor: float = 2.0,
+    jitter: bool = True
+):
+    #Automatically retries an API request if it temporarily fails,
+    #waiting slightly longer after each attempt to give the server time to recover.
+    def decorator(func: Callable):
+        def wrapper(*args, **kwargs):
+            delay = initial_delay
+            for attempt in range(1, max_retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as exc:
+                    log.warning("Connection attempt %d/%d failed. Retrying shortly...", attempt, max_retries)
+                    if attempt == max_retries:
+                        raise exc
+                    
+                    sleep_duration = delay * (1 + (random.random() if jitter else 0))
+                    time.sleep(sleep_duration)
+                    delay *= backoff_factor
+        return wrapper
+    return decorator
+    
+
 # External data gathering
 
 # Changes Made: 3/10/2026 3AM 
