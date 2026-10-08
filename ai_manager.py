@@ -9,6 +9,7 @@ import time
 import logging
 from typing import Optional, Dict, Any, List, Tuple, Callable
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import requests
 import random
 
@@ -285,7 +286,7 @@ def enrich_record(input_record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
     enriched = dict(input_record)
     enriched.update(ai_part)
-    enriched["external_data_fetched_at"] = datetime.now()
+    enriched["external_data_fetched_at"] = datetime.now(ZoneInfo("Asia/Singapore")).isoformat()
     enriched["external_data_errors"] = external["errors"]
     return enriched
 
