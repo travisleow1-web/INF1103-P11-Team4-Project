@@ -103,6 +103,19 @@ RESPONSE_SCHEMA = {
     ]
 }
 
+FALLBACK_AI_RESPONSE: Dict[str, Any] = {
+    "risk_factors": [],
+    "primary_risk_factor": "infrastructure_disruption",
+    "affected_location": "Unknown",
+    "expected_impact": "None",
+    "confidence_score": 0.0,
+    "sources": ["System Fallback - External Feeds or AI API Failure"],
+    "conflicting_sources": True,
+    "extreme_event": "None",
+    "insights": ["AI enrichment failed to complete. System defaulted to safety status."],
+    "alternative_route": None
+}
+
 # ==========================================
 # CENTRALIZED LOGGING SETUP (NEW)
 # ==========================================
@@ -264,14 +277,15 @@ def _call_gemini(prompt: str) -> Dict[str, Any]:
 # --------------------------------------------------------------------------
 # Public entry point
 # --------------------------------------------------------------------------
-def enrich_record(input_record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def enrich_record(input_record: Dict[str, Any]) -> Dict[str, Any]:
     """
-    input_record (from IO_MANAGER)  ->  AI-enriched record (for LOGIC_MANAGER)
-    Returns None if the AI could not produce a valid answer. Never crashes the system.
+    input_record (from IO_MANAGER) -> AI-enriched record (for LOGIC_MANAGER)
+    Guarantees a dictionary return value even on API/network failure.
     """
     external = fetch_external_data(input_record)
     prompt = build_prompt(input_record, external)
 
+    ai_part = None
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             ai_part = _call_gemini(prompt)
@@ -281,12 +295,16 @@ def enrich_record(input_record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         except requests.RequestException as exc:
             log.warning("AI API failure (attempt %d): %s", attempt, exc)
             time.sleep(2 ** attempt)
-    else:
-        log.error("AI enrichment failed after %d attempts", MAX_RETRIES)
-        return None
 
     enriched = dict(input_record)
-    enriched.update(ai_part)
+    
+    # Safely attach Gemini results or fallback defaults
+    if ai_part:
+        enriched.update(ai_part)
+    else:
+        log.error("AI enrichment failed after %d attempts. Applying fallback output.", MAX_RETRIES)
+        enriched.update(FALLBACK_AI_RESPONSE)
+
     enriched["external_data_fetched_at"] = datetime.now(ZoneInfo("Asia/Singapore")).isoformat()
     enriched["external_data_errors"] = external["errors"]
     return enriched
