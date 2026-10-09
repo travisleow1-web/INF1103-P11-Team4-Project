@@ -7,14 +7,44 @@ import os
 import json
 import time
 import logging
+import hashlib
 from typing import Optional, Dict, Any, List, Tuple, Callable
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import requests
 import random
 
+CACHE_FILE = "ai_cache.json"
+
 log = logging.getLogger("ai_manager")
 
+# --------------------------------------------------------------------------
+# LOCAL AI RESPONSE CACHING
+# --------------------------------------------------------------------------
+def _load_cache() -> Dict[str, Any]:
+    """Reads existing cache entries from ai_cache.json on startup[cite: 2, 3]."""
+    if not os.path.exists(CACHE_FILE):
+        return {}
+    try:
+        with open(CACHE_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as exc:
+        log.warning("Failed to load AI response cache from %s: %s", CACHE_FILE, exc)
+        return {}
+
+
+def _save_cache(cache_data: Dict[str, Any]) -> None:
+    """Saves updated AI responses back to disk to ensure data persistence[cite: 2, 3, 4]."""
+    try:
+        with open(CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(cache_data, f, indent=2, default=str)
+    except Exception as exc:
+        log.warning("Failed to save AI response to %s: %s", CACHE_FILE, exc)
+
+
+def _get_cache_key(prompt: str) -> str:
+    """Generates a unique deterministic SHA-256 hash for a given prompt string."""
+    return hashlib.sha256(prompt.encode("utf-8")).hexdigest()
 # --------------------------------------------------------------------------
 # Configuration & Constants (Extracted Hardcoded Values)
 # --------------------------------------------------------------------------
@@ -159,7 +189,6 @@ def retry_with_smart_delay(
                     delay *= backoff_factor
         return wrapper
     return decorator
-    
 
 # External data gathering
 # Changes Made: 3/10/2026 3AM 
@@ -176,11 +205,6 @@ def _geocode(place: str) -> Optional[Tuple[float, float]]:
     if not results:
         return None
     return results[0]["latitude"], results[0]["longitude"]
-
-
-def _earthquake(place: str) -> Optional[Tuple[float, float]]:
-    r = http_session.get("",
-                         params={"name": place, "count":1}, timeout=HTTP_TIMEOUT,)
 
 
 def _weather(place: str) -> Dict[str, Any]:
@@ -284,21 +308,35 @@ def _call_gemini(prompt: str) -> Dict[str, Any]:
 def enrich_record(input_record: Dict[str, Any]) -> Dict[str, Any]:
     """
     input_record (from IO_MANAGER) -> AI-enriched record (for LOGIC_MANAGER)
-    Guarantees a dictionary return value even on API/network failure.
+    Checks local cache before issuing API requests. Guarantees a dictionary return value.
     """
     external = fetch_external_data(input_record)
     prompt = build_prompt(input_record, external)
+    
+    cache_key = _get_cache_key(prompt)
+    cache = _load_cache()
 
     ai_part = None
-    for attempt in range(1, MAX_RETRIES + 1):
-        try:
-            ai_part = _call_gemini(prompt)
-            break
-        except (ValueError, json.JSONDecodeError, KeyError) as exc:
-            log.warning("malformed AI reply (attempt %d): %s", attempt, exc)
-        except requests.RequestException as exc:
-            log.warning("AI API failure (attempt %d): %s", attempt, exc)
-            time.sleep(2 ** attempt)
+
+    # Check if this exact prompt payload was already processed
+    if cache_key in cache:
+        log.info("AI Cache Hit! Reusing cached response for key %s...", cache_key[:10])
+        ai_part = cache[cache_key]
+    else:
+        # Cache miss: Attempt API calls with retry logic
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                ai_part = _call_gemini(prompt)
+                
+                # Save fresh API result to cache file for persistent storage[cite: 3, 4]
+                cache[cache_key] = ai_part
+                _save_cache(cache)
+                break
+            except (ValueError, json.JSONDecodeError, KeyError) as exc:
+                log.warning("malformed AI reply (attempt %d): %s", attempt, exc)
+            except requests.RequestException as exc:
+                log.warning("AI API failure (attempt %d): %s", attempt, exc)
+                time.sleep(2 ** attempt)
 
     enriched = dict(input_record)
     
