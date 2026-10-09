@@ -176,6 +176,7 @@ def _weather(place: str) -> Dict[str, Any]:
         params={
             "latitude": lat, "longitude": lon, "timezone": "auto", "forecast_days": 7,
             "daily": "precipitation_sum,wind_gusts_10m_max,weather_code",
+            "cell_selection": "sea"  # <--- Added this line
         },
         timeout=HTTP_TIMEOUT,
     )
