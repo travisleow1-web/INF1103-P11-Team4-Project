@@ -162,7 +162,6 @@ def retry_with_smart_delay(
     
 
 # External data gathering
-
 # Changes Made: 3/10/2026 3AM 
 # Replaced individual requests.get() calls with a shared http_session.get().
 # Instead of creating a new connection for each request, we now reuse a single session, which improves performance and reduces overhead.
@@ -177,6 +176,11 @@ def _geocode(place: str) -> Optional[Tuple[float, float]]:
     if not results:
         return None
     return results[0]["latitude"], results[0]["longitude"]
+
+
+def _earthquake(place: str) -> Optional[Tuple[float, float]]:
+    r = http_session.get("",
+                         params={"name": place, "count":1}, timeout=HTTP_TIMEOUT,)
 
 
 def _weather(place: str) -> Dict[str, Any]:
