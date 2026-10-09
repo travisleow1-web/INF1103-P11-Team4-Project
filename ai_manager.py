@@ -1,27 +1,9 @@
-"""
-config.py
-Constants, logging, fail-fast env checks, and the shared HTTP session.
-Import this first; every other module depends on it.
-"""
-
 import os
 import logging
 import requests
-
-# --------------------------------------------------------------------------
-# Logging (set up first so every other module can log safely)
-# --------------------------------------------------------------------------
-log = logging.getLogger("ai_manager")
-log.setLevel(logging.DEBUG)
-
-if not log.handlers:
-    file_handler = logging.FileHandler("app.log", encoding="utf-8")
-    file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(logging.Formatter(
-        "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    ))
-    log.addHandler(file_handler)
+import time
+import random
+from typing import Optional, Dict, Any, List, Tuple, Callable
 
 # --------------------------------------------------------------------------
 # Constants
@@ -59,3 +41,45 @@ if not GEMINI_API_KEY:
 # Connection pooling
 # --------------------------------------------------------------------------
 http_session = requests.Session()
+
+# --------------------------------------------------------------------------
+# Logging
+# --------------------------------------------------------------------------
+log = logging.getLogger("ai_manager")
+log.setLevel(logging.DEBUG)
+
+if not log.handlers:
+    file_handler = logging.FileHandler("app.log", encoding="utf-8")
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    ))
+    log.addHandler(file_handler)
+
+def retry_with_smart_delay(
+    max_retries: int = MAX_RETRIES,
+    initial_delay: float = 1.0,
+    backoff_factor: float = 2.0,
+    jitter: bool = True,
+):
+    #Automatically retries an API request if it temporarily fails,
+    #Waiting slightly longer after each attempt to give the server time to recover.
+    """Retry a function if it raises, waiting longer after each attempt."""
+    def decorator(func: Callable):
+        def wrapper(*args, **kwargs):
+            delay = initial_delay
+            for attempt in range(1, max_retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as exc:
+                    log.warning(
+                        "%s attempt %d/%d failed: %s",
+                        func.__name__, attempt, max_retries, exc,
+                    )
+                    if attempt == max_retries:
+                        raise
+                    time.sleep(delay * (1 + (random.random() if jitter else 0)))
+                    delay *= backoff_factor
+        return wrapper
+    return decorator
