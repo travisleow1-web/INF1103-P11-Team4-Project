@@ -143,6 +143,8 @@ def csv_shipments():
     The file needs the columns in CSV_COLUMNS; port lat/lon are looked up from
     the port reference like in manual entry. If the file can't be read or any
     row is invalid, the errors are shown and the user is asked for a path again.
+    Once the file loads, the user chooses whether to add further shipments;
+    those are entered manually and appended below the CSV rows.
     """
     while True:
         path = questionary.path("CSV file path:", validate=validator.validate_csv_path).ask()
@@ -158,6 +160,12 @@ def csv_shipments():
             print(f"Could not read file: {e}")
             continue
         print(df)
+        break
+
+    if questionary.confirm("Add further shipments manually?").ask():
+        return pd.concat([df, manual_shipments()], ignore_index=True)
+    return df
+
 
 if __name__ == "__main__":
     print(input_method())
