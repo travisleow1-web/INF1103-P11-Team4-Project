@@ -57,13 +57,15 @@ def departure_time():
     return answer.strip()
 
 
-def arrival_time():
-    """Prompt for the arrival date, re-asking until it is a valid DD/MM/YYYY.
+def arrival_time(departure):
+    """Prompt for the arrival date, re-asking until it is a valid DD/MM/YYYY after departure.
 
-    Returns the date as a string with surrounding whitespace removed.
+    The departure date string is rejected as an arrival, as is anything
+    earlier. Returns the date as a string with surrounding whitespace removed.
     """
     answer = questionary.text(
-        "Arrival time (DD/MM/YYYY):", validate=validator.validate_date
+        "Arrival time (DD/MM/YYYY):",
+        validate=lambda answer: validator.validate_arrival_date(answer, departure),
     ).ask()
     return answer.strip()
 
@@ -103,8 +105,9 @@ def manual_shipments():
         destination_lats.append(destination_lat)
         destination_lons.append(destination_lon)
 
-        departure_times.append(departure_time())
-        arrival_times.append(arrival_time())
+        departure = departure_time()
+        departure_times.append(departure)
+        arrival_times.append(arrival_time(departure))
 
         if questionary.confirm("Add another shipment?").ask():
             continue
