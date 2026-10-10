@@ -23,12 +23,6 @@ def ask_port(message, validate=validator.validate_port):
     return answer.split(" - ")[0].strip().upper()
 
 
-def shipment_id():
-    """Prompt for a shipment ID and return it as typed (not validated yet)."""
-    answer = questionary.text("Shipment ID:").ask()
-    return answer
-
-
 def origin_port():
     """Prompt for the origin port and return its code."""
     return ask_port("Origin port:")
@@ -74,12 +68,12 @@ def manual_shipments():
     """Collect one or more shipments from the user and return them as a DataFrame.
 
     Each loop asks for one shipment's fields and appends them to one list per
-    column. Port latitude/longitude are looked up from the port reference, not
-    asked for. After each shipment the user chooses whether to add another.
+    column. Shipment IDs are not asked for; input_method assigns them. Port
+    latitude/longitude are looked up from the port reference, not asked for.
+    After each shipment the user chooses whether to add another.
     The lists are then combined into a DataFrame with one row per shipment.
     """
     # One list per output column; index i across all lists is shipment i.
-    ids = []
     origin_ports = []
     origin_lats = []
     origin_lons = []
@@ -89,8 +83,6 @@ def manual_shipments():
     departure_times = []
     arrival_times = []
     while True:
-        ids.append(shipment_id())
-
         # Fill in the origin's coordinates from the chosen port code.
         origin = origin_port()
         origin_lat, origin_lon = validator.port_coordinates(origin)
@@ -116,7 +108,6 @@ def manual_shipments():
     # Explicit dtypes keep columns typed correctly even when the lists are empty.
     return pd.DataFrame(
         {
-            "shipment_id": pd.Series(ids, dtype="str"),
             "origin_port": pd.Series(origin_ports, dtype="str"),
             "origin_lat": pd.Series(origin_lats, dtype="float"),
             "origin_lon": pd.Series(origin_lons, dtype="float"),
@@ -129,15 +120,29 @@ def manual_shipments():
     )
 
 
+def assign_shipment_ids(df):
+    """Return df with a shipment_id column first, numbered SHP-001, SHP-002, ... in row order.
+
+    Any shipment_id already in df (e.g. from a CSV file) is replaced, so CSV
+    and manual shipments are numbered the same way.
+    """
+    df = df.drop(columns="shipment_id", errors="ignore")
+    df.insert(0, "shipment_id", [f"SHP-{i:03d}" for i in range(1, len(df) + 1)])
+    return df
+
+
 def input_method():
-    """Ask whether shipments are entered manually or loaded from a CSV file."""
+    """Ask whether shipments are entered manually or loaded from a CSV file.
+
+    Returns the shipments as a DataFrame with automatically assigned IDs.
+    """
     selection = questionary.select(
         "How do you want to add shipments?",
         choices=["Enter manually", "Upload a CSV file"],
     ).ask()
     if selection == "Upload a CSV file":
-        return csv_shipments()
-    return manual_shipments()
+        return assign_shipment_ids(csv_shipments())
+    return assign_shipment_ids(manual_shipments())
 
 
 def csv_shipments():
