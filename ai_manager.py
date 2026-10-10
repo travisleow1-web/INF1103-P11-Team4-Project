@@ -95,6 +95,21 @@ if not GEMINI_API_KEY:
 # --------------------------------------------------------------------------
 http_session = requests.Session()
 
+# Add FALLBACK_AI_RESPONSE as the safe default when enrichment fails
+FALLBACK_AI_RESPONSE: Dict[str, Any] = {
+    "risk_factors": [],  
+    "primary_risk_factor": "infrastructure_disruption",
+    "affected_location": "Unknown",
+    "expected_impact": "None",
+    "confidence_score": 0.0,
+    "sources": ["System Fallback - External Feeds or AI API Failure"],
+    "conflicting_sources": True,
+    "extreme_event": "None",
+    "insights": ["AI enrichment failed to complete. System defaulted to safety status."],
+    "alternative_route": None,
+}
+
+
 # --------------------------------------------------------------------------
 # Logging
 # --------------------------------------------------------------------------
@@ -136,3 +151,14 @@ def retry_with_smart_delay(
                     delay *= backoff_factor
         return wrapper
     return decorator
+# Add extract_shipment() to select the shipment fields used by the AI and cache key
+def extract_shipment(record: Dict[str, Any]) -> Dict[str, Any]:
+    """Pick only the shipment fields the AI (and the cache key) care about."""
+    return {k: record[k] for k in SHIPMENT_FIELDS if k in record}
+
+# Add build_prompt() to combine shipment and external data into the model prompt
+def build_prompt(shipment: Dict[str, Any], external: Dict[str, Any]) -> str:
+    return (
+        "SHIPMENT:\n" + json.dumps(shipment, default=str)
+        + "\n\nEXTERNAL DATA:\n" + json.dumps(external, default=str)
+    )
