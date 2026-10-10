@@ -29,7 +29,60 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 GEMINI_URL = (
     f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 )
+ALLOWED_RISK_TYPES = [
+    "weather", "severe_crosswinds", "port_congestion", "labor_shortage",
+    "piracy_threat", "severe_civil_unrest", "geopolitical",
+    "infrastructure_disruption",
+]
+ALLOWED_SEVERITY = ["Low", "Medium", "High"]
+ALLOWED_IMPACT = ["Delay", "Cost Increase", "Cargo Damage", "Cargo Destruction", "None"]
 
+SYSTEM_PROMPT = """You are a logistics risk analyst for shipments passing through or destined for Singapore.
+Your role is exclusively to analyse, structure, and quantify risk factors from provided feeds.
+You NEVER decide operational actions (such as proceed, delay, reroute, or insure): downstream business rules execute those.
+
+Rules:
+- Identify ALL distinct risk factors present across the data. Do NOT omit moderate or low risks.
+- Use ONLY the shipment data and external data provided. Do not invent facts.
+- If data is missing, old, or contradictory, lower confidence_score and set conflicting_sources to true."""
+
+RESPONSE_SCHEMA = {
+    "type": "OBJECT",
+    "properties": {
+        "risk_factors": {
+            "type": "ARRAY",
+            "items": {
+                "type": "OBJECT",
+                "properties": {
+                    "type": {"type": "STRING", "enum": ALLOWED_RISK_TYPES},
+                    "severity": {"type": "STRING", "enum": ALLOWED_SEVERITY},
+                    "detail": {"type": "STRING"},
+                },
+                "required": ["type", "severity", "detail"],
+            },
+        },
+        "primary_risk_factor": {"type": "STRING", "enum": ALLOWED_RISK_TYPES},
+        "affected_location": {"type": "STRING"},
+        "expected_impact": {"type": "STRING", "enum": ALLOWED_IMPACT},
+        "confidence_score": {"type": "NUMBER"},
+        "sources": {"type": "ARRAY", "items": {"type": "STRING"}},
+        "conflicting_sources": {"type": "BOOLEAN"},
+        "extreme_event": {"type": "STRING"},
+        "insights": {"type": "ARRAY", "items": {"type": "STRING"}},
+        "alternative_route": {
+            "type": "OBJECT",
+            "properties": {
+                "name": {"type": "STRING"},
+                "distance_km": {"type": "NUMBER"},
+            },
+        },
+    },
+    "required": [
+        "risk_factors", "primary_risk_factor", "affected_location",
+        "expected_impact", "confidence_score", "sources",
+        "conflicting_sources", "extreme_event", "insights",
+    ],
+}
 # --------------------------------------------------------------------------
 # Fail-fast validation
 # --------------------------------------------------------------------------
