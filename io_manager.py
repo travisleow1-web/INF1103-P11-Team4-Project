@@ -175,6 +175,25 @@ def csv_shipments():
     return df
 
 
+def show_weather(shipment, weather):
+    """Print the forecast at a shipment's origin and destination.
+
+    weather is the dict from ai_manager.get_shipment_weather; an end whose
+    feed failed is None and is reported as unavailable.
+    """
+    print(f"\n{shipment['shipment_id']}: {shipment['origin_port']} -> {shipment['destination_port']}")
+    for end in ("origin", "destination"):
+        print(f"  {end.capitalize()} ({shipment[f'{end}_port']}) forecast:")
+        daily = weather[end]
+        if daily is None:
+            print("    weather unavailable")
+            continue
+        for day, rain, gust in zip(
+            daily["time"], daily["precipitation_sum"], daily["wind_gusts_10m_max"]
+        ):
+            print(f"    {day}  rain {rain} mm  max gust {gust} km/h")
+
+
 if __name__ == "__main__":
     print(input_method())
 
