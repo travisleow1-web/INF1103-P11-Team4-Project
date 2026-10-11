@@ -197,3 +197,35 @@ def rule_inventory_replacement(record, decision):
             "Rule 5: cargo destruction predicted from an extreme event at origin"
         )
 
+def decide_outcome(record, decision):
+    """Turn the accumulated flags into one final operational outcome."""
+    if decision.outcome == "REJECT":
+        return
+
+    goods = record["goods"]
+    time_sensitive = goods.get("perishable") or goods.get("time_sensitive")
+
+    if "Procurement Alert" in decision.flags:
+        decision.outcome = "DELAY"
+    elif "Premium Increase Required" in decision.flags:
+        decision.outcome = "INSURE"
+    elif decision.overall_risk == "High":
+        # Prefer rerouting for time-sensitive cargo, otherwise delay the departure
+        if time_sensitive and record.get("alternative_route"):
+            decision.outcome = "REROUTE"
+            decision.actions.append(f"Reroute via {record['alternative_route']['name']}")
+        else:
+            decision.outcome = "DELAY"
+            decision.actions.append("Delay departure until conditions clear")
+        decision.needs_human = True
+    elif decision.overall_risk == "Medium":
+        decision.outcome = "PROCEED"
+        decision.actions.append("Proceed with monitoring")
+    else:
+        decision.outcome = "PROCEED"
+
+    # Anything a human must look at is not fully automatic
+    if decision.hold_shipment and decision.outcome == "PROCEED":
+        decision.outcome = "ESCALATE"
+
+
