@@ -33,10 +33,6 @@ GEMINI_URL = (
     f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 )
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if not GEMINI_API_KEY:
-    raise RuntimeError("CRITICAL ERROR: 'GEMINI_API_KEY' is not set. The application cannot start.")
-
 ALLOWED_RISK_TYPES = [
     "weather", "severe_crosswinds", "port_congestion", "labor_shortage",
     "piracy_threat", "severe_civil_unrest", "geopolitical",
