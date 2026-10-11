@@ -175,23 +175,42 @@ def csv_shipments():
     return df
 
 
+def daily_stat(hourly, variable, pick):
+    """Collapse an hourly series to one value per day, as {"YYYY-MM-DD": value}.
+
+    pick (e.g. max or min) is applied to each day's non-missing readings;
+    days with no readings are left out.
+    """
+    by_day = {}
+    for stamp, value in zip(hourly["time"], hourly[variable]):
+        if value is not None:
+            by_day.setdefault(stamp[:10], []).append(value)
+    return {day: pick(values) for day, values in by_day.items()}
+
+
 def show_weather(shipment, weather):
-    """Print the forecast at a shipment's origin and destination.
+    """Print a per-day forecast summary at a shipment's origin and destination.
 
     weather is the dict from ai_manager.get_shipment_weather; an end whose
-    feed failed is None and is reported as unavailable.
+    feed failed is None and is reported as unavailable. Each day shows the
+    highest wind and gust, the lowest pressure and the lowest visibility.
     """
     print(f"\n{shipment['shipment_id']}: {shipment['origin_port']} -> {shipment['destination_port']}")
     for end in ("origin", "destination"):
         print(f"  {end.capitalize()} ({shipment[f'{end}_port']}) forecast:")
-        daily = weather[end]
-        if daily is None:
+        hourly = weather[end]
+        if hourly is None:
             print("    weather unavailable")
             continue
-        for day, rain, gust in zip(
-            daily["time"], daily["precipitation_sum"], daily["wind_gusts_10m_max"]
-        ):
-            print(f"    {day}  rain {rain} mm  max gust {gust} km/h")
+        wind = daily_stat(hourly, "wind_speed_10m", max)
+        gust = daily_stat(hourly, "wind_gusts_10m", max)
+        pressure = daily_stat(hourly, "pressure_msl", min)
+        visibility = daily_stat(hourly, "visibility", min)
+        for day in sorted({stamp[:10] for stamp in hourly["time"]}):
+            print(
+                f"    {day}  wind {wind.get(day, '-')} km/h  gust {gust.get(day, '-')} km/h"
+                f"  pressure {pressure.get(day, '-')} hPa  visibility {visibility.get(day, '-')} m"
+            )
 
 
 if __name__ == "__main__":

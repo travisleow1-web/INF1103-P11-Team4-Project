@@ -16,6 +16,8 @@ MAX_PLACES_LIMIT = 4
 GDELT_MAX_RECORDS = 8
 GDELT_TIMESPAN = "3d"
 TIMEZONE = "Asia/Singapore"
+FORECAST_DAYS = 16  # Open-Meteo's maximum
+WEATHER_VARIABLES = ("wind_speed_10m", "wind_gusts_10m", "pressure_msl", "visibility")
 
 # Exactly the columns io_manager.input_method() returns, in the same order.
 SHIPMENT_FIELDS = (
@@ -214,9 +216,10 @@ def _geocode(place: str) -> Optional[Tuple[float, float]]:
 
 
 def fetch_weather(lat: float, lon: float) -> Dict[str, Any]:
-    """Return the 7-day Open-Meteo forecast for a coordinate pair.
+    """Return the hourly Open-Meteo forecast (WEATHER_VARIABLES) for a coordinate pair.
 
-    Raises on network/HTTP errors; callers decide how to handle failure.
+    Covers FORECAST_DAYS days; the dict has a "time" list plus one list per
+    variable. Raises on network/HTTP errors; callers decide how to handle failure.
     """
     r = http_session.get(
         "https://api.open-meteo.com/v1/forecast",
@@ -224,14 +227,14 @@ def fetch_weather(lat: float, lon: float) -> Dict[str, Any]:
             "latitude": lat,
             "longitude": lon,
             "timezone": "auto",
-            "forecast_days": 7,
-            "daily": "precipitation_sum,wind_gusts_10m_max,weather_code",
+            "forecast_days": FORECAST_DAYS,
+            "hourly": ",".join(WEATHER_VARIABLES),
             "cell_selection": "sea",
         },
         timeout=HTTP_TIMEOUT,
     )
     r.raise_for_status()
-    return r.json().get("daily", {})
+    return r.json().get("hourly", {})
 
 
 def get_shipment_weather(shipment: Dict[str, Any]) -> Dict[str, Any]:
