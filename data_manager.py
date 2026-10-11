@@ -20,4 +20,18 @@ def save_records(db_records, file_path):
   with open(file_path, "w", encoding="utf-8") as f:
     json.dump(db_records, f, indent=2)
 
+def add_record(file_path, db_records, record, decision):
+    """decision is a dict. Stores both, plus fields used for history look-ups."""
+
+    entry = {
+        **record,
+        "decision": decision,
+        "saved_at": datetime.now().isoformat(),
+        "flagged": decision["needs_human"] or decision["overall_risk"] != "Low",
+        "delayed": decision["outcome"] == "DELAY",
+    }
+    db_records.append(json.loads(json.dumps(entry, default=str)))
+    save_records(db_records, file_path)
+
+
 records = load_records(DB_FILE)
