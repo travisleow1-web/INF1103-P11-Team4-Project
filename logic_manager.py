@@ -77,3 +77,4 @@ def _add_alert(decision, recipient, channels, message):
     decision.alerts.append(
         {"recipient": recipient, "channels": channels, "message": message}
     )
+
