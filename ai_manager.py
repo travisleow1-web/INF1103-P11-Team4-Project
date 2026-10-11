@@ -4,6 +4,7 @@ import logging
 import requests
 import time
 import random
+import pandas as pd
 from typing import Optional, Dict, Any, List, Tuple, Callable
 
 # --------------------------------------------------------------------------
@@ -260,6 +261,25 @@ def get_shipment_weather(shipment: Dict[str, Any]) -> Dict[str, Any]:
             log.warning("weather feed failed for %s %s: %s", shipment.get("shipment_id"), end, exc)
             weather[end] = None
     return weather
+
+
+def assess_shipments(shipments: pd.DataFrame) -> pd.DataFrame:
+    """Return one row per shipment: the original columns plus Gemini's response fields.
+
+    The weather is only used inside the prompt. If the API call fails or the
+    response is missing required fields, the row gets FALLBACK_AI_RESPONSE.
+    """
+    rows = []
+    for shipment in shipments.to_dict("records"):
+        try:
+            result = call_gemini(build_prompt(shipment, get_shipment_weather(shipment)))
+            if not all(k in result for k in RESPONSE_SCHEMA["required"]):
+                raise ValueError("Gemini response missing required fields")
+        except Exception as exc:
+            log.error("AI assessment failed for %s: %s", shipment["shipment_id"], exc)
+            result = FALLBACK_AI_RESPONSE
+        rows.append({**shipment, **result})
+    return pd.DataFrame(rows)
 
 
 def _weather(place: str) -> Dict[str, Any]:
