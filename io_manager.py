@@ -212,6 +212,17 @@ def show_details(assessments):
             print(f"    - {insight}")
 
 
+def show_risk_factors(assessments):
+    """Print one row per (shipment, risk factor) pair, for sorting or filtering by severity."""
+    print(
+        pd.json_normalize(
+            assessments.to_dict("records"),
+            record_path="risk_factors",
+            meta=["shipment_id", "expected_impact", "confidence_score"],
+        ).to_string(index=False)
+    )
+
+
 if __name__ == "__main__":
     print(input_method())
 
