@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from dataclasses import dataclass, field
 from enum import IntEnum
@@ -183,3 +183,28 @@ def rule_asset_reallocation(record, decision):
             decision.rationale.append(
                 "Rule 2: Severe Crosswinds noted, transport already suitable"
             )
+
+def rule_low_risk_validation(record, decision, data_manager, now):
+    """
+    Rule 3: never auto-approve a 'Low' route that recently failed.
+    Ask the Data Manager for the last 21 days of logs on this exact route.
+    """
+    if decision.overall_risk != "Low":
+        return
+
+    since = now - timedelta(days=HISTORY_WINDOW_DAYS)
+    past = data_manager.get_route_history(record["route_id"], since)
+    problem_runs = [p for p in past if p.get("flagged") or p.get("delayed")]
+
+    if problem_runs:
+        decision.needs_human = True
+        decision.hold_shipment = True
+        decision.flags.append("Cautionary Override")
+        decision.actions.append("Require human dispatcher sign-off")
+        decision.rationale.append(
+            f"Rule 3: AI says Low but {len(problem_runs)} shipment(s) on route "
+            f"{record['route_id']} were flagged or delayed in the last {HISTORY_WINDOW_DAYS} days"
+        )
+    else:
+        decision.rationale.append("Rule 3: Low risk and clean 21-day history, auto-approve")
+
