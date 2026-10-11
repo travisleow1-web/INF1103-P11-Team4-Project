@@ -164,6 +164,7 @@ def retry_with_smart_delay(
                     delay *= backoff_factor
         return wrapper
     return decorator
+
 # Add extract_shipment() to select the shipment fields used by the AI and cache key
 def extract_shipment(record: Dict[str, Any]) -> Dict[str, Any]:
     """Pick only the shipment fields the AI (and the cache key) care about."""
@@ -178,6 +179,10 @@ def build_prompt(shipment: Dict[str, Any], external: Dict[str, Any]) -> str:
 
 @retry_with_smart_delay(max_retries=MAX_RETRIES)
 def call_gemini(prompt: str) -> Dict[str, Any]:
+    api_key = get_api_key()
+    if api_key is None:
+        raise RuntimeError("GEMINI_API_KEY is not set")
+
     body = {
         "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
@@ -189,7 +194,7 @@ def call_gemini(prompt: str) -> Dict[str, Any]:
     }
     r = http_session.post(
         GEMINI_URL,
-        headers={"x-goog-api-key": GEMINI_API_KEY, "Content-Type": "application/json"},
+        headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
         json=body,
         timeout=HTTP_TIMEOUT * 2,
     )
@@ -198,3 +203,77 @@ def call_gemini(prompt: str) -> Dict[str, Any]:
     # responseSchema constrains Gemini to valid JSON matching our shape.
     raw_text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
     return json.loads(raw_text)
+
+def _geocode(place: str) -> Optional[Tuple[float, float]]:
+    r = http_session.get(
+        "https://geocoding-api.open-meteo.com/v1/search",
+        params={"name": place, "count": 1},
+        timeout=HTTP_TIMEOUT,
+    )
+    r.raise_for_status()
+    results = r.json().get("results")
+    if not results:
+        return None
+    return results[0]["latitude"], results[0]["longitude"]
+
+
+def _weather(place: str) -> Dict[str, Any]:
+    coords = _geocode(place)
+    if coords is None:
+        return {"place": place, "error": "location not found"}
+    lat, lon = coords
+    r = http_session.get(
+        "https://api.open-meteo.com/v1/forecast",
+        params={
+            "latitude": lat,
+            "longitude": lon,
+            "timezone": "auto",
+            "forecast_days": 7,
+            "daily": "precipitation_sum,wind_gusts_10m_max,weather_code",
+            "cell_selection": "sea",
+        },
+        timeout=HTTP_TIMEOUT,
+    )
+    r.raise_for_status()
+    return {"place": place, "source": "open-meteo.com", "daily": r.json().get("daily", {})}
+
+
+def _news(places: List[str]) -> List[Dict[str, Any]]:
+    place_q = " OR ".join(f'"{p}"' for p in places if p)
+    topic_q = 'piracy OR "armed robbery" OR "port congestion" OR strike OR protest OR unrest'
+    r = http_session.get(
+        "https://api.gdeltproject.org/api/v2/doc/doc",
+        params={
+            "query": f"({place_q}) ({topic_q})",
+            "mode": "ArtList",
+            "maxrecords": GDELT_MAX_RECORDS,
+            "format": "json",
+            "timespan": GDELT_TIMESPAN,
+        },
+        timeout=HTTP_TIMEOUT,
+    )
+    r.raise_for_status()
+    articles = r.json().get("articles", [])
+    return [{"title": a.get("title"), "url": a.get("url"), "seen": a.get("seendate")} for a in articles]
+
+
+def fetch_external_data(record: Dict[str, Any]) -> Dict[str, Any]:
+    places = [record.get("origin"), record.get("destination")] + list(record.get("waypoints", []))
+    places = [p for p in places if p]  # drop empty values
+
+    data: Dict[str, Any] = {"weather": [], "news": [], "errors": []}
+
+    for place in places[:MAX_PLACES_LIMIT]:
+        try:
+            data["weather"].append(_weather(place))
+        except Exception as exc:
+            log.warning("weather feed failed for %s: %s", place, exc)
+            data["errors"].append(f"weather:{place}")
+
+    try:
+        data["news"] = _news(places[:MAX_PLACES_LIMIT])
+    except Exception as exc:
+        log.warning("news feed failed: %s", exc)
+        data["errors"].append("news")
+
+    return data
