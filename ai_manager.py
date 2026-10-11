@@ -183,7 +183,8 @@ def call_gemini(prompt: str) -> Dict[str, Any]:
         "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {
-            "temperature": 0.2,
+            "temperature": 0,
+            "seed": 0,
             "responseMimeType": "application/json",
             "responseSchema": RESPONSE_SCHEMA,
         },
