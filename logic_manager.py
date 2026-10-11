@@ -288,4 +288,41 @@ def stakeholder_alerting(record, decision):
         _add_alert(decision, recipient, ["sms", "email"], summary)
 
 
+def escalation_protocol(decision):
+    """Final gate: anything needing a human is never marked as fully automatic."""
+    if decision.needs_human and decision.outcome == "PROCEED":
+        decision.outcome = "ESCALATE"
+    if decision.needs_human:
+        decision.actions.append("Route to human review queue")
 
+# --------------------------------------------------------------------------
+# MAIN ENTRY POINT
+# --------------------------------------------------------------------------
+
+def evaluate_shipment(ai_record, data_manager, now=None):
+    """
+    Run one AI-enriched record through every rule and return a Decision.
+    This is the only function IO_MANAGER needs to call.
+    """
+    now = now or datetime.now()
+    record = dict(ai_record)  # do not mutate the caller's data
+    decision = Decision(shipment_id=record.get("shipment_id", "UNKNOWN"))
+
+    # Part 1
+    if not validate_record(record, decision, now):
+        return decision
+
+    # Part 2
+    rule_perfect_storm(record, decision)
+    rule_asset_reallocation(record, decision)
+    rule_dynamic_insurance(record, decision)
+    rule_low_risk_validation(record, decision, data_manager, now)
+    rule_inventory_replacement(record, decision)
+    decide_outcome(record, decision)
+
+    # Part 3
+    check_financial_threshold(record, decision)
+    stakeholder_alerting(record, decision)
+    escalation_protocol(decision)
+
+    return decision
