@@ -1,0 +1,265 @@
+{
+  "description": "Static reference table of major maritime chokepoints/waypoints for the Supply Chain Risk Assessor project. Coordinates and geographic characterization are based on public knowledge (Wikipedia, UNCTAD Review of Maritime Transport, ReCAAP public reports). Security advisory, weather severity, and incident count fields are simplified/illustrative baseline values for coursework use, standing in for proprietary threat-intelligence and insurance data that isn't accessible to students -- adjust freely to fit your team's scenarios. Four open-ocean entries (North Pacific Ocean, North Atlantic Ocean, South Atlantic Ocean, Caribbean Sea) were added to cover long-haul crossings that the original strait/canal-focused list left with no matching waypoint at all -- notably trans-Pacific (US West Coast <-> East Asia) and trans-Atlantic (US East Coast / Europe) routes, which don't pass through any named strait.",
+  "schema": {
+    "name": "string - chokepoint/waypoint name",
+    "region": "string - ocean/sea region",
+    "lat": "float - approximate decimal degrees latitude",
+    "lon": "float - approximate decimal degrees longitude",
+    "security_advisory": "enum - none | watch | high-risk",
+    "weather_severity": "enum - calm | moderate | severe",
+    "baseline_incident_count": "int - simulated recent incident count, 0-10",
+    "notes": "string - brief context"
+  },
+  "waypoints": [
+    {
+      "name": "Strait of Malacca",
+      "region": "Southeast Asia / Indian Ocean - Pacific Ocean gateway",
+      "lat": 2.5,
+      "lon": 101.3,
+      "security_advisory": "watch",
+      "weather_severity": "moderate",
+      "baseline_incident_count": 6,
+      "notes": "One of the world's busiest shipping lanes; historically elevated petty theft/armed robbery incidents, monitored by regional patrols."
+    },
+    {
+      "name": "Singapore Strait",
+      "region": "Southeast Asia / Indian Ocean - Pacific Ocean gateway",
+      "lat": 1.2,
+      "lon": 103.8,
+      "security_advisory": "watch",
+      "weather_severity": "moderate",
+      "baseline_incident_count": 6,
+      "notes": "High vessel density anchorage area; recurring petty piracy/armed robbery incidents per ReCAAP reporting; collision/congestion risk."
+    },
+    {
+      "name": "Strait of Hormuz",
+      "region": "Persian Gulf / Arabian Sea gateway",
+      "lat": 26.6,
+      "lon": 56.25,
+      "security_advisory": "high-risk",
+      "weather_severity": "calm",
+      "baseline_incident_count": 5,
+      "notes": "Critical oil transit chokepoint; periodic geopolitical tension and vessel seizure incidents."
+    },
+    {
+      "name": "Bab-el-Mandeb",
+      "region": "Red Sea / Gulf of Aden gateway",
+      "lat": 12.6,
+      "lon": 43.3,
+      "security_advisory": "high-risk",
+      "weather_severity": "moderate",
+      "baseline_incident_count": 8,
+      "notes": "Red Sea entrance; history of piracy and, more recently, militant attacks on commercial shipping."
+    },
+    {
+      "name": "Gulf of Aden",
+      "region": "Northwest Indian Ocean",
+      "lat": 12.5,
+      "lon": 47.5,
+      "security_advisory": "high-risk",
+      "weather_severity": "moderate",
+      "baseline_incident_count": 7,
+      "notes": "Historic Somali piracy corridor; international naval patrol presence (e.g. combined task forces)."
+    },
+    {
+      "name": "Suez Canal",
+      "region": "Mediterranean Sea / Red Sea link",
+      "lat": 30.5,
+      "lon": 32.3,
+      "security_advisory": "watch",
+      "weather_severity": "calm",
+      "baseline_incident_count": 2,
+      "notes": "Major Asia-Europe shortcut; grounding/blockage risk (e.g. Ever Given 2021) rather than piracy."
+    },
+    {
+      "name": "Panama Canal",
+      "region": "Central America / Pacific-Atlantic link",
+      "lat": 9.08,
+      "lon": -79.68,
+      "security_advisory": "none",
+      "weather_severity": "moderate",
+      "baseline_incident_count": 1,
+      "notes": "Drought-driven draft/transit restrictions have periodically limited throughput in recent years."
+    },
+    {
+      "name": "Strait of Gibraltar",
+      "region": "Mediterranean Sea / Atlantic Ocean gateway",
+      "lat": 35.95,
+      "lon": -5.6,
+      "security_advisory": "watch",
+      "weather_severity": "moderate",
+      "baseline_incident_count": 1,
+      "notes": "Narrow, high-traffic strait; strong currents and periodic high winds."
+    },
+    {
+      "name": "Bosphorus Strait",
+      "region": "Black Sea / Sea of Marmara link",
+      "lat": 41.1,
+      "lon": 29.06,
+      "security_advisory": "watch",
+      "weather_severity": "moderate",
+      "baseline_incident_count": 1,
+      "notes": "Narrow urban strait through Istanbul; congestion and geopolitical sensitivity around Black Sea access."
+    },
+    {
+      "name": "Dardanelles Strait",
+      "region": "Aegean Sea / Sea of Marmara link",
+      "lat": 40.2,
+      "lon": 26.4,
+      "security_advisory": "watch",
+      "weather_severity": "moderate",
+      "baseline_incident_count": 1,
+      "notes": "Paired with the Bosphorus as the Turkish Straits; regulated transit."
+    },
+    {
+      "name": "Strait of Dover / English Channel",
+      "region": "North Sea / Atlantic Ocean",
+      "lat": 51.0,
+      "lon": 1.4,
+      "security_advisory": "none",
+      "weather_severity": "severe",
+      "baseline_incident_count": 1,
+      "notes": "One of the world's busiest shipping lanes; frequent fog and storms, collision risk from traffic density."
+    },
+    {
+      "name": "Taiwan Strait",
+      "region": "East Asia / Pacific Ocean",
+      "lat": 24.5,
+      "lon": 119.5,
+      "security_advisory": "watch",
+      "weather_severity": "moderate",
+      "baseline_incident_count": 3,
+      "notes": "Geopolitically sensitive; typhoon-affected season roughly May-Nov."
+    },
+    {
+      "name": "South China Sea",
+      "region": "East Asia / Pacific Ocean",
+      "lat": 10.0,
+      "lon": 114.0,
+      "security_advisory": "watch",
+      "weather_severity": "severe",
+      "baseline_incident_count": 5,
+      "notes": "Broad, heavily transited sea with territorial disputes and active typhoon season."
+    },
+    {
+      "name": "Cape of Good Hope",
+      "region": "South Atlantic / Indian Ocean link",
+      "lat": -34.35,
+      "lon": 18.47,
+      "security_advisory": "watch",
+      "weather_severity": "severe",
+      "baseline_incident_count": 3,
+      "notes": "Longer alternative to the Suez Canal; rough seas and increased traffic since Red Sea diversions began."
+    },
+    {
+      "name": "Strait of Magellan",
+      "region": "South Atlantic / South Pacific link",
+      "lat": -52.6,
+      "lon": -70.0,
+      "security_advisory": "none",
+      "weather_severity": "severe",
+      "baseline_incident_count": 1,
+      "notes": "Remote southern-tip route; harsh, unpredictable weather and strong currents."
+    },
+    {
+      "name": "Danish Straits (Oresund)",
+      "region": "Baltic Sea / North Sea link",
+      "lat": 55.7,
+      "lon": 12.7,
+      "security_advisory": "none",
+      "weather_severity": "moderate",
+      "baseline_incident_count": 1,
+      "notes": "Key Baltic Sea access point; shallow, congested, seasonal ice risk."
+    },
+    {
+      "name": "Lombok Strait",
+      "region": "Southeast Asia / Indian Ocean - Pacific Ocean gateway",
+      "lat": -8.5,
+      "lon": 115.7,
+      "security_advisory": "watch",
+      "weather_severity": "moderate",
+      "baseline_incident_count": 2,
+      "notes": "Deeper alternative to the Malacca Strait for larger vessels; less congested but less charted."
+    },
+    {
+      "name": "Sunda Strait",
+      "region": "Southeast Asia / Indian Ocean - Pacific Ocean gateway",
+      "lat": -6.0,
+      "lon": 105.8,
+      "security_advisory": "watch",
+      "weather_severity": "severe",
+      "baseline_incident_count": 3,
+      "notes": "Narrow strait near active volcanic region (Anak Krakatoa); tsunami and piracy risk history."
+    },
+    {
+      "name": "Mozambique Channel",
+      "region": "Southwest Indian Ocean",
+      "lat": -17.0,
+      "lon": 41.0,
+      "security_advisory": "watch",
+      "weather_severity": "severe",
+      "baseline_incident_count": 3,
+      "notes": "Cyclone-prone corridor between Madagascar and mainland Africa; periodic piracy spillover."
+    },
+    {
+      "name": "Korea Strait",
+      "region": "East Asia / Sea of Japan link",
+      "lat": 34.0,
+      "lon": 129.3,
+      "security_advisory": "none",
+      "weather_severity": "moderate",
+      "baseline_incident_count": 1,
+      "notes": "Busy route between Korea and Japan; typhoon-season weather risk."
+    },
+    {
+      "name": "Yucatan Channel",
+      "region": "Gulf of Mexico / Caribbean Sea link",
+      "lat": 21.5,
+      "lon": -85.5,
+      "security_advisory": "none",
+      "weather_severity": "moderate",
+      "baseline_incident_count": 1,
+      "notes": "Gulf of Mexico access point; Atlantic hurricane season (roughly June-Nov) risk."
+    },
+    {
+      "name": "North Pacific Ocean",
+      "region": "Open ocean - North America west coast / East Asia gateway",
+      "lat": 45.0,
+      "lon": 180.0,
+      "security_advisory": "none",
+      "weather_severity": "severe",
+      "baseline_incident_count": 2,
+      "notes": "Open-ocean crossing for US/Canada west coast <-> East Asia trade (e.g. Los Angeles/Long Beach <-> Shanghai). Great-circle routes curve up toward the Aleutians/high latitudes rather than running straight across; the Aleutian Low drives severe winter storms (roughly Nov-Mar) that are a leading cause of containers lost overboard on this corridor. No piracy/security concern, unlike the strait-based waypoints above."
+    },
+    {
+      "name": "North Atlantic Ocean",
+      "region": "Open ocean - North America east coast / Europe gateway",
+      "lat": 53.0,
+      "lon": -40.0,
+      "security_advisory": "none",
+      "weather_severity": "severe",
+      "baseline_incident_count": 1,
+      "notes": "Open-ocean crossing for US/Canada east coast <-> Northern Europe trade (e.g. New York <-> Rotterdam). Frequent North Atlantic gales and heavy winter seas; historically also an iceberg hazard at higher latitudes on the great-circle route."
+    },
+    {
+      "name": "South Atlantic Ocean",
+      "region": "Open ocean - South America east coast / Europe-Africa gateway",
+      "lat": -15.0,
+      "lon": -26.0,
+      "security_advisory": "none",
+      "weather_severity": "moderate",
+      "baseline_incident_count": 1,
+      "notes": "Open-ocean crossing for South America's east coast <-> Europe/Africa trade (e.g. Santos <-> Rotterdam). Generally calmer than the North Atlantic/North Pacific; outside the Atlantic hurricane belt, which stays north of the equator."
+    },
+    {
+      "name": "Caribbean Sea",
+      "region": "Caribbean Sea / Gulf of Mexico approach",
+      "lat": 15.0,
+      "lon": -75.0,
+      "security_advisory": "watch",
+      "weather_severity": "severe",
+      "baseline_incident_count": 2,
+      "notes": "Links the US Gulf Coast (e.g. Houston) and the Panama Canal approach with the wider Atlantic; squarely within the Atlantic hurricane belt (roughly June-Nov), and has reported armed robbery/theft incidents at anchorages, lower in frequency than the Strait of Malacca / Singapore Strait."
+    }
+  ]
+}
