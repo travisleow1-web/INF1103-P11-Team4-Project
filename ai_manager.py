@@ -299,13 +299,15 @@ def fetch_news(shipment: Dict[str, Any]) -> Optional[List[Dict[str, Any]]]:
 def assess_shipments(shipments: pd.DataFrame) -> pd.DataFrame:
     """Return one row per shipment: the original columns plus Gemini's response fields.
 
-    The weather is only used inside the prompt. If the API call fails or the
+    The weather and news are only used inside the prompt. If the API call fails or the
     response is missing required fields, the row gets FALLBACK_AI_RESPONSE.
     """
     rows = []
     for shipment in shipments.to_dict("records"):
         try:
-            result = call_gemini(build_prompt(shipment, get_shipment_weather(shipment)))
+            result = call_gemini(build_prompt(
+                shipment, {"weather": get_shipment_weather(shipment), "news": fetch_news(shipment)}
+            ))
             if not all(k in result for k in RESPONSE_SCHEMA["required"]):
                 raise ValueError("Gemini response missing required fields")
         except Exception as exc:
