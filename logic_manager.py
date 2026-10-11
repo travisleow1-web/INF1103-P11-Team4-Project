@@ -60,3 +60,20 @@ class Decision:
     actions: list = field(default_factory=list)    # business actions to carry out
     alerts: list = field(default_factory=list)     # dicts: who / channel / message
     rationale: list = field(default_factory=list)  # audit trail (why each rule fired)
+
+# --------------------------------------------------------------------------
+# Helper functions
+# --------------------------------------------------------------------------
+def _level(text):
+    """Convert 'Medium' / 'medium' / 'MEDIUM' into a Level. Unknown -> LOW."""
+    return LEVEL_FROM_TEXT.get(str(text).strip().lower(), Level.LOW)
+
+def _key(text):
+    """Normalise labels like 'Piracy Threat' -> 'piracy_threat'."""
+    return str(text).strip().lower().replace(" ", "_")
+
+
+def _add_alert(decision, recipient, channels, message):
+    decision.alerts.append(
+        {"recipient": recipient, "channels": channels, "message": message}
+    )
