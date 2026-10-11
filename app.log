@@ -1,0 +1,1 @@
+2026-10-11 23:27:36 [WARNING] ai_manager: weather feed failed for T destination: 400 Client Error: Bad Request for url: https://api.open-meteo.com/v1/forecast?latitude=999&longitude=121.5&timezone=auto&forecast_days=7&daily=precipitation_sum%2Cwind_gusts_10m_max%2Cweather_code&cell_selection=sea

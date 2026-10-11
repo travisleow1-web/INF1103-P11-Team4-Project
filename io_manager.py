@@ -193,7 +193,8 @@ def show_weather(shipment, weather):
 
     weather is the dict from ai_manager.get_shipment_weather; an end whose
     feed failed is None and is reported as unavailable. Each day shows the
-    highest wind and gust, the lowest pressure and the lowest visibility.
+    highest wind, gust and wave values, the lowest pressure and the lowest
+    visibility; "-" marks a day with no data.
     """
     print(f"\n{shipment['shipment_id']}: {shipment['origin_port']} -> {shipment['destination_port']}")
     for end in ("origin", "destination"):
@@ -206,10 +207,15 @@ def show_weather(shipment, weather):
         gust = daily_stat(hourly, "wind_gusts_10m", max)
         pressure = daily_stat(hourly, "pressure_msl", min)
         visibility = daily_stat(hourly, "visibility", min)
+        wave = daily_stat(hourly, "wave_height", max)
+        swell = daily_stat(hourly, "swell_wave_height", max)
+        period = daily_stat(hourly, "wave_period", max)
         for day in sorted({stamp[:10] for stamp in hourly["time"]}):
             print(
                 f"    {day}  wind {wind.get(day, '-')} km/h  gust {gust.get(day, '-')} km/h"
                 f"  pressure {pressure.get(day, '-')} hPa  visibility {visibility.get(day, '-')} m"
+                f"  wave {wave.get(day, '-')} m  swell {swell.get(day, '-')} m"
+                f"  period {period.get(day, '-')} s"
             )
 
 

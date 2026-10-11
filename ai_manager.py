@@ -16,8 +16,6 @@ MAX_PLACES_LIMIT = 4
 GDELT_MAX_RECORDS = 8
 GDELT_TIMESPAN = "3d"
 TIMEZONE = "Asia/Singapore"
-FORECAST_DAYS = 16  # Open-Meteo's maximum
-WEATHER_VARIABLES = ("wind_speed_10m", "wind_gusts_10m", "pressure_msl", "visibility")
 
 # Exactly the columns io_manager.input_method() returns, in the same order.
 SHIPMENT_FIELDS = (
@@ -216,25 +214,35 @@ def _geocode(place: str) -> Optional[Tuple[float, float]]:
 
 
 def fetch_weather(lat: float, lon: float) -> Dict[str, Any]:
-    """Return the hourly Open-Meteo forecast (WEATHER_VARIABLES) for a coordinate pair.
+    """Return 16 days (Open-Meteo's maximum) of hourly weather and wave data.
 
-    Covers FORECAST_DAYS days; the dict has a "time" list plus one list per
-    variable. Raises on network/HTTP errors; callers decide how to handle failure.
+    Raises on network/HTTP errors; callers decide how to handle failure.
     """
-    r = http_session.get(
-        "https://api.open-meteo.com/v1/forecast",
-        params={
-            "latitude": lat,
-            "longitude": lon,
-            "timezone": "auto",
-            "forecast_days": FORECAST_DAYS,
-            "hourly": ",".join(WEATHER_VARIABLES),
-            "cell_selection": "sea",
-        },
-        timeout=HTTP_TIMEOUT,
-    )
-    r.raise_for_status()
-    return r.json().get("hourly", {})
+    return {
+        **http_session.get(
+            "https://api.open-meteo.com/v1/forecast",
+            params={
+                "latitude": lat,
+                "longitude": lon,
+                "timezone": "auto",
+                "forecast_days": 16,
+                "hourly": "wind_speed_10m,wind_gusts_10m,pressure_msl,visibility",
+                "cell_selection": "sea",
+            },
+            timeout=HTTP_TIMEOUT,
+        ).json()["hourly"],
+        **http_session.get(
+            "https://marine-api.open-meteo.com/v1/marine",
+            params={
+                "latitude": lat,
+                "longitude": lon,
+                "timezone": "auto",
+                "forecast_days": 16,
+                "hourly": "wave_height,swell_wave_height,wave_period",
+            },
+            timeout=HTTP_TIMEOUT,
+        ).json()["hourly"],
+    }
 
 
 def get_shipment_weather(shipment: Dict[str, Any]) -> Dict[str, Any]:
