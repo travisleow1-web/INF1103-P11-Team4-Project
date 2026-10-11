@@ -234,6 +234,22 @@ def fetch_weather(lat: float, lon: float) -> Dict[str, Any]:
     return r.json().get("daily", {})
 
 
+def get_shipment_weather(shipment: Dict[str, Any]) -> Dict[str, Any]:
+    """Fetch the forecast at a shipment's origin and destination coordinates.
+
+    A failed fetch is logged and stored as None, so one bad feed never stops
+    the run.
+    """
+    weather = {}
+    for end in ("origin", "destination"):
+        try:
+            weather[end] = fetch_weather(shipment[f"{end}_lat"], shipment[f"{end}_lon"])
+        except Exception as exc:
+            log.warning("weather feed failed for %s %s: %s", shipment.get("shipment_id"), end, exc)
+            weather[end] = None
+    return weather
+
+
 def _weather(place: str) -> Dict[str, Any]:
     coords = _geocode(place)
     if coords is None:
