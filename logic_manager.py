@@ -170,4 +170,30 @@ def rule_dynamic_insurance(record, decision):
         if decision.overall_risk != "High":
             decision.overall_risk = "High"
 
+def rule_inventory_replacement(record, decision):
+    """
+    Rule 5: cargo likely destroyed by a sudden extreme event
+    (e.g. Category 5 hurricane at the origin port) -> Procurement Alert.
+    Do not just stop the shipment: tell the company to reorder now.
+    """
+    impact = _key(record["expected_impact"])
+    event = _key(record.get("extreme_event", ""))
+    at_origin = _key(record["affected_location"]) == _key(record["origin"])
+
+    cargo_destruction_likely = impact in {"cargo_destruction", "total_loss"}
+    if cargo_destruction_likely and event and at_origin:
+        decision.hold_shipment = True
+        decision.flags.append("Procurement Alert")
+        decision.actions.append(
+            f"Reorder goods immediately: {record['goods']['description']} "
+            f"(extreme event: {record['extreme_event']})"
+        )
+        _add_alert(
+            decision, "procurement_team", ["email", "sms"],
+            f"Shipment {record['shipment_id']} is at risk of destruction. "
+            f"Consider reordering to avoid stock-out.",
+        )
+        decision.rationale.append(
+            "Rule 5: cargo destruction predicted from an extreme event at origin"
+        )
 
