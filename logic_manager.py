@@ -78,3 +78,75 @@ def _add_alert(decision, recipient, channels, message):
         {"recipient": recipient, "channels": channels, "message": message}
     )
 
+# --------------------------------------------------------------------------
+# PART 2: OPERATIONAL DECISION MAKING
+# --------------------------------------------------------------------------
+
+def rule_perfect_storm(record, decision):
+    """
+    Rule 1: several smaller risks combine into one emergency.
+    Medium Rain + Medium Port Congestion + Medium Labor Shortage -> High Risk.
+    """
+    levels = {_key(r["type"]): _level(r["severity"]) for r in record["risk_factors"]}
+
+    # Any single High factor already makes the shipment High risk
+    if any(lv == Level.HIGH for lv in levels.values()):
+        decision.overall_risk = "High"
+        decision.rationale.append("Rule 1: at least one risk factor is High")
+
+    mediums = [
+        f for f in PERFECT_STORM_FACTORS
+        if levels.get(f, Level.LOW) >= Level.MEDIUM
+    ]
+    if len(mediums) >= PERFECT_STORM_MIN_MEDIUMS:
+        decision.overall_risk = "High"
+        decision.flags.append("Perfect Storm")
+        decision.rationale.append(
+            f"Rule 1 (Perfect Storm): {', '.join(sorted(mediums))} all >= Medium, upgraded to High"
+        )
+    elif decision.overall_risk != "High" and any(lv == Level.MEDIUM for lv in levels.values()):
+        decision.overall_risk = "Medium"
+
+def rule_asset_reallocation(record, decision):
+    """
+    Rule 2: Severe Crosswinds on a Light Freight vehicle -> reassign to Heavy Freight.
+    """
+    factor_keys = {_key(r["type"]) for r in record["risk_factors"]}
+    primary = _key(record["primary_risk_factor"])
+
+    if "severe_crosswinds" in factor_keys or primary == "severe_crosswinds":
+        if record["transport_type"] == "Light Freight":
+            record["transport_type"] = "Heavy Freight"
+            decision.actions.append("Reassign load to a Heavy Freight carrier")
+            decision.flags.append("Asset Reallocated")
+            decision.rationale.append(
+                "Rule 2: Severe Crosswinds + Light Freight, moved to Heavy Freight (rollover risk)"
+            )
+        else:
+            decision.rationale.append(
+                "Rule 2: Severe Crosswinds noted, transport already suitable"
+            )
+
+def rule_low_risk_validation(record, decision, data_manager, now):
+    """
+    Rule 3: never auto-approve a 'Low' route that recently failed.
+    Ask the Data Manager for the last 21 days of logs on this exact route.
+    """
+    if decision.overall_risk != "Low":
+        return
+
+    since = now - timedelta(days=HISTORY_WINDOW_DAYS)
+    past = data_manager.get_route_history(record["route_id"], since)
+    problem_runs = [p for p in past if p.get("flagged") or p.get("delayed")]
+
+    if problem_runs:
+        decision.needs_human = True
+        decision.hold_shipment = True
+        decision.flags.append("Cautionary Override")
+        decision.actions.append("Require human dispatcher sign-off")
+        decision.rationale.append(
+            f"Rule 3: AI says Low but {len(problem_runs)} shipment(s) on route "
+            f"{record['route_id']} were flagged or delayed in the last {HISTORY_WINDOW_DAYS} days"
+        )
+    else:
+        decision.rationale.append("Rule 3: Low risk and clean 21-day history, auto-approve")
