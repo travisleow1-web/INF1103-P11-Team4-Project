@@ -175,50 +175,6 @@ def csv_shipments():
     return df
 
 
-def daily_stat(hourly, variable, pick):
-    """Collapse an hourly series to one value per day, as {"YYYY-MM-DD": value}.
-
-    pick (e.g. max or min) is applied to each day's non-missing readings;
-    days with no readings are left out.
-    """
-    by_day = {}
-    for stamp, value in zip(hourly["time"], hourly[variable]):
-        if value is not None:
-            by_day.setdefault(stamp[:10], []).append(value)
-    return {day: pick(values) for day, values in by_day.items()}
-
-
-def show_weather(shipment, weather):
-    """Print a per-day forecast summary at a shipment's origin and destination.
-
-    weather is the dict from ai_manager.get_shipment_weather; an end whose
-    feed failed is None and is reported as unavailable. Each day shows the
-    highest wind, gust and wave values, the lowest pressure and the lowest
-    visibility; "-" marks a day with no data.
-    """
-    print(f"\n{shipment['shipment_id']}: {shipment['origin_port']} -> {shipment['destination_port']}")
-    for end in ("origin", "destination"):
-        print(f"  {end.capitalize()} ({shipment[f'{end}_port']}) forecast:")
-        hourly = weather[end]
-        if hourly is None:
-            print("    weather unavailable")
-            continue
-        wind = daily_stat(hourly, "wind_speed_10m", max)
-        gust = daily_stat(hourly, "wind_gusts_10m", max)
-        pressure = daily_stat(hourly, "pressure_msl", min)
-        visibility = daily_stat(hourly, "visibility", min)
-        wave = daily_stat(hourly, "wave_height", max)
-        swell = daily_stat(hourly, "swell_wave_height", max)
-        period = daily_stat(hourly, "wave_period", max)
-        for day in sorted({stamp[:10] for stamp in hourly["time"]}):
-            print(
-                f"    {day}  wind {wind.get(day, '-')} km/h  gust {gust.get(day, '-')} km/h"
-                f"  pressure {pressure.get(day, '-')} hPa  visibility {visibility.get(day, '-')} m"
-                f"  wave {wave.get(day, '-')} m  swell {swell.get(day, '-')} m"
-                f"  period {period.get(day, '-')} s"
-            )
-
-
 def show_assessments(assessments):
     """Print the assessments DataFrame with one column per shipment and one row per field."""
     with pd.option_context("display.max_colwidth", None):
