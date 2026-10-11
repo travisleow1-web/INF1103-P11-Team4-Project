@@ -5,6 +5,7 @@ import requests
 import time
 import random
 import pandas as pd
+import validator
 from typing import Optional, Dict, Any, List, Tuple, Callable
 
 # --------------------------------------------------------------------------
@@ -261,6 +262,38 @@ def get_shipment_weather(shipment: Dict[str, Any]) -> Dict[str, Any]:
             log.warning("weather feed failed for %s %s: %s", shipment.get("shipment_id"), end, exc)
             weather[end] = None
     return weather
+
+
+def fetch_news(shipment: Dict[str, Any]) -> Optional[List[Dict[str, Any]]]:
+    """Return recent GDELT headlines about risks at a shipment's origin and destination ports.
+
+    Returns [] when GDELT has no matching articles and None if the feed fails
+    (logged), so one bad feed never stops the run. GDELT allows one request
+    every 5 seconds, hence the sleep.
+    """
+    time.sleep(5)
+    try:
+        return [
+            {"title": a["title"], "seen": a["seendate"]}
+            for a in http_session.get(
+                "https://api.gdeltproject.org/api/v2/doc/doc",
+                params={
+                    "query": (
+                        f'("{validator.PORTS_BY_CODE[shipment["origin_port"]]["name"]}"'
+                        f' OR "{validator.PORTS_BY_CODE[shipment["destination_port"]]["name"]}")'
+                        ' (piracy OR "armed robbery" OR "port congestion" OR strike OR protest OR unrest)'
+                    ),
+                    "mode": "ArtList",
+                    "maxrecords": 8,
+                    "format": "json",
+                    "timespan": "3d",
+                },
+                timeout=HTTP_TIMEOUT,
+            ).json().get("articles", [])
+        ]
+    except Exception as exc:
+        log.warning("news feed failed for %s: %s", shipment.get("shipment_id"), exc)
+        return None
 
 
 def assess_shipments(shipments: pd.DataFrame) -> pd.DataFrame:
