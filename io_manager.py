@@ -23,12 +23,6 @@ def ask_port(message, validate=validator.validate_port):
     return answer.split(" - ")[0].strip().upper()
 
 
-def shipment_id():
-    """Prompt for a shipment ID and return it as typed (not validated yet)."""
-    answer = questionary.text("Shipment ID:").ask()
-    return answer
-
-
 def origin_port():
     """Prompt for the origin port and return its code."""
     return ask_port("Origin port:")
@@ -57,13 +51,15 @@ def departure_time():
     return answer.strip()
 
 
-def arrival_time():
-    """Prompt for the arrival date, re-asking until it is a valid DD/MM/YYYY.
+def arrival_time(departure):
+    """Prompt for the arrival date, re-asking until it is a valid DD/MM/YYYY after departure.
 
-    Returns the date as a string with surrounding whitespace removed.
+    The departure date string is rejected as an arrival, as is anything
+    earlier. Returns the date as a string with surrounding whitespace removed.
     """
     answer = questionary.text(
-        "Arrival time (DD/MM/YYYY):", validate=validator.validate_date
+        "Arrival time (DD/MM/YYYY):",
+        validate=lambda answer: validator.validate_arrival_date(answer, departure),
     ).ask()
     return answer.strip()
 
@@ -72,12 +68,12 @@ def manual_shipments():
     """Collect one or more shipments from the user and return them as a DataFrame.
 
     Each loop asks for one shipment's fields and appends them to one list per
-    column. Port latitude/longitude are looked up from the port reference, not
-    asked for. After each shipment the user chooses whether to add another.
+    column. Shipment IDs are not asked for; input_method assigns them. Port
+    latitude/longitude are looked up from the port reference, not asked for.
+    After each shipment the user chooses whether to add another.
     The lists are then combined into a DataFrame with one row per shipment.
     """
     # One list per output column; index i across all lists is shipment i.
-    ids = []
     origin_ports = []
     origin_lats = []
     origin_lons = []
@@ -87,8 +83,6 @@ def manual_shipments():
     departure_times = []
     arrival_times = []
     while True:
-        ids.append(shipment_id())
-
         # Fill in the origin's coordinates from the chosen port code.
         origin = origin_port()
         origin_lat, origin_lon = validator.port_coordinates(origin)
@@ -103,8 +97,9 @@ def manual_shipments():
         destination_lats.append(destination_lat)
         destination_lons.append(destination_lon)
 
-        departure_times.append(departure_time())
-        arrival_times.append(arrival_time())
+        departure = departure_time()
+        departure_times.append(departure)
+        arrival_times.append(arrival_time(departure))
 
         if questionary.confirm("Add another shipment?").ask():
             continue
@@ -113,7 +108,6 @@ def manual_shipments():
     # Explicit dtypes keep columns typed correctly even when the lists are empty.
     return pd.DataFrame(
         {
-            "shipment_id": pd.Series(ids, dtype="str"),
             "origin_port": pd.Series(origin_ports, dtype="str"),
             "origin_lat": pd.Series(origin_lats, dtype="float"),
             "origin_lon": pd.Series(origin_lons, dtype="float"),
@@ -126,15 +120,29 @@ def manual_shipments():
     )
 
 
+def assign_shipment_ids(df):
+    """Return df with a shipment_id column first, numbered SHP-001, SHP-002, ... in row order.
+
+    Any shipment_id already in df (e.g. from a CSV file) is replaced, so CSV
+    and manual shipments are numbered the same way.
+    """
+    df = df.drop(columns="shipment_id", errors="ignore")
+    df.insert(0, "shipment_id", [f"SHP-{i:03d}" for i in range(1, len(df) + 1)])
+    return df
+
+
 def input_method():
-    """Ask whether shipments are entered manually or loaded from a CSV file."""
+    """Ask whether shipments are entered manually or loaded from a CSV file.
+
+    Returns the shipments as a DataFrame with automatically assigned IDs.
+    """
     selection = questionary.select(
         "How do you want to add shipments?",
         choices=["Enter manually", "Upload a CSV file"],
     ).ask()
     if selection == "Upload a CSV file":
-        return csv_shipments()
-    return manual_shipments()
+        return assign_shipment_ids(csv_shipments())
+    return assign_shipment_ids(manual_shipments())
 
 
 def csv_shipments():
@@ -143,6 +151,8 @@ def csv_shipments():
     The file needs the columns in CSV_COLUMNS; port lat/lon are looked up from
     the port reference like in manual entry. If the file can't be read or any
     row is invalid, the errors are shown and the user is asked for a path again.
+    Once the file loads, the user chooses whether to add further shipments;
+    those are entered manually and appended below the CSV rows.
     """
     while True:
         path = questionary.path("CSV file path:", validate=validator.validate_csv_path).ask()
@@ -158,6 +168,12 @@ def csv_shipments():
             print(f"Could not read file: {e}")
             continue
         print(df)
+        break
+
+    if questionary.confirm("Add further shipments manually?").ask():
+        return pd.concat([df, manual_shipments()], ignore_index=True)
+    return df
+
 
 if __name__ == "__main__":
     print(input_method())

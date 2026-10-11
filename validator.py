@@ -41,6 +41,20 @@ def validate_date(text):
     return True
 
 
+def validate_arrival_date(text, departure):
+    """Check that text is a valid DD/MM/YYYY date after departure, for use as a questionary validator.
+
+    departure is the already entered departure date string. Returns True when
+    valid, otherwise an error message string.
+    """
+    result = validate_date(text)
+    if result is not True:
+        return result
+    if datetime.strptime(text.strip(), "%d/%m/%Y") <= datetime.strptime(departure, "%d/%m/%Y"):
+        return "Arrival must be after the departure date."
+    return True
+
+
 def validate_port(answer):
     """Check that answer is exactly one of PORT_CHOICES, for use as a questionary validator.
 
