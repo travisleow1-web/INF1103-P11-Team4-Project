@@ -198,6 +198,20 @@ def show_summary(assessments):
     print(pd.DataFrame(rows).to_string(index=False))
 
 
+def show_details(assessments):
+    """Print a text block per shipment: header, each risk factor, then the insights."""
+    for a in assessments.to_dict("records"):
+        print(
+            f"\n{a['shipment_id']} | impact: {a['expected_impact']}"
+            f" | confidence: {a['confidence_score']}"
+        )
+        for f in a["risk_factors"]:
+            print(f"    [{f['severity']}] {f['type']}: {f['detail']}")
+        print("  Insights:")
+        for insight in a["insights"]:
+            print(f"    - {insight}")
+
+
 if __name__ == "__main__":
     print(input_method())
 
