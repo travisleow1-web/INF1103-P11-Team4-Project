@@ -5,6 +5,7 @@ import requests
 import time
 import random
 import pandas as pd
+import data_manager
 import validator
 from typing import Optional, Dict, Any, List, Tuple, Callable
 
@@ -283,19 +284,26 @@ def fetch_news(shipment: Dict[str, Any]) -> Optional[List[Dict[str, Any]]]:
 def assess_shipments(shipments: pd.DataFrame) -> pd.DataFrame:
     """Return one row per shipment: the original columns plus Gemini's response fields.
 
-    The weather and news are only used inside the prompt. If the API call fails or the
-    response is missing required fields, the row gets FALLBACK_AI_RESPONSE.
+    The weather and news are only used inside the prompt and the saved file. If
+    the API call fails or the response is missing required fields, the row gets
+    FALLBACK_AI_RESPONSE. Each shipment's input row, weather, news and AI response
+    are also saved together in data_manager.PROCESSED_FILE, keyed by shipment_id.
     """
     rows = []
+    processed = {}
     for shipment in shipments.to_dict("records"):
+        external = {"weather": get_shipment_weather(shipment), "news": fetch_news(shipment)}
         try:
-            result = call_gemini(build_prompt(
-                shipment, {"weather": get_shipment_weather(shipment), "news": fetch_news(shipment)}
-            ))
+            result = call_gemini(build_prompt(shipment, external))
             if not all(k in result for k in RESPONSE_SCHEMA["required"]):
                 raise ValueError("Gemini response missing required fields")
         except Exception as exc:
             log.error("AI assessment failed for %s: %s", shipment["shipment_id"], exc)
             result = FALLBACK_AI_RESPONSE
         rows.append({**shipment, **result})
+        processed[shipment["shipment_id"]] = {"shipment": shipment, **external, "ai_response": result}
+    try:
+        data_manager.save_records(processed, data_manager.PROCESSED_FILE)
+    except (OSError, TypeError) as exc:
+        log.error("could not save %s: %s", data_manager.PROCESSED_FILE, exc)
     return pd.DataFrame(rows)
