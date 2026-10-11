@@ -175,10 +175,27 @@ def csv_shipments():
     return df
 
 
-def show_assessments(assessments):
-    """Print the assessments DataFrame with one column per shipment and one row per field."""
-    with pd.option_context("display.max_colwidth", None):
-        print(assessments.T.to_string())
+def show_summary(assessments):
+    """Print one aligned row per shipment with scalar fields only.
+
+    primary_severity is the severity of the risk factor matching
+    primary_risk_factor ("-" if the AI listed none).
+    """
+    rows = [
+        {
+            "shipment_id": a["shipment_id"],
+            "expected_impact": a["expected_impact"],
+            "confidence_score": a["confidence_score"],
+            "primary_factor": a["primary_risk_factor"],
+            "primary_severity": next(
+                (f["severity"] for f in a["risk_factors"] if f["type"] == a["primary_risk_factor"]), "-"
+            ),
+            "n_risk_factors": len(a["risk_factors"]),
+            "conflicting_sources": a["conflicting_sources"],
+        }
+        for a in assessments.to_dict("records")
+    ]
+    print(pd.DataFrame(rows).to_string(index=False))
 
 
 if __name__ == "__main__":
