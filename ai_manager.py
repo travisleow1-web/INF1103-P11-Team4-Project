@@ -170,3 +170,26 @@ def build_prompt(shipment: Dict[str, Any], external: Dict[str, Any]) -> str:
         "SHIPMENT:\n" + json.dumps(shipment, default=str)
         + "\n\nEXTERNAL DATA:\n" + json.dumps(external, default=str)
     )
+
+@retry_with_smart_delay(max_retries=MAX_RETRIES)
+def call_gemini(prompt: str) -> Dict[str, Any]:
+    body = {
+        "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": 0.2,
+            "responseMimeType": "application/json",
+            "responseSchema": RESPONSE_SCHEMA,
+        },
+    }
+    r = http_session.post(
+        GEMINI_URL,
+        headers={"x-goog-api-key": GEMINI_API_KEY, "Content-Type": "application/json"},
+        json=body,
+        timeout=HTTP_TIMEOUT * 2,
+    )
+    r.raise_for_status()
+
+    # responseSchema constrains Gemini to valid JSON matching our shape.
+    raw_text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
+    return json.loads(raw_text)
