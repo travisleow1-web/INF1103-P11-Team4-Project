@@ -150,3 +150,24 @@ def rule_low_risk_validation(record, decision, data_manager, now):
         )
     else:
         decision.rationale.append("Rule 3: Low risk and clean 21-day history, auto-approve")
+
+def rule_dynamic_insurance(record, decision):
+    """
+    Rule 4: Piracy Threat or Severe Civil Unrest -> update financial profile
+    and hold until a human confirms extended insurance was bought.
+    """
+    factor_keys = {_key(r["type"]) for r in record["risk_factors"]}
+    triggered = INSURANCE_TRIGGERS & (factor_keys | {_key(record["primary_risk_factor"])})
+
+    if triggered:
+        decision.hold_shipment = True
+        decision.needs_human = True
+        decision.flags.append("Premium Increase Required")
+        decision.actions.append("Update financial profile: extended insurance needed")
+        decision.rationale.append(
+            f"Rule 4: {', '.join(sorted(triggered))} detected, holding until insurance confirmed"
+        )
+        if decision.overall_risk != "High":
+            decision.overall_risk = "High"
+
+
