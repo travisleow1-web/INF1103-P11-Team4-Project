@@ -14,9 +14,6 @@ from typing import Optional, Dict, Any, List, Tuple, Callable
 CACHE_FILE = "ai_cache.json"
 MAX_RETRIES = 3
 HTTP_TIMEOUT = 20
-MAX_PLACES_LIMIT = 4
-GDELT_MAX_RECORDS = 8
-GDELT_TIMESPAN = "3d"
 TIMEZONE = "Asia/Singapore"
 
 # Exactly the columns io_manager.input_method() returns, in the same order.
@@ -203,19 +200,6 @@ def call_gemini(prompt: str) -> Dict[str, Any]:
     raw_text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
     return json.loads(raw_text)
 
-def _geocode(place: str) -> Optional[Tuple[float, float]]:
-    r = http_session.get(
-        "https://geocoding-api.open-meteo.com/v1/search",
-        params={"name": place, "count": 1},
-        timeout=HTTP_TIMEOUT,
-    )
-    r.raise_for_status()
-    results = r.json().get("results")
-    if not results:
-        return None
-    return results[0]["latitude"], results[0]["longitude"]
-
-
 def fetch_weather(lat: float, lon: float) -> Dict[str, Any]:
     """Return 16 days (Open-Meteo's maximum) of hourly weather and wave data.
 
@@ -315,65 +299,3 @@ def assess_shipments(shipments: pd.DataFrame) -> pd.DataFrame:
             result = FALLBACK_AI_RESPONSE
         rows.append({**shipment, **result})
     return pd.DataFrame(rows)
-
-
-def _weather(place: str) -> Dict[str, Any]:
-    coords = _geocode(place)
-    if coords is None:
-        return {"place": place, "error": "location not found"}
-    lat, lon = coords
-    r = http_session.get(
-        "https://api.open-meteo.com/v1/forecast",
-        params={
-            "latitude": lat,
-            "longitude": lon,
-            "timezone": "auto",
-            "forecast_days": 7,
-            "daily": "precipitation_sum,wind_gusts_10m_max,weather_code",
-            "cell_selection": "sea",
-        },
-        timeout=HTTP_TIMEOUT,
-    )
-    r.raise_for_status()
-    return {"place": place, "source": "open-meteo.com", "daily": r.json().get("daily", {})}
-
-
-def _news(places: List[str]) -> List[Dict[str, Any]]:
-    place_q = " OR ".join(f'"{p}"' for p in places if p)
-    topic_q = 'piracy OR "armed robbery" OR "port congestion" OR strike OR protest OR unrest'
-    r = http_session.get(
-        "https://api.gdeltproject.org/api/v2/doc/doc",
-        params={
-            "query": f"({place_q}) ({topic_q})",
-            "mode": "ArtList",
-            "maxrecords": GDELT_MAX_RECORDS,
-            "format": "json",
-            "timespan": GDELT_TIMESPAN,
-        },
-        timeout=HTTP_TIMEOUT,
-    )
-    r.raise_for_status()
-    articles = r.json().get("articles", [])
-    return [{"title": a.get("title"), "url": a.get("url"), "seen": a.get("seendate")} for a in articles]
-
-
-def fetch_external_data(record: Dict[str, Any]) -> Dict[str, Any]:
-    places = [record.get("origin"), record.get("destination")] + list(record.get("waypoints", []))
-    places = [p for p in places if p]  # drop empty values
-
-    data: Dict[str, Any] = {"weather": [], "news": [], "errors": []}
-
-    for place in places[:MAX_PLACES_LIMIT]:
-        try:
-            data["weather"].append(_weather(place))
-        except Exception as exc:
-            log.warning("weather feed failed for %s: %s", place, exc)
-            data["errors"].append(f"weather:{place}")
-
-    try:
-        data["news"] = _news(places[:MAX_PLACES_LIMIT])
-    except Exception as exc:
-        log.warning("news feed failed: %s", exc)
-        data["errors"].append("news")
-
-    return data
