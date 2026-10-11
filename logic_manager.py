@@ -229,3 +229,45 @@ def decide_outcome(record, decision):
         decision.outcome = "ESCALATE"
 
 
+# --------------------------------------------------------------------------
+# PART 3: ESCALATION PROTOCOLS
+# --------------------------------------------------------------------------
+
+def check_financial_threshold(record, decision):
+    """
+    If an automated reroute adds more than 20% distance, stop the auto-reroute
+    and send an 'Excessive Cost' alert to the Operations Director.
+    """
+    if decision.outcome != "REROUTE":
+        return
+
+    base = record.get("baseline_distance_km")
+    new = record.get("alternative_route", {}).get("distance_km")
+    if not base or not new:
+        decision.needs_human = True
+        decision.flags.append("Reroute distance unknown")
+        decision.rationale.append("Financial check: cannot compare distances, needs human")
+        return
+
+    increase_pct = (new - base) / base * 100
+    if increase_pct > REROUTE_COST_LIMIT_PCT:
+        decision.outcome = "ESCALATE"
+        decision.hold_shipment = True
+        decision.needs_human = True
+        decision.flags.append("Excessive Cost")
+        decision.actions = [a for a in decision.actions if not a.startswith("Reroute")]
+        decision.actions.append("Automatic rerouting stopped")
+        _add_alert(
+            decision, "operations_director", ["email"],
+            f"Excessive Cost: reroute for {record['shipment_id']} adds "
+            f"{increase_pct:.1f}% distance (limit {REROUTE_COST_LIMIT_PCT:.0f}%).",
+        )
+        decision.rationale.append(
+            f"Financial check: reroute +{increase_pct:.1f}% > {REROUTE_COST_LIMIT_PCT:.0f}%, stopped"
+        )
+    else:
+        decision.rationale.append(
+            f"Financial check: reroute +{increase_pct:.1f}% is within the limit"
+        )
+
+
