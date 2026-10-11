@@ -44,6 +44,32 @@ def get_route_history(db_records, route_id, since):
       out.append({"date": saved, "flagged": r["flagged"], "delayed": r["delayed"]})
   return out
 
+def query_records(db_records, filter):
+  """Used by IO Manager filter/query."""
+  risk = filter.get("risk")
+  outcome = filter.get("outcome")
+  needs_human = filter.get("needs_human")
+  text = filter.get("text")
+  text_lower = text.lower() if text else None
 
+  # Fast-path: if no filters applied, return shallow full list
+  if not (risk or outcome or (needs_human is not None) or text_lower):
+    return db_records
+
+  result = []
+  for r in db_records:
+    decision = r["decision"]
+
+    matched_record = (
+        #filtered criteria is not empty and record matches criteria
+        (risk and decision.get("overall_risk") == risk) or 
+        (outcome and decision.get("outcome") == outcome) or 
+        (needs_human is not None and decision.get("needs_human") == needs_human) or
+        (text_lower and (text_lower in r["origin"].lower() or text_lower in r["destination"].lower()))
+    )
+    if matched_record:
+        result.append(r)
+
+  return result
 
 records = load_records(DB_FILE)
