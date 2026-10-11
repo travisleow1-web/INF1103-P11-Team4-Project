@@ -213,6 +213,27 @@ def _geocode(place: str) -> Optional[Tuple[float, float]]:
     return results[0]["latitude"], results[0]["longitude"]
 
 
+def fetch_weather(lat: float, lon: float) -> Dict[str, Any]:
+    """Return the 7-day Open-Meteo forecast for a coordinate pair.
+
+    Raises on network/HTTP errors; callers decide how to handle failure.
+    """
+    r = http_session.get(
+        "https://api.open-meteo.com/v1/forecast",
+        params={
+            "latitude": lat,
+            "longitude": lon,
+            "timezone": "auto",
+            "forecast_days": 7,
+            "daily": "precipitation_sum,wind_gusts_10m_max,weather_code",
+            "cell_selection": "sea",
+        },
+        timeout=HTTP_TIMEOUT,
+    )
+    r.raise_for_status()
+    return r.json().get("daily", {})
+
+
 def _weather(place: str) -> Dict[str, Any]:
     coords = _geocode(place)
     if coords is None:
