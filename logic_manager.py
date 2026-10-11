@@ -270,4 +270,22 @@ def check_financial_threshold(record, decision):
             f"Financial check: reroute +{increase_pct:.1f}% is within the limit"
         )
 
+def stakeholder_alerting(record, decision):
+    """
+    Stakeholder Alerting: a shipment marked risky sends an urgent SMS and email
+    to the cargo owner and the active supply chain manager.
+    """
+    if decision.overall_risk != "High":
+        return
+
+    summary = (
+        f"URGENT: shipment {record['shipment_id']} is HIGH RISK. "
+        f"Main risk: {record['primary_risk_factor']} at {record['affected_location']}. "
+        f"Expected impact: {record['expected_impact']}. "
+        f"Recommended: {decision.outcome}."
+    )
+    for recipient in ("cargo_owner", "supply_chain_manager"):
+        _add_alert(decision, recipient, ["sms", "email"], summary)
+
+
 
