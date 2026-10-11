@@ -17,9 +17,11 @@ GDELT_MAX_RECORDS = 8
 GDELT_TIMESPAN = "3d"
 TIMEZONE = "Asia/Singapore"
 
+# Exactly the columns io_manager.input_method() returns, in the same order.
 SHIPMENT_FIELDS = (
-    "origin", "destination", "waypoints", "transport_mode", "transport_type",
-    "goods", "departure_date", "expected_arrival", "baseline_distance_km",
+    "shipment_id", "origin_port", "origin_lat", "origin_lon",
+    "destination_port", "destination_lat", "destination_lon",
+    "departure_time", "arrival_time",
 )
 
 # --------------------------------------------------------------------------
