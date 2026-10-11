@@ -87,13 +87,6 @@ RESPONSE_SCHEMA = {
     ],
 }
 # --------------------------------------------------------------------------
-# Fail-fast validation
-# --------------------------------------------------------------------------
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if not GEMINI_API_KEY:
-    raise RuntimeError("CRITICAL ERROR: 'GEMINI_API_KEY' is not set. The application cannot start.")
-
-# --------------------------------------------------------------------------
 # Connection pooling
 # --------------------------------------------------------------------------
 http_session = requests.Session()
@@ -127,6 +120,18 @@ if not log.handlers:
         datefmt="%Y-%m-%d %H:%M:%S",
     ))
     log.addHandler(file_handler)
+
+
+def get_api_key() -> Optional[str]:
+    """Return the Gemini API key, or None (and log it) if it isn't set.
+
+    Read at call time rather than import time so a missing key never crashes
+    the app; callers fall back to FALLBACK_AI_RESPONSE instead.
+    """
+    key = os.getenv("GEMINI_API_KEY") or None
+    if key is None:
+        log.error("GEMINI_API_KEY is not set; AI calls will use the fallback response.")
+    return key
 
 def retry_with_smart_delay(
     max_retries: int = MAX_RETRIES,
