@@ -45,3 +45,18 @@ REQUIRED_FIELDS = [
     "transport_mode", "goods", "risk_factors", "primary_risk_factor",
     "affected_location", "expected_impact", "confidence_score", "sources",
 ]
+
+# --------------------------------------------------------------------------
+# Output object 
+# --------------------------------------------------------------------------
+@dataclass
+class Decision:
+    shipment_id: str
+    overall_risk: str = "Low"
+    outcome: str = "PROCEED"      # PROCEED / DELAY / REROUTE / INSURE / ESCALATE / REJECT
+    hold_shipment: bool = False
+    needs_human: bool = False
+    flags: list = field(default_factory=list)      # e.g. "Premium Increase Required"
+    actions: list = field(default_factory=list)    # business actions to carry out
+    alerts: list = field(default_factory=list)     # dicts: who / channel / message
+    rationale: list = field(default_factory=list)  # audit trail (why each rule fired)
