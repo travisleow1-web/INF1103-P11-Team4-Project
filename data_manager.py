@@ -21,17 +21,29 @@ def save_records(db_records, file_path):
     json.dump(db_records, f, indent=2)
 
 def add_record(file_path, db_records, record, decision):
-    """decision is a dict. Stores both, plus fields used for history look-ups."""
+  """decision is a dict. Stores both, plus fields used for history look-ups."""
 
-    entry = {
-        **record,
-        "decision": decision,
-        "saved_at": datetime.now().isoformat(),
-        "flagged": decision["needs_human"] or decision["overall_risk"] != "Low",
-        "delayed": decision["outcome"] == "DELAY",
-    }
-    db_records.append(json.loads(json.dumps(entry, default=str)))
-    save_records(db_records, file_path)
+  entry = {
+    **record,
+    "decision": decision,
+    "saved_at": datetime.now().isoformat(),
+    "flagged": decision["needs_human"] or decision["overall_risk"] != "Low",
+    "delayed": decision["outcome"] == "DELAY",
+  }
+  db_records.append(json.loads(json.dumps(entry, default=str)))
+  save_records(db_records, file_path)
+
+def get_route_history(db_records, route_id, since):
+  """Used by Logic Manager Rule 3 (last 21 days on the same route)."""
+  out = []
+  for r in db_records:
+    if r.get("route_id") != route_id:
+      continue
+    saved = datetime.fromisoformat(r["saved_at"])
+    if saved >= since:
+      out.append({"date": saved, "flagged": r["flagged"], "delayed": r["delayed"]})
+  return out
+
 
 
 records = load_records(DB_FILE)
