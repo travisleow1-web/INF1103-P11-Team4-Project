@@ -8,6 +8,7 @@ from enum import IntEnum
 
 
 DB_FILE = "shipments.json"
+PROCESSED_FILE = "processed_shipments.json"  # per shipment: input row, weather, news, AI response
 
 def load_records(file_path):
     """Startup: load all records."""
