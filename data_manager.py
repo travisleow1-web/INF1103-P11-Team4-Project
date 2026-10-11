@@ -15,5 +15,9 @@ def load_records(file_path):
     except (json.JSONDecodeError, OSError) as exc: #File is corrupted or any other errors
       return []
 
+def save_records(db_records, file_path):
+  """End of Program: save all records."""
+  with open(file_path, "w", encoding="utf-8") as f:
+    json.dump(db_records, f, indent=2)
+
 records = load_records(DB_FILE)
-print(records)
