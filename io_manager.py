@@ -219,6 +219,12 @@ def show_weather(shipment, weather):
             )
 
 
+def show_assessments(assessments):
+    """Print the assessments DataFrame with one column per shipment and one row per field."""
+    with pd.option_context("display.max_colwidth", None):
+        print(assessments.T.to_string())
+
+
 if __name__ == "__main__":
     print(input_method())
 
