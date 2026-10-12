@@ -1,13 +1,61 @@
 import os
 import json
-import logging
-import requests
 import time
 import random
+import hashlib
+import logging
+import requests
+import validator
 import pandas as pd
 import data_manager
-import validator
+from zoneinfo import ZoneInfo
+from datetime import datetime
+from typing import Any, Dict, Optional
 from typing import Optional, Dict, Any, List, Tuple, Callable
+
+CACHE_FILE = "ai_cache.json"
+
+_cache: Optional[Dict[str, Any]] = None  # loaded once, kept in memory
+
+def _load_cache() -> Dict[str, Any]:
+    if not os.path.exists(CACHE_FILE):
+        return {}
+    try:
+        with open(CACHE_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as exc:
+        log.warning("Failed to load AI response cache from %s: %s", CACHE_FILE, exc)
+        return {}
+
+
+def _save_cache(cache_data: Dict[str, Any]) -> None:
+    try:
+        with open(CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(cache_data, f, indent=2, default=str)
+    except Exception as exc:
+        log.warning("Failed to save AI response to %s: %s", CACHE_FILE, exc)
+
+
+def get_cache_key(shipment: Dict[str, Any]) -> str:
+    """Deterministic SHA-256 of the shipment fields plus today's date."""
+    today = datetime.now(ZoneInfo(TIMEZONE)).date().isoformat()
+    payload = json.dumps(shipment, sort_keys=True, default=str) + "|" + today
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def cache_get(key: str) -> Optional[Dict[str, Any]]:
+    global _cache
+    if _cache is None:
+        _cache = _load_cache()
+    return _cache.get(key)
+
+
+def cache_set(key: str, value: Dict[str, Any]) -> None:
+    global _cache
+    if _cache is None:
+        _cache = _load_cache()
+    _cache[key] = value
+    _save_cache(_cache)
 
 # --------------------------------------------------------------------------
 # Constants
@@ -309,4 +357,4 @@ def assess_shipments(shipments: pd.DataFrame) -> pd.DataFrame:
         data_manager.add_record(DB_FILE, DB_RECORDS, processed, data_manager.PROCESSED_FILE)
     except (OSError, TypeError) as exc:
         log.error("could not save %s: %s", data_manager.PROCESSED_FILE, exc)
-    return pd.DataFrame(rows)
+    return pd.D
