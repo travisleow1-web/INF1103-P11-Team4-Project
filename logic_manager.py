@@ -10,7 +10,7 @@ Design notes (matches the four-manager flow):
   - Every AI value is a fixed code (risk types, severities, port codes,
     insight codes ...). The allowed values are imported from ai_manager, so
     both managers always use the same field inputs.
-  - It returns a Decision object. IO_MANAGER displays it, DATA_MANAGER saves it
+  - It returns a decision dict (see new_decision). IO_MANAGER displays it, DATA_MANAGER saves it
     (data_manager.add_record expects decision_to_dict(decision)).
   - The AI never makes the final decision. Every outcome is decided here.
 
@@ -35,10 +35,9 @@ Rule pipeline:
   Part 3  Escalation protocols (financial check, alerts, human review)
 """
 
+import copy
 import math
-from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta
-from enum import IntEnum
 
 import data_manager
 import validator
@@ -56,13 +55,10 @@ from ai_manager import (
 # --------------------------------------------------------------------------
 # Constants (change thresholds here, not inside the rules)
 # --------------------------------------------------------------------------
-class Level(IntEnum):
-    LOW = 1
-    MEDIUM = 2
-    HIGH = 3
+# Severity levels as plain numbers so they can be compared (HIGH > MEDIUM)
+LOW, MEDIUM, HIGH = 1, 2, 3
 
-
-LEVEL_FROM_TEXT = {"low": Level.LOW, "medium": Level.MEDIUM, "high": Level.HIGH}
+LEVEL_FROM_TEXT = {"low": LOW, "medium": MEDIUM, "high": HIGH}
 
 CONFIDENCE_MIN = 0.60             # below this, AI output needs a human
 HISTORY_WINDOW_DAYS = 21          # Rule 3 look-back
@@ -96,47 +92,61 @@ REQUIRED_FIELDS = [
 # --------------------------------------------------------------------------
 # Output object
 # --------------------------------------------------------------------------
-@dataclass
-class Decision:
-    shipment_id: str
-    overall_risk: str = "Low"
-    outcome: str = "PROCEED"      # PROCEED / DELAY / REROUTE / INSURE / ESCALATE / REJECT
-    hold_shipment: bool = False
-    needs_human: bool = False
-    flags: list = field(default_factory=list)      # e.g. "Premium Increase Required"
-    actions: list = field(default_factory=list)    # business actions to carry out
-    alerts: list = field(default_factory=list)     # dicts: recipient / channels / message
-    rationale: list = field(default_factory=list)  # audit trail (why each rule fired)
+def new_decision(shipment_id):
+    """Return a fresh decision for one shipment, as a plain dict.
+
+    Keys:
+      shipment_id    str
+      overall_risk   "Low" / "Medium" / "High"
+      outcome        PROCEED / DELAY / REROUTE / INSURE / ESCALATE / REJECT
+      hold_shipment  bool
+      needs_human    bool
+      flags          list of str, e.g. "Premium Increase Required"
+      actions        list of str, business actions to carry out
+      alerts         list of dicts: recipient / channels / message
+      rationale      list of str, audit trail (why each rule fired)
+    """
+    return {
+        "shipment_id": shipment_id,
+        "overall_risk": "Low",
+        "outcome": "PROCEED",
+        "hold_shipment": False,
+        "needs_human": False,
+        "flags": [],
+        "actions": [],
+        "alerts": [],
+        "rationale": [],
+    }
 
 
 def decision_to_dict(decision):
-    """Plain dict version of a Decision, in the shape data_manager.add_record expects."""
-    return asdict(decision)
+    """Independent copy of a decision, in the shape data_manager.add_record expects."""
+    return copy.deepcopy(decision)
 
 
 # --------------------------------------------------------------------------
 # Helper functions
 # --------------------------------------------------------------------------
 def _level(text):
-    """Convert 'Medium' / 'medium' / 'MEDIUM' into a Level. Unknown -> LOW."""
-    return LEVEL_FROM_TEXT.get(str(text).strip().lower(), Level.LOW)
+    """Convert 'Medium' / 'medium' / 'MEDIUM' into 1-3. Unknown -> LOW."""
+    return LEVEL_FROM_TEXT.get(str(text).strip().lower(), LOW)
 
 
 def _add_alert(decision, recipient, channels, message):
-    decision.alerts.append(
+    decision["alerts"].append(
         {"recipient": recipient, "channels": channels, "message": message}
     )
 
 
 def _add_flag(decision, flag):
-    if flag not in decision.flags:
-        decision.flags.append(flag)
+    if flag not in decision["flags"]:
+        decision["flags"].append(flag)
 
 
 def _raise_risk(decision, level):
     """Raise overall_risk to level ("Medium" or "High"), never lower it."""
-    if _level(level) > _level(decision.overall_risk):
-        decision.overall_risk = level
+    if _level(level) > _level(decision["overall_risk"]):
+        decision["overall_risk"] = level
 
 
 def _port_name(code):
@@ -266,44 +276,44 @@ def validate_record(record, decision, now):
     # None / "" count as missing here.
     missing = [f for f in REQUIRED_FIELDS if record.get(f) in (None, "")]
     if missing:
-        decision.outcome = "REJECT"
-        decision.needs_human = True
-        decision.flags.append("Incomplete AI record")
-        decision.rationale.append(f"Validation failed: missing fields {missing}")
+        decision["outcome"] = "REJECT"
+        decision["needs_human"] = True
+        decision["flags"].append("Incomplete AI record")
+        decision["rationale"].append(f"Validation failed: missing fields {missing}")
         return False
 
     confidence = record["confidence_score"]
     if (isinstance(confidence, bool) or not isinstance(confidence, (int, float))
             or not 0.0 <= confidence <= 1.0):
-        decision.outcome = "REJECT"
-        decision.needs_human = True
-        decision.flags.append("Invalid confidence score")
-        decision.rationale.append("Validation failed: confidence_score not in 0-1")
+        decision["outcome"] = "REJECT"
+        decision["needs_human"] = True
+        decision["flags"].append("Invalid confidence score")
+        decision["rationale"].append("Validation failed: confidence_score not in 0-1")
         return False
 
     # Softer problems: keep going, but a human must look at it
     problems = _schema_problems(record)
     if problems:
-        decision.needs_human = True
-        decision.flags.append("AI output outside schema")
-        decision.rationale.append(f"Validation: unexpected AI values {problems}")
+        decision["needs_human"] = True
+        decision["flags"].append("AI output outside schema")
+        decision["rationale"].append(f"Validation: unexpected AI values {problems}")
 
     if confidence < CONFIDENCE_MIN:
-        decision.needs_human = True
-        decision.flags.append("Low AI confidence")
-        decision.rationale.append(f"Confidence {confidence:.2f} is below {CONFIDENCE_MIN:.2f}")
+        decision["needs_human"] = True
+        decision["flags"].append("Low AI confidence")
+        decision["rationale"].append(f"Confidence {confidence:.2f} is below {CONFIDENCE_MIN:.2f}")
 
     fetched_at = _as_datetime(record.get("external_data_fetched_at")) \
         if record.get("external_data_fetched_at") else None
     if fetched_at and now - fetched_at > timedelta(hours=DATA_MAX_AGE_HOURS):
-        decision.needs_human = True
-        decision.flags.append("Outdated external data")
-        decision.rationale.append(f"External data is older than {DATA_MAX_AGE_HOURS}h")
+        decision["needs_human"] = True
+        decision["flags"].append("Outdated external data")
+        decision["rationale"].append(f"External data is older than {DATA_MAX_AGE_HOURS}h")
 
     if record.get("conflicting_sources") is True:
-        decision.needs_human = True
-        decision.flags.append("Conflicting sources")
-        decision.rationale.append("AI reported conflicting or missing information")
+        decision["needs_human"] = True
+        decision["flags"].append("Conflicting sources")
+        decision["rationale"].append("AI reported conflicting or missing information")
 
     return True
 
@@ -319,20 +329,20 @@ def rule_perfect_storm(record, decision):
     # Keep the highest severity if the AI lists the same type twice
     levels = {}
     for r in record["risk_factors"]:
-        levels[r["type"]] = max(levels.get(r["type"], Level.LOW), _level(r["severity"]))
+        levels[r["type"]] = max(levels.get(r["type"], LOW), _level(r["severity"]))
 
-    if any(lv == Level.HIGH for lv in levels.values()):
-        decision.overall_risk = "High"
-        decision.rationale.append("Rule 1: at least one risk factor is High")
+    if any(lv == HIGH for lv in levels.values()):
+        decision["overall_risk"] = "High"
+        decision["rationale"].append("Rule 1: at least one risk factor is High")
 
-    mediums = [f for f in PERFECT_STORM_FACTORS if levels.get(f, Level.LOW) >= Level.MEDIUM]
+    mediums = [f for f in PERFECT_STORM_FACTORS if levels.get(f, LOW) >= MEDIUM]
     if len(mediums) >= PERFECT_STORM_MIN_MEDIUMS:
-        decision.overall_risk = "High"
+        decision["overall_risk"] = "High"
         _add_flag(decision, "Perfect Storm")
-        decision.rationale.append(
+        decision["rationale"].append(
             f"Rule 1 (Perfect Storm): {', '.join(sorted(mediums))} all >= Medium, upgraded to High"
         )
-    elif any(lv == Level.MEDIUM for lv in levels.values()):
+    elif any(lv == MEDIUM for lv in levels.values()):
         _raise_risk(decision, "Medium")
 
 
@@ -347,9 +357,9 @@ def rule_ai_insights(record, decision):
     insights = record["insights"]
     for ins in insights:
         if ins["code"] in DATA_QUALITY_INSIGHTS:
-            decision.needs_human = True
+            decision["needs_human"] = True
             _add_flag(decision, f"AI flagged: {ins['code']}")
-            decision.rationale.append(f"Rule 1b: {_describe_insight(ins)} -> human review")
+            decision["rationale"].append(f"Rule 1b: {_describe_insight(ins)} -> human review")
 
     delays = [i for i in insights if i["code"] == "POTENTIAL_DELAY"]
     if delays:
@@ -361,15 +371,15 @@ def rule_ai_insights(record, decision):
             _raise_risk(decision, "Medium")
         if days >= DELAY_DAYS_LIMIT:
             _add_flag(decision, "Significant Delay Expected")
-            decision.rationale.append(
-                f"Rule 1b: {_describe_insight(worst)} -> risk {decision.overall_risk}"
+            decision["rationale"].append(
+                f"Rule 1b: {_describe_insight(worst)} -> risk {decision["overall_risk"]}"
             )
 
     for ins in insights:
-        if ins["code"] in ("EXTREME_EVENT", "MULTIPLE_RISKS") and _level(ins["severity"]) == Level.HIGH:
+        if ins["code"] in ("EXTREME_EVENT", "MULTIPLE_RISKS") and _level(ins["severity"]) == HIGH:
             _raise_risk(decision, "High")
             _add_flag(decision, "Extreme Event" if ins["code"] == "EXTREME_EVENT" else "Compound Risk")
-            decision.rationale.append(f"Rule 1b: {_describe_insight(ins)} -> risk High")
+            decision["rationale"].append(f"Rule 1b: {_describe_insight(ins)} -> risk High")
 
 
 def rule_asset_reallocation(record, decision):
@@ -380,13 +390,13 @@ def rule_asset_reallocation(record, decision):
     if CROSSWIND_FACTOR in factor_types or record["primary_risk_factor"] == CROSSWIND_FACTOR:
         if record["transport_type"] == "Light Freight":
             record["transport_type"] = "Heavy Freight"
-            decision.actions.append("Reassign load to a Heavy Freight carrier")
+            decision["actions"].append("Reassign load to a Heavy Freight carrier")
             _add_flag(decision, "Asset Reallocated")
-            decision.rationale.append(
+            decision["rationale"].append(
                 "Rule 2: severe_crosswinds + Light Freight -> Heavy Freight (rollover risk)"
             )
         else:
-            decision.rationale.append(
+            decision["rationale"].append(
                 f"Rule 2: severe_crosswinds noted, {record['transport_type']} already suitable"
             )
 
@@ -400,14 +410,14 @@ def rule_dynamic_insurance(record, decision):
     triggered = INSURANCE_TRIGGERS & (factor_types | {record["primary_risk_factor"]})
 
     if triggered:
-        decision.hold_shipment = True
-        decision.needs_human = True
+        decision["hold_shipment"] = True
+        decision["needs_human"] = True
         _add_flag(decision, "Premium Increase Required")
-        decision.actions.append("Update financial profile: extended insurance needed")
-        decision.rationale.append(
+        decision["actions"].append("Update financial profile: extended insurance needed")
+        decision["rationale"].append(
             f"Rule 4: {', '.join(sorted(triggered))} detected, holding until insurance confirmed"
         )
-        decision.overall_risk = "High"
+        decision["overall_risk"] = "High"
 
 
 def rule_low_risk_validation(record, decision, db_records, now):
@@ -415,30 +425,30 @@ def rule_low_risk_validation(record, decision, db_records, now):
     Rule 3: never auto-approve a 'Low' route that recently failed.
     Ask the Data Manager for the last 21 days of saved records on this exact route.
     """
-    if decision.overall_risk != "Low":
+    if decision["overall_risk"] != "Low":
         return
 
     since = now - timedelta(days=HISTORY_WINDOW_DAYS)
     try:
         past = data_manager.get_route_history(db_records, record["route_id"], since)
     except (KeyError, TypeError, ValueError) as exc:
-        decision.needs_human = True
+        decision["needs_human"] = True
         _add_flag(decision, "Route history unavailable")
-        decision.rationale.append(f"Rule 3: could not read route history ({exc}), needs human")
+        decision["rationale"].append(f"Rule 3: could not read route history ({exc}), needs human")
         return
 
     problem_runs = [p for p in past if p.get("flagged") or p.get("delayed")]
     if problem_runs:
-        decision.needs_human = True
-        decision.hold_shipment = True
+        decision["needs_human"] = True
+        decision["hold_shipment"] = True
         _add_flag(decision, "Cautionary Override")
-        decision.actions.append("Require human dispatcher sign-off")
-        decision.rationale.append(
+        decision["actions"].append("Require human dispatcher sign-off")
+        decision["rationale"].append(
             f"Rule 3: AI says Low but {len(problem_runs)} shipment(s) on route "
             f"{record['route_id']} were flagged or delayed in the last {HISTORY_WINDOW_DAYS} days"
         )
     else:
-        decision.rationale.append("Rule 3: Low risk and clean 21-day history, auto-approve")
+        decision["rationale"].append("Rule 3: Low risk and clean 21-day history, auto-approve")
 
 
 def rule_inventory_replacement(record, decision):
@@ -453,50 +463,50 @@ def rule_inventory_replacement(record, decision):
     if (record["expected_impact"] in CARGO_DESTRUCTION_IMPACTS
             and event != NO_EXTREME_EVENT and at_origin):
         goods = record["goods"].get("description", "the goods on this shipment")
-        decision.hold_shipment = True
+        decision["hold_shipment"] = True
         _add_flag(decision, "Procurement Alert")
-        decision.actions.append(f"Reorder goods immediately: {goods} (extreme event: {event})")
+        decision["actions"].append(f"Reorder goods immediately: {goods} (extreme event: {event})")
         _add_alert(
             decision, "procurement_team", ["email", "sms"],
             f"Shipment {record['shipment_id']} is at risk of destruction ({event} at "
             f"{record['origin']}). Consider reordering to avoid stock-out.",
         )
-        decision.rationale.append(
+        decision["rationale"].append(
             f"Rule 5: Cargo Destruction + extreme_event={event} @{record['origin_port']} (origin)"
         )
 
 
 def decide_outcome(record, decision):
     """Turn the accumulated flags into one final operational outcome."""
-    if decision.outcome == "REJECT":
+    if decision["outcome"] == "REJECT":
         return
 
     goods = record["goods"]
     time_sensitive = goods.get("perishable") or goods.get("time_sensitive")
     alternative = record.get("alternative_route")
 
-    if "Procurement Alert" in decision.flags:
-        decision.outcome = "DELAY"
-    elif "Premium Increase Required" in decision.flags:
-        decision.outcome = "INSURE"
-    elif decision.overall_risk == "High":
+    if "Procurement Alert" in decision["flags"]:
+        decision["outcome"] = "DELAY"
+    elif "Premium Increase Required" in decision["flags"]:
+        decision["outcome"] = "INSURE"
+    elif decision["overall_risk"] == "High":
         # Prefer rerouting for time-sensitive cargo, otherwise delay the departure
         if time_sensitive and alternative and alternative.get("name"):
-            decision.outcome = "REROUTE"
-            decision.actions.append(f"Reroute via {alternative['name']}")
+            decision["outcome"] = "REROUTE"
+            decision["actions"].append(f"Reroute via {alternative['name']}")
         else:
-            decision.outcome = "DELAY"
-            decision.actions.append("Delay departure until conditions clear")
-        decision.needs_human = True
-    elif decision.overall_risk == "Medium":
-        decision.outcome = "PROCEED"
-        decision.actions.append("Proceed with monitoring")
+            decision["outcome"] = "DELAY"
+            decision["actions"].append("Delay departure until conditions clear")
+        decision["needs_human"] = True
+    elif decision["overall_risk"] == "Medium":
+        decision["outcome"] = "PROCEED"
+        decision["actions"].append("Proceed with monitoring")
     else:
-        decision.outcome = "PROCEED"
+        decision["outcome"] = "PROCEED"
 
     # Anything held for a human is not fully automatic
-    if decision.hold_shipment and decision.outcome == "PROCEED":
-        decision.outcome = "ESCALATE"
+    if decision["hold_shipment"] and decision["outcome"] == "PROCEED":
+        decision["outcome"] = "ESCALATE"
 
 
 # --------------------------------------------------------------------------
@@ -507,35 +517,35 @@ def check_financial_threshold(record, decision):
     If an automated reroute adds more than 20% distance, stop the auto-reroute
     and send an 'Excessive Cost' alert to the Operations Director.
     """
-    if decision.outcome != "REROUTE":
+    if decision["outcome"] != "REROUTE":
         return
 
     base = record.get("baseline_distance_km")
     new = (record.get("alternative_route") or {}).get("distance_km")
     if not base or not new:
-        decision.needs_human = True
+        decision["needs_human"] = True
         _add_flag(decision, "Reroute distance unknown")
-        decision.rationale.append("Financial check: cannot compare distances, needs human")
+        decision["rationale"].append("Financial check: cannot compare distances, needs human")
         return
 
     increase_pct = (new - base) / base * 100
     if increase_pct > REROUTE_COST_LIMIT_PCT:
-        decision.outcome = "ESCALATE"
-        decision.hold_shipment = True
-        decision.needs_human = True
+        decision["outcome"] = "ESCALATE"
+        decision["hold_shipment"] = True
+        decision["needs_human"] = True
         _add_flag(decision, "Excessive Cost")
-        decision.actions = [a for a in decision.actions if not a.startswith("Reroute")]
-        decision.actions.append("Automatic rerouting stopped")
+        decision["actions"] = [a for a in decision["actions"] if not a.startswith("Reroute")]
+        decision["actions"].append("Automatic rerouting stopped")
         _add_alert(
             decision, "operations_director", ["email"],
             f"Excessive Cost: reroute for {record['shipment_id']} adds "
             f"{increase_pct:.1f}% distance (limit {REROUTE_COST_LIMIT_PCT:.0f}%).",
         )
-        decision.rationale.append(
+        decision["rationale"].append(
             f"Financial check: reroute +{increase_pct:.1f}% > {REROUTE_COST_LIMIT_PCT:.0f}%, stopped"
         )
     else:
-        decision.rationale.append(
+        decision["rationale"].append(
             f"Financial check: reroute +{increase_pct:.1f}% is within the limit"
         )
 
@@ -547,7 +557,7 @@ def stakeholder_alerting(record, decision):
     AI's risk factors and insight flags. The message text is built here from
     the AI's codes; the AI itself never writes sentences.
     """
-    if decision.overall_risk != "High":
+    if decision["overall_risk"] != "High":
         return
 
     factors = "; ".join(
@@ -561,7 +571,7 @@ def stakeholder_alerting(record, decision):
         f"{record['destination']}) is HIGH RISK. "
         f"Main risk: {record['primary_risk_factor']} at {_port_name(record['affected_location'])}. "
         f"Expected impact: {record['expected_impact']}. "
-        f"Recommended: {decision.outcome}. "
+        f"Recommended: {decision["outcome"]}. "
         f"Risk factors: {factors}. AI flags: {flags}."
     )
     for recipient in ("cargo_owner", "supply_chain_manager"):
@@ -570,10 +580,10 @@ def stakeholder_alerting(record, decision):
 
 def escalation_protocol(decision):
     """Final gate: anything needing a human is never marked as fully automatic."""
-    if decision.needs_human and decision.outcome == "PROCEED":
-        decision.outcome = "ESCALATE"
-    if decision.needs_human:
-        decision.actions.append("Route to human review queue")
+    if decision["needs_human"] and decision["outcome"] == "PROCEED":
+        decision["outcome"] = "ESCALATE"
+    if decision["needs_human"]:
+        decision["actions"].append("Route to human review queue")
 
 
 # --------------------------------------------------------------------------
@@ -587,12 +597,12 @@ def evaluate_shipment(ai_record, db_records, now=None):
     db_records - list from data_manager.load_records(data_manager.DB_FILE)
 
     Returns (record, decision): the prepared record (with route_id, origin,
-    destination, ...) and its Decision, ready for
+    destination, ...) and its decision dict, ready for
     data_manager.add_record(file, db_records, record, decision_to_dict(decision)).
     """
     now = now or datetime.now()
     record = prepare_record(ai_record)  # copy, never mutates the caller's data
-    decision = Decision(shipment_id=str(record.get("shipment_id", "UNKNOWN")))
+    decision = new_decision(str(record.get("shipment_id", "UNKNOWN")))
 
     # Part 1
     if not validate_record(record, decision, now):
@@ -705,9 +715,9 @@ if __name__ == "__main__":
     for name, rec in cases.items():
         _, d = evaluate_shipment(rec, db_records, now)
         print(f"\n=== {name} ===")
-        print("Outcome :", d.outcome, "| Risk:", d.overall_risk, "| Human:", d.needs_human)
-        print("Flags   :", d.flags)
-        print("Actions :", d.actions)
-        print("Alerts  :", [(a["recipient"], a["channels"]) for a in d.alerts])
-        for line in d.rationale:
+        print("Outcome :", d["outcome"], "| Risk:", d["overall_risk"], "| Human:", d["needs_human"])
+        print("Flags   :", d["flags"])
+        print("Actions :", d["actions"])
+        print("Alerts  :", [(a["recipient"], a["channels"]) for a in d["alerts"]])
+        for line in d["rationale"]:
             print("  -", line)
