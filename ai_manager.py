@@ -7,15 +7,197 @@ import logging
 import requests
 import validator
 import pandas as pd
-import data_manager
 from zoneinfo import ZoneInfo
 from datetime import datetime
-from typing import Any, Dict, Optional
-from typing import Optional, Dict, Any, List, Tuple, Callable
+from typing import Optional, Dict, Any, List, Callable
 
+# --------------------------------------------------------------------------
+# Constants
+# --------------------------------------------------------------------------
 CACHE_FILE = "ai_cache.json"
+MAX_RETRIES = 3
+HTTP_TIMEOUT = 20
+TIMEZONE = "Asia/Singapore"
 
+# Bump this whenever RESPONSE_SCHEMA changes, so old cached answers in the
+# previous format are never reused.
+SCHEMA_VERSION = 2
+
+# Exactly the columns io_manager.input_method() returns, in the same order.
+SHIPMENT_FIELDS = (
+    "shipment_id", "origin_port", "origin_lat", "origin_lon",
+    "destination_port", "destination_lat", "destination_lon",
+    "departure_time", "arrival_time",
+)
+
+# --------------------------------------------------------------------------
+# Shared field definitions
+# --------------------------------------------------------------------------
+# Every value the AI returns comes from one of these lists, so the Logic
+# Manager can match on exact values instead of reading sentences.
+# logic_manager.py imports these lists, so both managers always use the
+# same field inputs. Change them here only.
+with open("waypoints_reference.json", encoding="utf-8") as f:
+    WAYPOINT_NAMES = [w["name"] for w in json.load(f)["waypoints"]]
+
+ALLOWED_RISK_TYPES = [
+    "weather", "severe_crosswinds", "port_congestion", "labor_shortage",
+    "piracy_threat", "severe_civil_unrest", "geopolitical",
+    "infrastructure_disruption",
+]
+ALLOWED_SEVERITY = ["Low", "Medium", "High"]
+ALLOWED_IMPACT = ["Delay", "Cost Increase", "Cargo Damage", "Cargo Destruction", "None"]
+
+# Where a risk applies: a port code from ports_reference_4.json, a waypoint
+# name from waypoints_reference.json, the whole route, or unknown.
+ALLOWED_LOCATIONS = sorted(validator.PORTS_BY_CODE) + WAYPOINT_NAMES + ["Route", "Unknown"]
+
+ALLOWED_EXTREME_EVENTS = [
+    "none", "typhoon", "hurricane", "cyclone", "earthquake", "tsunami",
+    "port_closure", "vessel_collision", "armed_attack", "other",
+]
+
+ALLOWED_SOURCES = ["open_meteo_weather", "open_meteo_marine", "gdelt_news", "shipment_data"]
+
+# Machine-readable insight codes. The Logic Manager's business rules act on
+# these codes, so add a matching rule there if you add a code here.
+INSIGHT_CODES = [
+    "POTENTIAL_DELAY",      # conditions likely to delay departure or arrival
+    "MULTIPLE_RISKS",       # several risks occurring at the same time
+    "EXTREME_EVENT",        # sudden severe event (typhoon, port closure, attack)
+    "CONFLICTING_DATA",     # sources disagree with each other
+    "OUTDATED_DATA",        # a feed is old or stale
+    "MISSING_DATA",         # a feed is empty or failed
+    "NEEDS_HUMAN_REVIEW",   # anything else a person should look at
+]
+INSIGHT_RISK_TYPES = ALLOWED_RISK_TYPES + ["none"]
+
+# --------------------------------------------------------------------------
+# Gemini settings
+# --------------------------------------------------------------------------
+# Double-check this model ID against what your account supports.
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
+GEMINI_URL = (
+    f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+)
+
+SYSTEM_PROMPT = """You are a logistics risk analyst for shipments passing through or destined for Singapore.
+Your role is exclusively to analyse, structure, and quantify risk factors from provided feeds.
+You NEVER decide operational actions (such as proceed, delay, reroute, or insure): downstream business rules execute those.
+
+Rules:
+- Identify ALL distinct risk factors present across the data. Do NOT omit moderate or low risks.
+- Use ONLY the shipment data and external data provided. Do not invent facts.
+- If data is missing, old, or contradictory, lower confidence_score and set conflicting_sources to true.
+- confidence_score is a number from 0.0 to 1.0.
+- Output is read by code, not people. NEVER write sentences or prose in any field.
+- risk_factors[].detail is a single key=value token for the measurement behind the risk,
+  e.g. wind_gust_kmh=72, wave_height_m=4.1, visibility_m=800, news_articles=3.
+- Locations: use the port code (e.g. CNSHA) for ports, the waypoint name for straits and seas,
+  "Route" for the whole journey, "Unknown" if it cannot be placed.
+- alternative_route: only if a named waypoint offers a safer path; distance_km is the full
+  estimated sea distance of that alternative route. Omit it otherwise.
+- insights: one object per finding. risk_type is "none" for data-quality findings.
+  estimated_delay_days is your best estimate of added delay in whole days (0 if none or unknown).
+  Use MULTIPLE_RISKS when two or more risk factors are Medium or higher."""
+
+RESPONSE_SCHEMA = {
+    "type": "OBJECT",
+    "properties": {
+        "risk_factors": {
+            "type": "ARRAY",
+            "items": {
+                "type": "OBJECT",
+                "properties": {
+                    "type": {"type": "STRING", "enum": ALLOWED_RISK_TYPES},
+                    "severity": {"type": "STRING", "enum": ALLOWED_SEVERITY},
+                    "location": {"type": "STRING", "enum": ALLOWED_LOCATIONS},
+                    "source": {"type": "STRING", "enum": ALLOWED_SOURCES},
+                    "detail": {"type": "STRING"},
+                },
+                "required": ["type", "severity", "location", "source", "detail"],
+            },
+        },
+        "primary_risk_factor": {"type": "STRING", "enum": ALLOWED_RISK_TYPES},
+        "affected_location": {"type": "STRING", "enum": ALLOWED_LOCATIONS},
+        "expected_impact": {"type": "STRING", "enum": ALLOWED_IMPACT},
+        "confidence_score": {"type": "NUMBER"},
+        "sources": {"type": "ARRAY", "items": {"type": "STRING", "enum": ALLOWED_SOURCES}},
+        "conflicting_sources": {"type": "BOOLEAN"},
+        "extreme_event": {"type": "STRING", "enum": ALLOWED_EXTREME_EVENTS},
+        "insights": {
+            "type": "ARRAY",
+            "items": {
+                "type": "OBJECT",
+                "properties": {
+                    "code": {"type": "STRING", "enum": INSIGHT_CODES},
+                    "risk_type": {"type": "STRING", "enum": INSIGHT_RISK_TYPES},
+                    "severity": {"type": "STRING", "enum": ALLOWED_SEVERITY},
+                    "location": {"type": "STRING", "enum": ALLOWED_LOCATIONS},
+                    "estimated_delay_days": {"type": "INTEGER"},
+                },
+                "required": ["code", "risk_type", "severity", "location", "estimated_delay_days"],
+            },
+        },
+        "alternative_route": {
+            "type": "OBJECT",
+            "properties": {
+                "name": {"type": "STRING", "enum": WAYPOINT_NAMES},
+                "distance_km": {"type": "NUMBER"},
+            },
+            "required": ["name", "distance_km"],
+        },
+    },
+    "required": [
+        "risk_factors", "primary_risk_factor", "affected_location",
+        "expected_impact", "confidence_score", "sources",
+        "conflicting_sources", "extreme_event", "insights",
+    ],
+}
+
+# Safe default when enrichment fails: low confidence + MISSING_DATA makes the
+# Logic Manager send the shipment to human review.
+FALLBACK_AI_RESPONSE: Dict[str, Any] = {
+    "risk_factors": [],
+    "primary_risk_factor": "infrastructure_disruption",
+    "affected_location": "Unknown",
+    "expected_impact": "None",
+    "confidence_score": 0.0,
+    "sources": [],
+    "conflicting_sources": True,
+    "extreme_event": "none",
+    "insights": [{
+        "code": "MISSING_DATA", "risk_type": "none", "severity": "High",
+        "location": "Route", "estimated_delay_days": 0,
+    }],
+    "alternative_route": None,
+}
+
+# --------------------------------------------------------------------------
+# Connection pooling
+# --------------------------------------------------------------------------
+http_session = requests.Session()
+
+# --------------------------------------------------------------------------
+# Logging
+# --------------------------------------------------------------------------
+log = logging.getLogger("ai_manager")
+log.setLevel(logging.DEBUG)
+
+if not log.handlers:
+    file_handler = logging.FileHandler("app.log", encoding="utf-8")
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    ))
+    log.addHandler(file_handler)
+
+# --------------------------------------------------------------------------
+# Response cache (one Gemini call per shipment per day)
+# --------------------------------------------------------------------------
 _cache: Optional[Dict[str, Any]] = None  # loaded once, kept in memory
+
 
 def _load_cache() -> Dict[str, Any]:
     if not os.path.exists(CACHE_FILE):
@@ -37,9 +219,14 @@ def _save_cache(cache_data: Dict[str, Any]) -> None:
 
 
 def get_cache_key(shipment: Dict[str, Any]) -> str:
-    """Deterministic SHA-256 of the shipment fields plus today's date."""
+    """Deterministic SHA-256 of the shipment fields, today's date and the schema version.
+
+    shipment_id is left out so the same route and dates hit the cache even
+    when the IDs are renumbered between runs.
+    """
     today = datetime.now(ZoneInfo(TIMEZONE)).date().isoformat()
-    payload = json.dumps(shipment, sort_keys=True, default=str) + "|" + today
+    fields = {k: v for k, v in shipment.items() if k != "shipment_id"}
+    payload = json.dumps(fields, sort_keys=True, default=str) + f"|{today}|v{SCHEMA_VERSION}"
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -57,121 +244,10 @@ def cache_set(key: str, value: Dict[str, Any]) -> None:
     _cache[key] = value
     _save_cache(_cache)
 
-# --------------------------------------------------------------------------
-# Constants
-# --------------------------------------------------------------------------
-CACHE_FILE = "ai_cache.json"
-MAX_RETRIES = 3
-HTTP_TIMEOUT = 20
-TIMEZONE = "Asia/Singapore"
-DB_FILE = "shipments.json"
-
-# Exactly the columns io_manager.input_method() returns, in the same order.
-SHIPMENT_FIELDS = (
-    "shipment_id", "origin_port", "origin_lat", "origin_lon",
-    "destination_port", "destination_lat", "destination_lon",
-    "departure_time", "arrival_time",
-)
 
 # --------------------------------------------------------------------------
-# Gemini settings
+# Gemini call
 # --------------------------------------------------------------------------
-# Double-check this model ID against what your account supports.
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
-GEMINI_URL = (
-    f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
-)
-
-ALLOWED_RISK_TYPES = [
-    "weather", "severe_crosswinds", "port_congestion", "labor_shortage",
-    "piracy_threat", "severe_civil_unrest", "geopolitical",
-    "infrastructure_disruption",
-]
-ALLOWED_SEVERITY = ["Low", "Medium", "High"]
-ALLOWED_IMPACT = ["Delay", "Cost Increase", "Cargo Damage", "Cargo Destruction", "None"]
-
-SYSTEM_PROMPT = """You are a logistics risk analyst for shipments passing through or destined for Singapore.
-Your role is exclusively to analyse, structure, and quantify risk factors from provided feeds.
-You NEVER decide operational actions (such as proceed, delay, reroute, or insure): downstream business rules execute those.
-
-Rules:
-- Identify ALL distinct risk factors present across the data. Do NOT omit moderate or low risks.
-- Use ONLY the shipment data and external data provided. Do not invent facts.
-- If data is missing, old, or contradictory, lower confidence_score and set conflicting_sources to true."""
-
-RESPONSE_SCHEMA = {
-    "type": "OBJECT",
-    "properties": {
-        "risk_factors": {
-            "type": "ARRAY",
-            "items": {
-                "type": "OBJECT",
-                "properties": {
-                    "type": {"type": "STRING", "enum": ALLOWED_RISK_TYPES},
-                    "severity": {"type": "STRING", "enum": ALLOWED_SEVERITY},
-                    "detail": {"type": "STRING"},
-                },
-                "required": ["type", "severity", "detail"],
-            },
-        },
-        "primary_risk_factor": {"type": "STRING", "enum": ALLOWED_RISK_TYPES},
-        "affected_location": {"type": "STRING"},
-        "expected_impact": {"type": "STRING", "enum": ALLOWED_IMPACT},
-        "confidence_score": {"type": "NUMBER"},
-        "sources": {"type": "ARRAY", "items": {"type": "STRING"}},
-        "conflicting_sources": {"type": "BOOLEAN"},
-        "extreme_event": {"type": "STRING"},
-        "insights": {"type": "ARRAY", "items": {"type": "STRING"}},
-        "alternative_route": {
-            "type": "OBJECT",
-            "properties": {
-                "name": {"type": "STRING"},
-                "distance_km": {"type": "NUMBER"},
-            },
-        },
-    },
-    "required": [
-        "risk_factors", "primary_risk_factor", "affected_location",
-        "expected_impact", "confidence_score", "sources",
-        "conflicting_sources", "extreme_event", "insights",
-    ],
-}
-# --------------------------------------------------------------------------
-# Connection pooling
-# --------------------------------------------------------------------------
-http_session = requests.Session()
-
-# Add FALLBACK_AI_RESPONSE as the safe default when enrichment fails
-FALLBACK_AI_RESPONSE: Dict[str, Any] = {
-    "risk_factors": [],  
-    "primary_risk_factor": "infrastructure_disruption",
-    "affected_location": "Unknown",
-    "expected_impact": "None",
-    "confidence_score": 0.0,
-    "sources": ["System Fallback - External Feeds or AI API Failure"],
-    "conflicting_sources": True,
-    "extreme_event": "None",
-    "insights": ["AI enrichment failed to complete. System defaulted to safety status."],
-    "alternative_route": None,
-}
-
-
-# --------------------------------------------------------------------------
-# Logging
-# --------------------------------------------------------------------------
-log = logging.getLogger("ai_manager")
-log.setLevel(logging.DEBUG)
-
-if not log.handlers:
-    file_handler = logging.FileHandler("app.log", encoding="utf-8")
-    file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(logging.Formatter(
-        "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    ))
-    log.addHandler(file_handler)
-
-
 def get_api_key() -> Optional[str]:
     """Return the Gemini API key, or None (and log it) if it isn't set.
 
@@ -183,15 +259,15 @@ def get_api_key() -> Optional[str]:
         log.error("GEMINI_API_KEY is not set; AI calls will use the fallback response.")
     return key
 
+
 def retry_with_smart_delay(
     max_retries: int = MAX_RETRIES,
     initial_delay: float = 1.0,
     backoff_factor: float = 2.0,
     jitter: bool = True,
 ):
-    #Automatically retries an API request if it temporarily fails,
-    #Waiting slightly longer after each attempt to give the server time to recover.
-    """Retry a function if it raises, waiting longer after each attempt."""
+    """Retry a function if it raises, waiting longer after each attempt
+    to give the server time to recover."""
     def decorator(func: Callable):
         def wrapper(*args, **kwargs):
             delay = initial_delay
@@ -210,17 +286,37 @@ def retry_with_smart_delay(
         return wrapper
     return decorator
 
-# Add extract_shipment() to select the shipment fields used by the AI and cache key
+
 def extract_shipment(record: Dict[str, Any]) -> Dict[str, Any]:
     """Pick only the shipment fields the AI (and the cache key) care about."""
     return {k: record[k] for k in SHIPMENT_FIELDS if k in record}
 
-# Add build_prompt() to combine shipment and external data into the model prompt
+
+def fill_coordinates(shipment: Dict[str, Any]) -> Dict[str, Any]:
+    """Return a copy with upper-case port codes and lat/lon looked up from the port reference.
+
+    Manual entry already supplies the coordinates; CSV rows may only have port
+    codes, so any missing or blank lat/lon is filled in here. Unknown port
+    codes are left as they are (the weather feed for them is logged as failed).
+    """
+    shipment = dict(shipment)
+    for end in ("origin", "destination"):
+        code = str(shipment.get(f"{end}_port", "")).strip().upper()
+        shipment[f"{end}_port"] = code
+        lat, lon = shipment.get(f"{end}_lat"), shipment.get(f"{end}_lon")
+        missing = any(v is None or v == "" or (isinstance(v, float) and v != v) for v in (lat, lon))
+        if missing and code in validator.PORTS_BY_CODE:
+            shipment[f"{end}_lat"], shipment[f"{end}_lon"] = validator.port_coordinates(code)
+    return shipment
+
+
 def build_prompt(shipment: Dict[str, Any], external: Dict[str, Any]) -> str:
+    """Combine shipment and external data into the model prompt."""
     return (
         "SHIPMENT:\n" + json.dumps(shipment, default=str)
         + "\n\nEXTERNAL DATA:\n" + json.dumps(external, default=str)
     )
+
 
 @retry_with_smart_delay(max_retries=MAX_RETRIES)
 def call_gemini(prompt: str) -> Dict[str, Any]:
@@ -250,6 +346,10 @@ def call_gemini(prompt: str) -> Dict[str, Any]:
     raw_text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
     return json.loads(raw_text)
 
+
+# --------------------------------------------------------------------------
+# External feeds
+# --------------------------------------------------------------------------
 def fetch_weather(lat: float, lon: float) -> Dict[str, Any]:
     """Return 16 days (Open-Meteo's maximum) of hourly weather and wave data.
 
@@ -299,7 +399,7 @@ def get_shipment_weather(shipment: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def fetch_news(shipment: Dict[str, Any]) -> Optional[List[Dict[str, Any]]]:
-    """Return recent GDELT headlines about risks at a shipment's origin and destination ports.
+    """Return recent English GDELT headlines about risks at a shipment's ports.
 
     Returns [] when GDELT has no matching articles and None if the feed fails
     (logged), so one bad feed never stops the run. GDELT allows one request
@@ -316,6 +416,7 @@ def fetch_news(shipment: Dict[str, Any]) -> Optional[List[Dict[str, Any]]]:
                         f'("{validator.PORTS_BY_CODE[shipment["origin_port"]]["name"]}"'
                         f' OR "{validator.PORTS_BY_CODE[shipment["destination_port"]]["name"]}")'
                         ' (piracy OR "armed robbery" OR "port congestion" OR strike OR protest OR unrest)'
+                        ' sourcelang:english'
                     ),
                     "mode": "ArtList",
                     "maxrecords": 8,
@@ -330,31 +431,41 @@ def fetch_news(shipment: Dict[str, Any]) -> Optional[List[Dict[str, Any]]]:
         return None
 
 
+# --------------------------------------------------------------------------
+# Main entry point
+# --------------------------------------------------------------------------
 def assess_shipments(shipments: pd.DataFrame) -> pd.DataFrame:
     """Return one row per shipment: the original columns plus Gemini's response fields.
 
-    The weather and news are only used inside the prompt and the saved file. If
-    the API call fails or the response is missing required fields, the row gets
-    FALLBACK_AI_RESPONSE. Each shipment's input row, weather, news and AI response
-    are also saved together in data_manager.PROCESSED_FILE, keyed by shipment_id.
+    Each row also gets external_data_fetched_at (ISO time the feeds were read)
+    for the Logic Manager's outdated-data check. A shipment already assessed
+    today is served from ai_cache.json instead of calling the APIs again.
+    If the API call fails or the response is missing required fields, the row
+    gets FALLBACK_AI_RESPONSE (failures are never cached).
+
+    Nothing is saved to shipments.json here: main.py saves each row through
+    data_manager.add_record once the Logic Manager has made its decision.
     """
     rows = []
-    processed = {}
-    DB_RECORDS = data_manager.load_records()
     for shipment in shipments.to_dict("records"):
+        shipment = fill_coordinates(shipment)
+        key = get_cache_key(extract_shipment(shipment))
+        cached = cache_get(key)
+        if cached:
+            log.info("cache hit for %s", shipment["shipment_id"])
+            rows.append({**shipment, **cached["result"],
+                         "external_data_fetched_at": cached["fetched_at"]})
+            continue
+
         external = {"weather": get_shipment_weather(shipment), "news": fetch_news(shipment)}
+        fetched_at = datetime.now().isoformat(timespec="seconds")
         try:
             result = call_gemini(build_prompt(shipment, external))
             if not all(k in result for k in RESPONSE_SCHEMA["required"]):
                 raise ValueError("Gemini response missing required fields")
+            cache_set(key, {"result": result, "fetched_at": fetched_at})
         except Exception as exc:
             log.error("AI assessment failed for %s: %s", shipment["shipment_id"], exc)
-            result = FALLBACK_AI_RESPONSE
-        rows.append({**shipment, **result})
-        processed[shipment["shipment_id"]] = {"shipment": shipment, **external, "ai_response": result}
-    try:
-        #data_manager.save_records(processed, data_manager.PROCESSED_FILE) old statement
-        data_manager.add_record(DB_FILE, DB_RECORDS, processed, data_manager.PROCESSED_FILE)
-    except (OSError, TypeError) as exc:
-        log.error("could not save %s: %s", data_manager.PROCESSED_FILE, exc)
-    return pd.D
+            result = dict(FALLBACK_AI_RESPONSE)
+        rows.append({**shipment, **result, "external_data_fetched_at": fetched_at})
+    return pd.DataFrame(rows)
