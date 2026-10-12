@@ -175,6 +175,54 @@ def csv_shipments():
     return df
 
 
+def show_summary(assessments):
+    """Print one aligned row per shipment with scalar fields only.
+
+    primary_severity is the severity of the risk factor matching
+    primary_risk_factor ("-" if the AI listed none).
+    """
+    rows = [
+        {
+            "shipment_id": a["shipment_id"],
+            "expected_impact": a["expected_impact"],
+            "confidence_score": a["confidence_score"],
+            "primary_factor": a["primary_risk_factor"],
+            "primary_severity": next(
+                (f["severity"] for f in a["risk_factors"] if f["type"] == a["primary_risk_factor"]), "-"
+            ),
+            "n_risk_factors": len(a["risk_factors"]),
+            "conflicting_sources": a["conflicting_sources"],
+        }
+        for a in assessments.to_dict("records")
+    ]
+    print(pd.DataFrame(rows).to_string(index=False))
+
+
+def show_details(assessments):
+    """Print a text block per shipment: header, each risk factor, then the insights."""
+    for a in assessments.to_dict("records"):
+        print(
+            f"\n{a['shipment_id']} | impact: {a['expected_impact']}"
+            f" | confidence: {a['confidence_score']}"
+        )
+        for f in a["risk_factors"]:
+            print(f"    [{f['severity']}] {f['type']}: {f['detail']}")
+        print("  Insights:")
+        for insight in a["insights"]:
+            print(f"    - {insight}")
+
+
+def show_risk_factors(assessments):
+    """Print one row per (shipment, risk factor) pair, for sorting or filtering by severity."""
+    print(
+        pd.json_normalize(
+            assessments.to_dict("records"),
+            record_path="risk_factors",
+            meta=["shipment_id", "expected_impact", "confidence_score"],
+        ).to_string(index=False)
+    )
+
+
 if __name__ == "__main__":
     print(input_method())
 

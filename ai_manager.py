@@ -4,6 +4,9 @@ import logging
 import requests
 import time
 import random
+import pandas as pd
+import data_manager
+import validator
 from typing import Optional, Dict, Any, List, Tuple, Callable
 
 # --------------------------------------------------------------------------
@@ -12,10 +15,8 @@ from typing import Optional, Dict, Any, List, Tuple, Callable
 CACHE_FILE = "ai_cache.json"
 MAX_RETRIES = 3
 HTTP_TIMEOUT = 20
-MAX_PLACES_LIMIT = 4
-GDELT_MAX_RECORDS = 8
-GDELT_TIMESPAN = "3d"
 TIMEZONE = "Asia/Singapore"
+DB_FILE = "shipments.json"
 
 # Exactly the columns io_manager.input_method() returns, in the same order.
 SHIPMENT_FIELDS = (
@@ -32,6 +33,7 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 GEMINI_URL = (
     f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 )
+
 ALLOWED_RISK_TYPES = [
     "weather", "severe_crosswinds", "port_congestion", "labor_shortage",
     "piracy_threat", "severe_civil_unrest", "geopolitical",
@@ -159,6 +161,7 @@ def retry_with_smart_delay(
                     delay *= backoff_factor
         return wrapper
     return decorator
+
 # Add extract_shipment() to select the shipment fields used by the AI and cache key
 def extract_shipment(record: Dict[str, Any]) -> Dict[str, Any]:
     """Pick only the shipment fields the AI (and the cache key) care about."""
@@ -170,3 +173,140 @@ def build_prompt(shipment: Dict[str, Any], external: Dict[str, Any]) -> str:
         "SHIPMENT:\n" + json.dumps(shipment, default=str)
         + "\n\nEXTERNAL DATA:\n" + json.dumps(external, default=str)
     )
+
+@retry_with_smart_delay(max_retries=MAX_RETRIES)
+def call_gemini(prompt: str) -> Dict[str, Any]:
+    api_key = get_api_key()
+    if api_key is None:
+        raise RuntimeError("GEMINI_API_KEY is not set")
+
+    body = {
+        "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": 0,
+            "seed": 0,
+            "responseMimeType": "application/json",
+            "responseSchema": RESPONSE_SCHEMA,
+        },
+    }
+    r = http_session.post(
+        GEMINI_URL,
+        headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
+        json=body,
+        timeout=HTTP_TIMEOUT * 2,
+    )
+    r.raise_for_status()
+
+    # responseSchema constrains Gemini to valid JSON matching our shape.
+    raw_text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
+    return json.loads(raw_text)
+
+def fetch_weather(lat: float, lon: float) -> Dict[str, Any]:
+    """Return 16 days (Open-Meteo's maximum) of hourly weather and wave data.
+
+    Raises on network/HTTP errors; callers decide how to handle failure.
+    """
+    return {
+        **http_session.get(
+            "https://api.open-meteo.com/v1/forecast",
+            params={
+                "latitude": lat,
+                "longitude": lon,
+                "timezone": "auto",
+                "forecast_days": 16,
+                "hourly": "wind_speed_10m,wind_gusts_10m,pressure_msl,visibility",
+                "cell_selection": "sea",
+            },
+            timeout=HTTP_TIMEOUT,
+        ).json()["hourly"],
+        **http_session.get(
+            "https://marine-api.open-meteo.com/v1/marine",
+            params={
+                "latitude": lat,
+                "longitude": lon,
+                "timezone": "auto",
+                "forecast_days": 16,
+                "hourly": "wave_height,swell_wave_height,wave_period",
+            },
+            timeout=HTTP_TIMEOUT,
+        ).json()["hourly"],
+    }
+
+
+def get_shipment_weather(shipment: Dict[str, Any]) -> Dict[str, Any]:
+    """Fetch the forecast at a shipment's origin and destination coordinates.
+
+    A failed fetch is logged and stored as None, so one bad feed never stops
+    the run.
+    """
+    weather = {}
+    for end in ("origin", "destination"):
+        try:
+            weather[end] = fetch_weather(shipment[f"{end}_lat"], shipment[f"{end}_lon"])
+        except Exception as exc:
+            log.warning("weather feed failed for %s %s: %s", shipment.get("shipment_id"), end, exc)
+            weather[end] = None
+    return weather
+
+
+def fetch_news(shipment: Dict[str, Any]) -> Optional[List[Dict[str, Any]]]:
+    """Return recent GDELT headlines about risks at a shipment's origin and destination ports.
+
+    Returns [] when GDELT has no matching articles and None if the feed fails
+    (logged), so one bad feed never stops the run. GDELT allows one request
+    every 5 seconds, hence the sleep.
+    """
+    time.sleep(5)
+    try:
+        return [
+            {"title": a["title"], "seen": a["seendate"]}
+            for a in http_session.get(
+                "https://api.gdeltproject.org/api/v2/doc/doc",
+                params={
+                    "query": (
+                        f'("{validator.PORTS_BY_CODE[shipment["origin_port"]]["name"]}"'
+                        f' OR "{validator.PORTS_BY_CODE[shipment["destination_port"]]["name"]}")'
+                        ' (piracy OR "armed robbery" OR "port congestion" OR strike OR protest OR unrest)'
+                    ),
+                    "mode": "ArtList",
+                    "maxrecords": 8,
+                    "format": "json",
+                    "timespan": "3d",
+                },
+                timeout=HTTP_TIMEOUT,
+            ).json().get("articles", [])
+        ]
+    except Exception as exc:
+        log.warning("news feed failed for %s: %s", shipment.get("shipment_id"), exc)
+        return None
+
+
+def assess_shipments(shipments: pd.DataFrame) -> pd.DataFrame:
+    """Return one row per shipment: the original columns plus Gemini's response fields.
+
+    The weather and news are only used inside the prompt and the saved file. If
+    the API call fails or the response is missing required fields, the row gets
+    FALLBACK_AI_RESPONSE. Each shipment's input row, weather, news and AI response
+    are also saved together in data_manager.PROCESSED_FILE, keyed by shipment_id.
+    """
+    rows = []
+    processed = {}
+    DB_RECORDS = data_manager.load_records()
+    for shipment in shipments.to_dict("records"):
+        external = {"weather": get_shipment_weather(shipment), "news": fetch_news(shipment)}
+        try:
+            result = call_gemini(build_prompt(shipment, external))
+            if not all(k in result for k in RESPONSE_SCHEMA["required"]):
+                raise ValueError("Gemini response missing required fields")
+        except Exception as exc:
+            log.error("AI assessment failed for %s: %s", shipment["shipment_id"], exc)
+            result = FALLBACK_AI_RESPONSE
+        rows.append({**shipment, **result})
+        processed[shipment["shipment_id"]] = {"shipment": shipment, **external, "ai_response": result}
+    try:
+        #data_manager.save_records(processed, data_manager.PROCESSED_FILE) old statement
+        data_manager.add_record(DB_FILE, DB_RECORDS, processed, data_manager.PROCESSED_FILE)
+    except (OSError, TypeError) as exc:
+        log.error("could not save %s: %s", data_manager.PROCESSED_FILE, exc)
+    return pd.DataFrame(rows)
