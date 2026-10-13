@@ -71,11 +71,14 @@ def assign_shipment_ids(df):
     return df
 
 def input_method():
-    """Ask whether to enter shipments manually or from a CSV file; return them with IDs assigned."""
+    """Ask whether to enter shipments manually or from a CSV file; return them with IDs assigned (None on Back)."""
     selection = questionary.select(
         "How do you want to add shipments?",
-        choices=["Enter manually", "Upload a CSV file"],
+        choices=["Enter manually", "Upload a CSV file", "Back"],
+        erase_when_done=True,
     ).unsafe_ask()
+    if selection == "Back":
+        return None
     if selection == "Upload a CSV file":
         return assign_shipment_ids(csv_shipments())
     return assign_shipment_ids(manual_shipments())
@@ -164,8 +167,11 @@ def get_search_criteria(db_records):
     needs_human = ""
     Add_Criteria = questionary.select(
         "Would you like to add a filter",
-        choices=["Yes","No (Run Search)"]
+        choices=["Yes","No (Run Search)","Back"],
+        erase_when_done=True,
     ).unsafe_ask()
+    if Add_Criteria == "Back":
+        return
     match Add_Criteria:
         case "Yes":
             while True:
@@ -176,23 +182,27 @@ def get_search_criteria(db_records):
 
                 Criteria = questionary.select(
                     "Filters",
-                    choices=["Risk","Outcome","Needs Human","Back (Finished Adding Filter)"]
+                    choices=["Risk","Outcome","Needs Human","Back (Finished Adding Filter)"],
+                    erase_when_done=True,
                 ).unsafe_ask()
                 match Criteria:
                     case "Risk":
                         risk = questionary.select(
                             "Risk",
                             choices=["Low", "Medium", "High"],
+                            erase_when_done=True,
                         ).unsafe_ask()
                     case "Outcome":
                         outcome = questionary.select(
                             "Outcome",
                             choices=["DELAY","INSURE","PROCEED","ESCALATE","REJECT"],
+                            erase_when_done=True,
                         ).unsafe_ask()
                     case "Needs Human":
                         needs_human = questionary.select(
                             "Needs Human",
                             choices=["YES","NO"],
+                            erase_when_done=True,
                         ).unsafe_ask()
                     case "Back (Finished Adding Filter)":
                         break
@@ -213,11 +223,14 @@ def main_menu(db_records):
     selection = questionary.select(
         "Main Menu",
         choices=["Add Shipment", "Search by Criteria", "Quit"],
+        erase_when_done=True,
     ).ask()
     try:
         match selection:
             case "Add Shipment":
                 shipments = input_method()
+                if shipments is None:  # the user chose Back
+                    return True
                 assessments = ai_manager.assess_shipments(shipments)
                 results = logic_manager.evaluate_shipments(assessments, db_records)
                 data_manager.add_record(data_manager.DB_FILE, db_records, results)
