@@ -12,4 +12,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Specify the command to run on container startup
-CMD ["python", "app.py"]
+CMD ["python", "io_manager.py"]

@@ -145,8 +145,8 @@ def input_method():
     return assign_shipment_ids(manual_shipments())
 
 
-def main_menu():
-    """main menu when running main.py"""
+def main_menu(db_records):
+    """Show the main menu and run the chosen action. Returns False when the user quits, otherwise True."""
     selection = questionary.select(
         "Main Menu",
         choices=["Add Shipment", "Show Dashboard", "Quit"],
@@ -156,14 +156,15 @@ def main_menu():
             shipments = input_method()
             assessments = ai_manager.assess_shipments(shipments)
             results = logic_manager.evaluate_shipments(assessments, db_records)
-            data_manager.add_record(data_manager.DB_FILE, db_records, results)                             
+            data_manager.add_record(data_manager.DB_FILE, db_records, results)
             show_summary(assessments)
             show_details(assessments)
             show_decisions(results)
         case "Show Dashboard":
             print("Dashboard Placeholder")
-        case "Quit":
+        case "Quit" | None:  # None: the user pressed Ctrl+C at the prompt
             return False
+    return True
 
 def csv_shipments():
     """Load shipments from a CSV file and return them as a DataFrame.
@@ -263,9 +264,9 @@ def show_decisions(results):
             for reason in d['rationale']:
                 print(f"    - {reason}")
 
-db_records = data_manager.load_records(data_manager.DB_FILE)
-while True:
-    if main_menu() == False:
-        break
-    else:
-        main_menu()
+
+if __name__ == "__main__":
+    # Past records are loaded once so Rule 3 can check the last 21 days.
+    db_records = data_manager.load_records(data_manager.DB_FILE)
+    while main_menu(db_records):
+        pass
