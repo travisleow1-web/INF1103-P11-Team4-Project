@@ -208,4 +208,13 @@ def evaluate_shipment(ai_record, db_records, now=None):
 
 def evaluate_shipments(assessments, db_records, now=None):
     """Evaluate every row of ai_manager.assess_shipments(); returns [(record, decision), ...]."""
-    return [evaluate_shipment(row, db_records, now) for row in assessments.to_dict("records")]
+    results = []
+    for row in assessments.to_dict("records"):
+        try:
+            results.append(evaluate_shipment(row, db_records, now))
+        except Exception as exc:
+            d = new_decision(str(row.get("shipment_id", "UNKNOWN")))
+            d["outcome"] = "REJECT"
+            _note(d, f"Evaluation failed: {exc!r}", "Evaluation error", human=True)
+            results.append((row, d))
+    return results

@@ -65,12 +65,12 @@ def query_records(db_records, filter):
   for r in db_records:
     decision = r["decision"]
 
-
-    if decision.get("overall_risk") != risk:
-      continue  
-    if decision.get("outcome") != outcome:
+    # A filter left as "" was never set, so it matches every record.
+    if risk != "" and decision.get("overall_risk") != risk:
       continue
-    if decision.get("needs_human") != needs_human:
+    if outcome != "" and decision.get("outcome") != outcome:
+      continue
+    if needs_human != "" and decision.get("needs_human") != needs_human:
       continue
     result.append(r)
 

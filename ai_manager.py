@@ -125,5 +125,12 @@ def enrich_record(record: Dict[Any, Any]) -> Dict[str, Any]:
     return {**shipment, **result, "external_data_fetched_at": fetched_at}
 
 def assess_shipments(shipments: pd.DataFrame) -> pd.DataFrame:
-    rows = [enrich_record(s) for s in shipments.to_dict("records")]
+    rows = []
+    for record in shipments.to_dict("records"):
+        try:
+            rows.append(enrich_record(record))
+        except Exception as exc:
+            log.error("could not assess %s: %s", record.get("shipment_id"), exc)
+            rows.append({**record, **FALLBACK_AI_RESPONSE,
+                         "external_data_fetched_at": datetime.now().isoformat(timespec="seconds")})
     return pd.DataFrame(rows)

@@ -19,7 +19,7 @@ def ask_port(message, validate=validator.validate_port):
         choices=validator.PORT_CHOICES,
         match_middle=True,
         validate=validate,
-    ).ask()
+    ).unsafe_ask()
     return answer.split(" - ")[0].strip().upper()
 
 def origin_port():
@@ -44,7 +44,7 @@ def departure_time():
     """
     answer = questionary.text(
         "Departure time (DD/MM/YYYY):", validate=validator.validate_date
-    ).ask()
+    ).unsafe_ask()
     return answer.strip()
 
 def arrival_time(departure):
@@ -56,7 +56,7 @@ def arrival_time(departure):
     answer = questionary.text(
         "Arrival time (DD/MM/YYYY):",
         validate=lambda answer: validator.validate_arrival_date(answer, departure),
-    ).ask()
+    ).unsafe_ask()
     return answer.strip()
 
 def manual_shipments():
@@ -96,7 +96,7 @@ def manual_shipments():
         departure_times.append(departure)
         arrival_times.append(arrival_time(departure))
 
-        if questionary.confirm("Add another shipment?").ask():
+        if questionary.confirm("Add another shipment?").unsafe_ask():
             continue
         break
 
@@ -132,7 +132,7 @@ def input_method():
     selection = questionary.select(
         "How do you want to add shipments?",
         choices=["Enter manually", "Upload a CSV file"],
-    ).ask()
+    ).unsafe_ask()
     if selection == "Upload a CSV file":
         return assign_shipment_ids(csv_shipments())
     return assign_shipment_ids(manual_shipments())
@@ -147,7 +147,7 @@ def csv_shipments():
     those are entered manually and appended below the CSV rows.
     """
     while True:
-        path = questionary.path("CSV file path:", validate=validator.validate_csv_path).ask()
+        path = questionary.path("CSV file path:", validate=validator.validate_csv_path).unsafe_ask()
         try:
             # Read everything as text and turn blank cells into "" so the
             # checks below don't have to deal with NaN.
@@ -162,7 +162,7 @@ def csv_shipments():
         print(df)
         break
 
-    if questionary.confirm("Add further shipments manually?").ask():
+    if questionary.confirm("Add further shipments manually?").unsafe_ask():
         return pd.concat([df, manual_shipments()], ignore_index=True)
     return df
 
@@ -232,7 +232,7 @@ def get_search_criteria(db_records):
     Add_Criteria = questionary.select(
         "Would you like to add a filter",
         choices=["Yes","No (Run Search)"]
-    ).ask()
+    ).unsafe_ask()
     match Add_Criteria:
         case "Yes":
             while True:
@@ -244,23 +244,23 @@ def get_search_criteria(db_records):
                 Criteria = questionary.select(
                     "Filters",
                     choices=["Risk","Outcome","Needs Human","Back (Finished Adding Filter)"]
-                ).ask()
+                ).unsafe_ask()
                 match Criteria:
                     case "Risk":
                         risk = questionary.select(
                             "Risk",
-                            choices=["Low", "Med", "High"],
-                        ).ask()
+                            choices=["Low", "Medium", "High"],
+                        ).unsafe_ask()
                     case "Outcome":
                         outcome = questionary.select(
                             "Outcome",
-                            choices=["DELAY","INSURE","REROUTE","PROCEED","ESCALATE"],
-                        ).ask()
+                            choices=["DELAY","INSURE","PROCEED","ESCALATE","REJECT"],
+                        ).unsafe_ask()
                     case "Needs Human":
                         needs_human = questionary.select(
                             "Needs Human",
                             choices=["YES","NO"],
-                        ).ask()
+                        ).unsafe_ask()
                     case "Back (Finished Adding Filter)":
                         break
     if needs_human == "YES":
@@ -281,19 +281,22 @@ def main_menu(db_records):
         "Main Menu",
         choices=["Add Shipment", "Search by Criteria", "Quit"],
     ).ask()
-    match selection:
-        case "Add Shipment":
-            shipments = input_method()
-            assessments = ai_manager.assess_shipments(shipments)
-            results = logic_manager.evaluate_shipments(assessments, db_records)
-            data_manager.add_record(data_manager.DB_FILE, db_records, results)
-            show_summary(assessments)
-            show_details(assessments)
-            show_decisions(results)
-        case "Search by Criteria":
-            get_search_criteria(db_records)
-        case "Quit" | None:  # None: the user pressed Ctrl+C at the prompt
-            return False
+    try:
+        match selection:
+            case "Add Shipment":
+                shipments = input_method()
+                assessments = ai_manager.assess_shipments(shipments)
+                results = logic_manager.evaluate_shipments(assessments, db_records)
+                data_manager.add_record(data_manager.DB_FILE, db_records, results)
+                show_summary(assessments)
+                show_details(assessments)
+                show_decisions(results)
+            case "Search by Criteria":
+                get_search_criteria(db_records)
+            case "Quit" | None:  # None: the user pressed Ctrl+C at the prompt
+                return False
+    except KeyboardInterrupt:  # Ctrl+C inside an action: back to the menu
+        print("Cancelled, back to the main menu.")
     return True
 
 if __name__ == "__main__":
