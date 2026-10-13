@@ -5,6 +5,7 @@ import validator
 CACHE_FILE = "ai_cache.json"
 MAX_RETRIES = 3
 HTTP_TIMEOUT = 20
+HISTORY_DAYS = 90  # shipments that departed this recently get historical weather
 TIMEZONE = "Asia/Singapore"
 SCHEMA_VERSION = 2
 
@@ -32,7 +33,8 @@ ALLOWED_EXTREME_EVENTS = [
     "port_closure", "vessel_collision", "armed_attack", "other",
 ]
 
-ALLOWED_SOURCES = ["open_meteo_weather", "open_meteo_marine", "gdelt_news", "shipment_data"]
+ALLOWED_SOURCES = ["open_meteo_weather", "open_meteo_marine", "open_meteo_historical_forecast",
+                   "open_meteo_historical_weather", "gdelt_news", "shipment_data"]
 
 INSIGHT_CODES = [
     "POTENTIAL_DELAY", "MULTIPLE_RISKS", "EXTREME_EVENT",
@@ -50,6 +52,8 @@ You NEVER decide operational actions (such as proceed, delay, reroute, or insure
 Rules:
 - Identify ALL distinct risk factors present across the data. Do NOT omit moderate or low risks.
 - Use ONLY the shipment data and external data provided. Do not invent facts.
+- For shipments that already departed, weather covers the departure-to-arrival dates: historical forecast data
+  (hourly keys) plus "historical_weather" (reanalysis; visibility is null). Judge what the shipment experienced.
 - If data is missing, old, or contradictory, lower confidence_score and set conflicting_sources to true.
 - confidence_score is a number from 0.0 to 1.0.
 - Output is read by code, not people. NEVER write sentences or prose in any field.
