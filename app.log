@@ -121,3 +121,79 @@
 2026-10-13 16:23:41 [ERROR] ai_manager: GEMINI_API_KEY is not set; AI calls will use the fallback response.
 2026-10-13 16:23:41 [WARNING] ai_manager: call_gemini attempt 3/3 failed: GEMINI_API_KEY is not set
 2026-10-13 16:23:41 [ERROR] ai_manager: AI assessment failed for SHP-005: GEMINI_API_KEY is not set
+2026-10-13 16:48:26 [WARNING] ai_manager: news feed failed for SHP-001: Expecting value: line 1 column 1 (char 0)
+2026-10-13 16:48:26 [ERROR] ai_manager: GEMINI_API_KEY is not set; AI calls will use the fallback response.
+2026-10-13 16:48:26 [WARNING] ai_manager: call_gemini attempt 1/3 failed: GEMINI_API_KEY is not set
+2026-10-13 16:48:27 [ERROR] ai_manager: GEMINI_API_KEY is not set; AI calls will use the fallback response.
+2026-10-13 16:48:27 [WARNING] ai_manager: call_gemini attempt 2/3 failed: GEMINI_API_KEY is not set
+2026-10-13 16:48:31 [ERROR] ai_manager: GEMINI_API_KEY is not set; AI calls will use the fallback response.
+2026-10-13 16:48:31 [WARNING] ai_manager: call_gemini attempt 3/3 failed: GEMINI_API_KEY is not set
+2026-10-13 16:48:31 [ERROR] ai_manager: AI assessment failed for SHP-001: GEMINI_API_KEY is not set
+2026-10-13 16:48:48 [WARNING] ai_manager: news feed failed for SHP-002: Expecting value: line 1 column 1 (char 0)
+2026-10-13 16:48:48 [ERROR] ai_manager: GEMINI_API_KEY is not set; AI calls will use the fallback response.
+2026-10-13 16:48:48 [WARNING] ai_manager: call_gemini attempt 1/3 failed: GEMINI_API_KEY is not set
+2026-10-13 16:48:50 [ERROR] ai_manager: GEMINI_API_KEY is not set; AI calls will use the fallback response.
+2026-10-13 16:48:50 [WARNING] ai_manager: call_gemini attempt 2/3 failed: GEMINI_API_KEY is not set
+2026-10-13 16:48:53 [ERROR] ai_manager: GEMINI_API_KEY is not set; AI calls will use the fallback response.
+2026-10-13 16:48:53 [WARNING] ai_manager: call_gemini attempt 3/3 failed: GEMINI_API_KEY is not set
+2026-10-13 16:48:53 [ERROR] ai_manager: AI assessment failed for SHP-002: GEMINI_API_KEY is not set
+2026-10-13 16:49:15 [ERROR] ai_manager: GEMINI_API_KEY is not set; AI calls will use the fallback response.
+2026-10-13 16:49:15 [WARNING] ai_manager: call_gemini attempt 1/3 failed: GEMINI_API_KEY is not set
+2026-10-13 16:49:16 [ERROR] ai_manager: GEMINI_API_KEY is not set; AI calls will use the fallback response.
+2026-10-13 16:49:16 [WARNING] ai_manager: call_gemini attempt 2/3 failed: GEMINI_API_KEY is not set
+2026-10-13 16:49:19 [ERROR] ai_manager: GEMINI_API_KEY is not set; AI calls will use the fallback response.
+2026-10-13 16:49:19 [WARNING] ai_manager: call_gemini attempt 3/3 failed: GEMINI_API_KEY is not set
+2026-10-13 16:49:19 [ERROR] ai_manager: AI assessment failed for SHP-003: GEMINI_API_KEY is not set
+2026-10-13 16:49:37 [WARNING] ai_manager: news feed failed for SHP-004: Expecting value: line 1 column 1 (char 0)
+2026-10-13 16:49:37 [ERROR] ai_manager: GEMINI_API_KEY is not set; AI calls will use the fallback response.
+2026-10-13 16:49:37 [WARNING] ai_manager: call_gemini attempt 1/3 failed: GEMINI_API_KEY is not set
+2026-10-13 16:49:39 [ERROR] ai_manager: GEMINI_API_KEY is not set; AI calls will use the fallback response.
+2026-10-13 16:49:39 [WARNING] ai_manager: call_gemini attempt 2/3 failed: GEMINI_API_KEY is not set
+2026-10-13 16:49:43 [ERROR] ai_manager: GEMINI_API_KEY is not set; AI calls will use the fallback response.
+2026-10-13 16:49:43 [WARNING] ai_manager: call_gemini attempt 3/3 failed: GEMINI_API_KEY is not set
+2026-10-13 16:49:43 [ERROR] ai_manager: AI assessment failed for SHP-004: GEMINI_API_KEY is not set
+2026-10-13 16:50:17 [ERROR] ai_manager: GEMINI_API_KEY is not set; AI calls will use the fallback response.
+2026-10-13 16:50:17 [WARNING] ai_manager: call_gemini attempt 1/3 failed: GEMINI_API_KEY is not set
+2026-10-13 16:50:19 [ERROR] ai_manager: GEMINI_API_KEY is not set; AI calls will use the fallback response.
+2026-10-13 16:50:19 [WARNING] ai_manager: call_gemini attempt 2/3 failed: GEMINI_API_KEY is not set
+2026-10-13 16:50:22 [ERROR] ai_manager: GEMINI_API_KEY is not set; AI calls will use the fallback response.
+2026-10-13 16:50:22 [WARNING] ai_manager: call_gemini attempt 3/3 failed: GEMINI_API_KEY is not set
+2026-10-13 16:50:22 [ERROR] ai_manager: AI assessment failed for SHP-005: GEMINI_API_KEY is not set
+2026-10-13 16:51:44 [WARNING] ai_manager: news feed failed for SHP-001: Expecting value: line 1 column 1 (char 0)
+2026-10-13 16:51:44 [ERROR] ai_manager: GEMINI_API_KEY is not set; AI calls will use the fallback response.
+2026-10-13 16:51:44 [WARNING] ai_manager: call_gemini attempt 1/3 failed: GEMINI_API_KEY is not set
+2026-10-13 16:51:46 [ERROR] ai_manager: GEMINI_API_KEY is not set; AI calls will use the fallback response.
+2026-10-13 16:51:46 [WARNING] ai_manager: call_gemini attempt 2/3 failed: GEMINI_API_KEY is not set
+2026-10-13 16:51:49 [ERROR] ai_manager: GEMINI_API_KEY is not set; AI calls will use the fallback response.
+2026-10-13 16:51:49 [WARNING] ai_manager: call_gemini attempt 3/3 failed: GEMINI_API_KEY is not set
+2026-10-13 16:51:49 [ERROR] ai_manager: AI assessment failed for SHP-001: GEMINI_API_KEY is not set
+2026-10-13 16:52:10 [ERROR] ai_manager: GEMINI_API_KEY is not set; AI calls will use the fallback response.
+2026-10-13 16:52:10 [WARNING] ai_manager: call_gemini attempt 1/3 failed: GEMINI_API_KEY is not set
+2026-10-13 16:52:12 [ERROR] ai_manager: GEMINI_API_KEY is not set; AI calls will use the fallback response.
+2026-10-13 16:52:12 [WARNING] ai_manager: call_gemini attempt 2/3 failed: GEMINI_API_KEY is not set
+2026-10-13 16:52:14 [ERROR] ai_manager: GEMINI_API_KEY is not set; AI calls will use the fallback response.
+2026-10-13 16:52:14 [WARNING] ai_manager: call_gemini attempt 3/3 failed: GEMINI_API_KEY is not set
+2026-10-13 16:52:14 [ERROR] ai_manager: AI assessment failed for SHP-002: GEMINI_API_KEY is not set
+2026-10-13 16:52:31 [WARNING] ai_manager: news feed failed for SHP-003: Expecting value: line 1 column 1 (char 0)
+2026-10-13 16:52:31 [ERROR] ai_manager: GEMINI_API_KEY is not set; AI calls will use the fallback response.
+2026-10-13 16:52:31 [WARNING] ai_manager: call_gemini attempt 1/3 failed: GEMINI_API_KEY is not set
+2026-10-13 16:52:32 [ERROR] ai_manager: GEMINI_API_KEY is not set; AI calls will use the fallback response.
+2026-10-13 16:52:32 [WARNING] ai_manager: call_gemini attempt 2/3 failed: GEMINI_API_KEY is not set
+2026-10-13 16:52:35 [ERROR] ai_manager: GEMINI_API_KEY is not set; AI calls will use the fallback response.
+2026-10-13 16:52:35 [WARNING] ai_manager: call_gemini attempt 3/3 failed: GEMINI_API_KEY is not set
+2026-10-13 16:52:35 [ERROR] ai_manager: AI assessment failed for SHP-003: GEMINI_API_KEY is not set
+2026-10-13 16:53:00 [ERROR] ai_manager: GEMINI_API_KEY is not set; AI calls will use the fallback response.
+2026-10-13 16:53:00 [WARNING] ai_manager: call_gemini attempt 1/3 failed: GEMINI_API_KEY is not set
+2026-10-13 16:53:01 [ERROR] ai_manager: GEMINI_API_KEY is not set; AI calls will use the fallback response.
+2026-10-13 16:53:01 [WARNING] ai_manager: call_gemini attempt 2/3 failed: GEMINI_API_KEY is not set
+2026-10-13 16:53:03 [ERROR] ai_manager: GEMINI_API_KEY is not set; AI calls will use the fallback response.
+2026-10-13 16:53:03 [WARNING] ai_manager: call_gemini attempt 3/3 failed: GEMINI_API_KEY is not set
+2026-10-13 16:53:03 [ERROR] ai_manager: AI assessment failed for SHP-004: GEMINI_API_KEY is not set
+2026-10-13 16:53:20 [WARNING] ai_manager: news feed failed for SHP-005: Expecting value: line 1 column 1 (char 0)
+2026-10-13 16:53:20 [ERROR] ai_manager: GEMINI_API_KEY is not set; AI calls will use the fallback response.
+2026-10-13 16:53:20 [WARNING] ai_manager: call_gemini attempt 1/3 failed: GEMINI_API_KEY is not set
+2026-10-13 16:53:22 [ERROR] ai_manager: GEMINI_API_KEY is not set; AI calls will use the fallback response.
+2026-10-13 16:53:22 [WARNING] ai_manager: call_gemini attempt 2/3 failed: GEMINI_API_KEY is not set
+2026-10-13 16:53:26 [ERROR] ai_manager: GEMINI_API_KEY is not set; AI calls will use the fallback response.
+2026-10-13 16:53:26 [WARNING] ai_manager: call_gemini attempt 3/3 failed: GEMINI_API_KEY is not set
+2026-10-13 16:53:26 [ERROR] ai_manager: AI assessment failed for SHP-005: GEMINI_API_KEY is not set

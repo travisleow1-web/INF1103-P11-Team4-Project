@@ -24,11 +24,9 @@ def ask_port(message, validate=validator.validate_port):
     ).ask()
     return answer.split(" - ")[0].strip().upper()
 
-
 def origin_port():
     """Prompt for the origin port and return its code."""
     return ask_port("Origin port:")
-
 
 def destination_port(origin):
     """Prompt for the destination port and return its code.
@@ -41,7 +39,6 @@ def destination_port(origin):
         validate=lambda answer: validator.validate_destination_port(answer, origin),
     )
 
-
 def departure_time():
     """Prompt for the departure date, re-asking until it is a valid DD/MM/YYYY.
 
@@ -51,7 +48,6 @@ def departure_time():
         "Departure time (DD/MM/YYYY):", validate=validator.validate_date
     ).ask()
     return answer.strip()
-
 
 def arrival_time(departure):
     """Prompt for the arrival date, re-asking until it is a valid DD/MM/YYYY after departure.
@@ -64,7 +60,6 @@ def arrival_time(departure):
         validate=lambda answer: validator.validate_arrival_date(answer, departure),
     ).ask()
     return answer.strip()
-
 
 def manual_shipments():
     """Collect one or more shipments from the user and return them as a DataFrame.
@@ -143,27 +138,6 @@ def input_method():
     if selection == "Upload a CSV file":
         return assign_shipment_ids(csv_shipments())
     return assign_shipment_ids(manual_shipments())
-
-
-def main_menu():
-    """main menu when running main.py"""
-    selection = questionary.select(
-        "Main Menu",
-        choices=["Add Shipment", "Show Dashboard", "Quit"],
-    ).ask()
-    match selection:
-        case "Add Shipment":
-            shipments = input_method()
-            assessments = ai_manager.assess_shipments(shipments)
-            results = logic_manager.evaluate_shipments(assessments, db_records)
-            data_manager.add_record(data_manager.DB_FILE, db_records, results)                             
-            show_summary(assessments)
-            show_details(assessments)
-            show_decisions(results)
-        case "Show Dashboard":
-            print("Dashboard Placeholder")
-        case "Quit":
-            return False
 
 def csv_shipments():
     """Load shipments from a CSV file and return them as a DataFrame.
@@ -263,9 +237,99 @@ def show_decisions(results):
             for reason in d['rationale']:
                 print(f"    - {reason}")
 
+def get_search_criteria(db_records):
+    risk = ""
+    outcome = ""
+    needs_human = ""
+    Add_Criteria = ""
+    Add_Criteria = questionary.select(
+        "Would you like to add a filter",
+        choices=["Yes","No (Run Search)"]
+    ).ask()
+    match Add_Criteria:
+        case "Yes":
+            while True:
+                print("Current Filters")
+                print(f"Risk : {risk}")
+                print(f"Outcome : {outcome}")
+                print(f"Needs Human : {needs_human}")
+
+                Criteria = ""
+                Criteria = questionary.select(
+                    "Filters",
+                    choices=["Risk","Outcome","Needs Human","Back (Finished Adding Filter)"]
+                ).ask()
+                match Criteria:
+                    case "Risk":
+                        risk = questionary.select(
+                            "Risk",
+                            choices=["Low", "Med", "High"],
+                        ).ask()
+                    case "Outcome":
+                        outcome = questionary.select(
+                            "Outcome",
+                            choices=["DELAY","INSURE","REROUTE","PROCEED","ESCALATE"],
+                        ).ask()
+                    case "Needs Human":
+                        needs_human = questionary.select(
+                            "Needs Human",
+                            choices=["YES","NO"],
+                        ).ask()
+                    case "Back (Finished Adding Filter)":
+                        break
+    if needs_human == "YES":
+        needs_human = True
+    elif needs_human == "NO":
+        needs_human = False
+    search_filter = {
+        "risk" : risk,
+        "outcome" : outcome,
+        "needs_human" : needs_human,
+    }
+    results = data_manager.query_records(db_records, search_filter)
+    for record in results:
+        d = record['decision']
+        print(f"\n{record['shipment_id']} | {record.get('origin', '?')} -> {record.get('destination', '?')}")
+        print(f"  Outcome     : {d['outcome']}")
+        print(f"  Overall risk: {d['overall_risk']}")
+        hold = " (shipment on hold)" if d['hold_shipment'] else ""
+        print(f"  Human review: {'YES' if d['needs_human'] else 'no'}{hold}")
+        if d['flags']:
+            print(f"  Flags       : {', '.join(d['flags'])}")
+        for action in d['actions']:
+            print(f"    * {action}")
+        for alert in d['alerts']:
+            print(f"    ! Alert to {alert['recipient']} via {'/'.join(alert['channels'])}")
+        if d['rationale']:
+            print("  Why:")
+            for reason in d['rationale']:
+                print(f"    - {reason}")
+    
+
+def main_menu(db_records):
+    """main menu when running main.py"""
+    selection = ""
+    selection = questionary.select(
+        "Main Menu",
+        choices=["Add Shipment", "Search by Criteria", "Quit"],
+    ).ask()
+    match selection:
+        case "Add Shipment":
+            shipments = input_method()
+            assessments = ai_manager.assess_shipments(shipments)
+            results = logic_manager.evaluate_shipments(assessments, db_records)
+            data_manager.add_record(data_manager.DB_FILE, db_records, results)                             
+            show_summary(assessments)
+            show_details(assessments)
+            show_decisions(results)
+        case "Search by Criteria":
+            get_search_criteria(db_records)
+        case "Quit":
+            return False
+
 db_records = data_manager.load_records(data_manager.DB_FILE)
 while True:
-    if main_menu() == False:
+    if main_menu(db_records) == False:
         break
     else:
-        main_menu()
+        main_menu(db_records)
