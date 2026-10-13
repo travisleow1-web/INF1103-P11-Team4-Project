@@ -35,11 +35,6 @@ def new_decision(shipment_id):
             "needs_human": False, "flags": [], "actions": [], "alerts": [], "rationale": []}
 
 
-def decision_to_dict(decision):
-    """Independent copy of a decision, in the shape data_manager.add_record expects."""
-    return copy.deepcopy(decision)
-
-
 # ---------------- Helpers ----------------
 def _level(text):
     return LEVEL_FROM_TEXT.get(str(text).strip().lower(), LOW)

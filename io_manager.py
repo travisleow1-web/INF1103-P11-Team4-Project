@@ -174,7 +174,6 @@ def csv_shipments():
         return pd.concat([df, manual_shipments()], ignore_index=True)
     return df
 
-
 def show_summary(assessments):
     """Print one aligned row per shipment with scalar fields only.
 
@@ -197,7 +196,6 @@ def show_summary(assessments):
     ]
     print(pd.DataFrame(rows).to_string(index=False))
 
-
 def show_details(assessments):
     """Print a text block per shipment: header, each risk factor, then the insights."""
     for a in assessments.to_dict("records"):
@@ -210,7 +208,6 @@ def show_details(assessments):
         print("  Insights:")
         for insight in a["insights"]:
             print(f"    - {insight}")
-
 
 def show_risk_factors(assessments):
     """Print one row per (shipment, risk factor) pair, for sorting or filtering by severity."""

@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import logic_manager
+import copy
 from datetime import datetime
 
 DB_FILE = "shipments.json"
@@ -26,7 +27,6 @@ def add_record(file_path, db_records, results):
 
   for record, decision in results:
     try:
-      decision = logic_manager.decision_to_dict(decision)
       entry = {
           **record,
           "decision": decision,
