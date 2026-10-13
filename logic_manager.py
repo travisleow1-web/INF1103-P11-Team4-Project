@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 import data_manager
 import validator
-from config import (ALLOWED_IMPACT, ALLOWED_LOCATIONS, ALLOWED_RISK_TYPES,
+from config import (ALLOWED_EXTREME_EVENTS, ALLOWED_IMPACT, ALLOWED_LOCATIONS, ALLOWED_RISK_TYPES,
                         ALLOWED_SEVERITY, INSIGHT_CODES, INSIGHT_RISK_TYPES)
 
 # Thresholds and rule inputs (change them here, not inside the rules)
