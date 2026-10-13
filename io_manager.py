@@ -222,6 +222,30 @@ def show_risk_factors(assessments):
         ).to_string(index=False)
     )
 
+def show_decisions(results):
+    """Print the Logic Manager's decision for each shipment.
+
+    results is the list of (record, decision) pairs from
+    logic_manager.evaluate_shipments().
+    """
+    print("\n========== DECISIONS ==========")
+    for record, d in results:
+        print(f"\n{d['shipment_id']} | {record.get('origin', '?')} -> {record.get('destination', '?')}")
+        print(f"  Outcome     : {d['outcome']}")
+        print(f"  Overall risk: {d['overall_risk']}")
+        hold = " (shipment on hold)" if d['hold_shipment'] else ""
+        print(f"  Human review: {'YES' if d['needs_human'] else 'no'}{hold}")
+        if d['flags']:
+            print(f"  Flags       : {', '.join(d['flags'])}")
+        for action in d['actions']:
+            print(f"    * {action}")
+        for alert in d['alerts']:
+            print(f"    ! Alert to {alert['recipient']} via {'/'.join(alert['channels'])}")
+        if d['rationale']:
+            print("  Why:")
+            for reason in d['rationale']:
+                print(f"    - {reason}")
+
 
 if __name__ == "__main__":
     print(input_method())

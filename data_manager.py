@@ -71,5 +71,3 @@ def query_records(db_records, filter):
         result.append(r)
 
   return result
-
-records = load_records(DB_FILE)
