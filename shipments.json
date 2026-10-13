@@ -341,10 +341,10 @@
     "baseline_distance_km": 3813.5,
     "decision": {
       "shipment_id": "SHP-001",
-      "overall_risk": "Low",
+      "overall_risk": "High",
       "outcome": "ESCALATE",
       "hold_shipment": true,
-      "needs_human": true,
+      "needs_human": false,
       "flags": [
         "Low AI confidence",
         "Conflicting sources",

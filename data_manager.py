@@ -69,15 +69,13 @@ def query_records(db_records, filter):
   for r in db_records:
     decision = r["decision"]
 
-    matched_record = (
-        #filtered criteria is not empty and record matches criteria
-        (risk and decision.get("overall_risk") == risk) or 
-        (outcome and decision.get("outcome") == outcome) or 
-        (needs_human is not None and decision.get("needs_human") == needs_human) #or
-        #(origin_port and (origin_port in r["origin"].lower())) or 
-        #(dest_port and (dest_port in r["destination"].lower()))
-    )
-    if matched_record:
-        result.append(r)
+
+    if decision.get("overall_risk") != risk:
+      continue  
+    if decision.get("outcome") != outcome:
+      continue
+    if decision.get("needs_human") != needs_human:
+      continue
+    result.append(r)
 
   return result
