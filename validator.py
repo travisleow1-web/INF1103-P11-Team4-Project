@@ -2,8 +2,7 @@ import json
 import os
 from datetime import UTC, datetime
 
-# Load the port reference once at import time. The path is relative, so the
-# program must be run from the repo root.
+# Loaded once at import. The path is relative, so run from the repo root.
 with open("ports_reference_4.json") as f:
     PORTS = json.load(f)["ports"]
 
@@ -14,26 +13,17 @@ PORTS_BY_CODE = {p["code"]: p for p in PORTS}
 
 
 def port_coordinates(code):
-    """Return the (lat, lon) of the port with this code.
-
-    Raises KeyError if the code isn't in the reference, so only pass codes
-    that have already been validated.
-    """
+    """Return (lat, lon) for a port code. Raises KeyError for an unknown code, so only pass validated codes."""
     port = PORTS_BY_CODE[code]
     return port["lat"], port["lon"]
 
 
 def validate_date(text):
-    """Check that text is a DD/MM/YYYY date, for use as a questionary validator.
-
-    Returns True when valid, otherwise an error message string that
-    questionary shows to the user before asking again.
-    """
+    """Questionary validator: True for a DD/MM/YYYY date, otherwise an error message."""
     value = text.strip()
     if value == "":
         return "Departure time is required."
-    # strptime raises ValueError for wrong formats and impossible dates
-    # such as 31/02/2026.
+    # Rejects wrong formats and impossible dates such as 31/02/2026.
     try:
         datetime.strptime(value, "%d/%m/%Y").replace(tzinfo=UTC)
     except ValueError:
@@ -42,11 +32,7 @@ def validate_date(text):
 
 
 def validate_arrival_date(text, departure):
-    """Check that text is a valid DD/MM/YYYY date after departure, for use as a questionary validator.
-
-    departure is the already entered departure date string. Returns True when
-    valid, otherwise an error message string.
-    """
+    """Questionary validator: a valid DD/MM/YYYY date after the departure string."""
     result = validate_date(text)
     if result is not True:
         return result
@@ -56,22 +42,14 @@ def validate_arrival_date(text, departure):
 
 
 def validate_port(answer):
-    """Check that answer is exactly one of PORT_CHOICES, for use as a questionary validator.
-
-    Returns True when valid, otherwise an error message string. Partially
-    typed text is rejected, so the user has to pick an entry from the list.
-    """
+    """Questionary validator: the answer must be exactly one of PORT_CHOICES."""
     if answer in PORT_CHOICES:
         return True
     return "Unknown port, pick one from the list"
 
 
 def validate_destination_port(answer, origin):
-    """Check that answer is a known port and not the origin, for use as a questionary validator.
-
-    origin is the already chosen origin port code. Returns True when valid,
-    otherwise an error message string.
-    """
+    """Questionary validator: a known port that differs from the origin port code."""
     result = validate_port(answer)
     if result is not True:
         return result
@@ -81,7 +59,7 @@ def validate_destination_port(answer, origin):
 
 
 def validate_csv_path(text):
-    """Check that text is a path to an existing .csv file, for use as a questionary validator."""
+    """Questionary validator: a path to an existing .csv file."""
     value = text.strip()
     if value == "":
         return "File path is required."

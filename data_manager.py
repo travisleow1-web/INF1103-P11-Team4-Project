@@ -22,7 +22,7 @@ def save_records(db_records, file_path):
     json.dump(db_records, f, indent=2)
 
 def add_record(file_path, db_records, results):
-  """results is a list of (record, decision) pairs. Stores both, plus fields used for history look-ups."""
+  """Append each (record, decision) pair to db_records with its history fields, then save."""
   for record, decision in results:
     try:
       entry = {
@@ -49,14 +49,14 @@ def get_route_history(db_records, route_id, since):
   return out
 
 def query_records(db_records, filter):
-  """Used by IO Manager filter/query."""
+  """Return the records matching every filter that is set; "" means not set."""
 
   
   risk = filter.get("risk")
   outcome = filter.get("outcome")
   needs_human = filter.get("needs_human")
 
-  # Fast-path: if no filters applied, return shallow full list
+  # No filters set: return everything
   if risk == "" and outcome == "" and needs_human == "":
     print("No Filters Used, Returning all Records")
     return db_records

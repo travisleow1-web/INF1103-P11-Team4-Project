@@ -18,7 +18,8 @@ def history_window(shipment: Dict[str, Any]) -> Optional[Tuple[str, str]]:
         return None
     today = date.today()
     if today - timedelta(days=HISTORY_DAYS) <= start < today:
-        return start.isoformat(), min(end, today).isoformat()
+        # The archive API rejects today's date (its latest allowed end_date is yesterday).
+        return start.isoformat(), min(end, today - timedelta(days=1)).isoformat()
     return None
 
 def fetch_weather(lat: float, lon: float, window: Optional[Tuple[str, str]] = None) -> Dict[str, Any]:

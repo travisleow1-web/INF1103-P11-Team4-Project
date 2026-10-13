@@ -50,7 +50,7 @@ def _clean_list(value, keys):
     return good, len(value) - len(good) if isinstance(value, list) else 0
 
 def prepare_record(ai_record):
-    """Part 0: copy of the AI row plus route_id, port names, defaults and cleaned lists."""
+    """Copy the AI row and add route_id, port names, defaults and cleaned lists."""
     r = dict(ai_record)
     o, dst = r.get("origin_port", ""), r.get("destination_port", "")
     r.setdefault("route_id", f"{o}-{dst}")
@@ -70,7 +70,7 @@ def prepare_record(ai_record):
     return r
 
 def validate_record(r, d, now):
-    """Part 1: return False (REJECT) for unusable records; flag softer problems for human review."""
+    """Return False (REJECT) for unusable records; flag softer problems for human review."""
     missing = [f for f in REQUIRED_FIELDS if r.get(f) in (None, "")]
     conf = r.get("confidence_score")
     if missing or isinstance(conf, bool) or not isinstance(conf, (int, float)) or not 0.0 <= conf <= 1.0:
