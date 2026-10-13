@@ -283,7 +283,7 @@
       "overall_risk": "Low",
       "outcome": "ESCALATE",
       "hold_shipment": false,
-      "needs_human": true,
+      "needs_human": false,
       "flags": [
         "Low AI confidence",
         "Conflicting sources",
@@ -616,6 +616,951 @@
       ]
     },
     "saved_at": "2026-10-13T16:23:41.851622",
+    "flagged": true,
+    "delayed": false
+  },
+  {
+    "shipment_id": "SHP-001",
+    "origin_port": "SGSIN",
+    "origin_lat": "1.266667",
+    "origin_lon": "103.833333",
+    "destination_port": "CNSHA",
+    "destination_lat": "31.216667",
+    "destination_lon": "121.5",
+    "departure_time": "01/10/2026",
+    "arrival_time": "08/10/2026",
+    "risk_factors": [],
+    "primary_risk_factor": "infrastructure_disruption",
+    "affected_location": "Unknown",
+    "expected_impact": "None",
+    "confidence_score": 0.0,
+    "sources": [],
+    "conflicting_sources": true,
+    "extreme_event": "none",
+    "insights": [
+      {
+        "code": "MISSING_DATA",
+        "risk_type": "none",
+        "severity": "High",
+        "location": "Route",
+        "estimated_delay_days": 0
+      }
+    ],
+    "alternative_route": null,
+    "external_data_fetched_at": "2026-10-13T16:48:26",
+    "route_id": "SGSIN-CNSHA",
+    "origin": "Singapore",
+    "destination": "Shanghai",
+    "transport_type": "Cargo Vessel",
+    "goods": {},
+    "baseline_distance_km": 3813.5,
+    "decision": {
+      "shipment_id": "SHP-001",
+      "overall_risk": "Low",
+      "outcome": "ESCALATE",
+      "hold_shipment": true,
+      "needs_human": true,
+      "flags": [
+        "Low AI confidence",
+        "Conflicting sources",
+        "AI flagged: MISSING_DATA",
+        "Cautionary Override"
+      ],
+      "actions": [
+        "Require human dispatcher sign-off",
+        "Route to human review queue"
+      ],
+      "alerts": [],
+      "rationale": [
+        "Confidence 0.00 is below 0.60",
+        "AI reported conflicting or missing information",
+        "Rule 1b: MISSING_DATA none/High @Route -> human review",
+        "Rule 3: AI says Low but 2 shipment(s) on route SGSIN-CNSHA were flagged or delayed in the last 21 days"
+      ]
+    },
+    "saved_at": "2026-10-13T16:50:22.501415",
+    "flagged": true,
+    "delayed": false
+  },
+  {
+    "shipment_id": "SHP-002",
+    "origin_port": "SGSIN",
+    "origin_lat": "1.266667",
+    "origin_lon": "103.833333",
+    "destination_port": "NLRTM",
+    "destination_lat": "51.933333",
+    "destination_lon": "4.133333",
+    "departure_time": "03/10/2026",
+    "arrival_time": "27/10/2026",
+    "risk_factors": [],
+    "primary_risk_factor": "infrastructure_disruption",
+    "affected_location": "Unknown",
+    "expected_impact": "None",
+    "confidence_score": 0.0,
+    "sources": [],
+    "conflicting_sources": true,
+    "extreme_event": "none",
+    "insights": [
+      {
+        "code": "MISSING_DATA",
+        "risk_type": "none",
+        "severity": "High",
+        "location": "Route",
+        "estimated_delay_days": 0
+      }
+    ],
+    "alternative_route": null,
+    "external_data_fetched_at": "2026-10-13T16:48:48",
+    "route_id": "SGSIN-NLRTM",
+    "origin": "Singapore",
+    "destination": "Rotterdam",
+    "transport_type": "Cargo Vessel",
+    "goods": {},
+    "baseline_distance_km": 10559.1,
+    "decision": {
+      "shipment_id": "SHP-002",
+      "overall_risk": "Low",
+      "outcome": "ESCALATE",
+      "hold_shipment": true,
+      "needs_human": true,
+      "flags": [
+        "Low AI confidence",
+        "Conflicting sources",
+        "AI flagged: MISSING_DATA",
+        "Cautionary Override"
+      ],
+      "actions": [
+        "Require human dispatcher sign-off",
+        "Route to human review queue"
+      ],
+      "alerts": [],
+      "rationale": [
+        "Confidence 0.00 is below 0.60",
+        "AI reported conflicting or missing information",
+        "Rule 1b: MISSING_DATA none/High @Route -> human review",
+        "Rule 3: AI says Low but 2 shipment(s) on route SGSIN-NLRTM were flagged or delayed in the last 21 days"
+      ]
+    },
+    "saved_at": "2026-10-13T16:50:22.501470",
+    "flagged": true,
+    "delayed": false
+  },
+  {
+    "shipment_id": "SHP-003",
+    "origin_port": "MYPKG",
+    "origin_lat": "3.0",
+    "origin_lon": "101.4",
+    "destination_port": "SGSIN",
+    "destination_lat": "1.266667",
+    "destination_lon": "103.833333",
+    "departure_time": "05/10/2026",
+    "arrival_time": "06/10/2026",
+    "risk_factors": [],
+    "primary_risk_factor": "infrastructure_disruption",
+    "affected_location": "Unknown",
+    "expected_impact": "None",
+    "confidence_score": 0.0,
+    "sources": [],
+    "conflicting_sources": true,
+    "extreme_event": "none",
+    "insights": [
+      {
+        "code": "MISSING_DATA",
+        "risk_type": "none",
+        "severity": "High",
+        "location": "Route",
+        "estimated_delay_days": 0
+      }
+    ],
+    "alternative_route": null,
+    "external_data_fetched_at": "2026-10-13T16:49:15",
+    "route_id": "MYPKG-SGSIN",
+    "origin": "Port Klang",
+    "destination": "Singapore",
+    "transport_type": "Cargo Vessel",
+    "goods": {},
+    "baseline_distance_km": 332.0,
+    "decision": {
+      "shipment_id": "SHP-003",
+      "overall_risk": "Low",
+      "outcome": "ESCALATE",
+      "hold_shipment": true,
+      "needs_human": true,
+      "flags": [
+        "Low AI confidence",
+        "Conflicting sources",
+        "AI flagged: MISSING_DATA",
+        "Cautionary Override"
+      ],
+      "actions": [
+        "Require human dispatcher sign-off",
+        "Route to human review queue"
+      ],
+      "alerts": [],
+      "rationale": [
+        "Confidence 0.00 is below 0.60",
+        "AI reported conflicting or missing information",
+        "Rule 1b: MISSING_DATA none/High @Route -> human review",
+        "Rule 3: AI says Low but 2 shipment(s) on route MYPKG-SGSIN were flagged or delayed in the last 21 days"
+      ]
+    },
+    "saved_at": "2026-10-13T16:50:22.501501",
+    "flagged": true,
+    "delayed": false
+  },
+  {
+    "shipment_id": "SHP-004",
+    "origin_port": "KRPUS",
+    "origin_lat": "35.1",
+    "origin_lon": "129.033333",
+    "destination_port": "SGSIN",
+    "destination_lat": "1.266667",
+    "destination_lon": "103.833333",
+    "departure_time": "07/10/2026",
+    "arrival_time": "13/10/2026",
+    "risk_factors": [],
+    "primary_risk_factor": "infrastructure_disruption",
+    "affected_location": "Unknown",
+    "expected_impact": "None",
+    "confidence_score": 0.0,
+    "sources": [],
+    "conflicting_sources": true,
+    "extreme_event": "none",
+    "insights": [
+      {
+        "code": "MISSING_DATA",
+        "risk_type": "none",
+        "severity": "High",
+        "location": "Route",
+        "estimated_delay_days": 0
+      }
+    ],
+    "alternative_route": null,
+    "external_data_fetched_at": "2026-10-13T16:49:37",
+    "route_id": "KRPUS-SGSIN",
+    "origin": "Busan",
+    "destination": "Singapore",
+    "transport_type": "Cargo Vessel",
+    "goods": {},
+    "baseline_distance_km": 4577.4,
+    "decision": {
+      "shipment_id": "SHP-004",
+      "overall_risk": "Low",
+      "outcome": "ESCALATE",
+      "hold_shipment": true,
+      "needs_human": true,
+      "flags": [
+        "Low AI confidence",
+        "Conflicting sources",
+        "AI flagged: MISSING_DATA",
+        "Cautionary Override"
+      ],
+      "actions": [
+        "Require human dispatcher sign-off",
+        "Route to human review queue"
+      ],
+      "alerts": [],
+      "rationale": [
+        "Confidence 0.00 is below 0.60",
+        "AI reported conflicting or missing information",
+        "Rule 1b: MISSING_DATA none/High @Route -> human review",
+        "Rule 3: AI says Low but 2 shipment(s) on route KRPUS-SGSIN were flagged or delayed in the last 21 days"
+      ]
+    },
+    "saved_at": "2026-10-13T16:50:22.501527",
+    "flagged": true,
+    "delayed": false
+  },
+  {
+    "shipment_id": "SHP-005",
+    "origin_port": "AEJEA",
+    "origin_lat": "25.016667",
+    "origin_lon": "55.05",
+    "destination_port": "HKHKG",
+    "destination_lat": "22.283333",
+    "destination_lon": "114.15",
+    "departure_time": "10/10/2026",
+    "arrival_time": "22/10/2026",
+    "risk_factors": [],
+    "primary_risk_factor": "infrastructure_disruption",
+    "affected_location": "Unknown",
+    "expected_impact": "None",
+    "confidence_score": 0.0,
+    "sources": [],
+    "conflicting_sources": true,
+    "extreme_event": "none",
+    "insights": [
+      {
+        "code": "MISSING_DATA",
+        "risk_type": "none",
+        "severity": "High",
+        "location": "Route",
+        "estimated_delay_days": 0
+      }
+    ],
+    "alternative_route": null,
+    "external_data_fetched_at": "2026-10-13T16:50:17",
+    "route_id": "AEJEA-HKHKG",
+    "origin": "Jebel Ali (Dubai)",
+    "destination": "Hong Kong",
+    "transport_type": "Cargo Vessel",
+    "goods": {},
+    "baseline_distance_km": 5979.5,
+    "decision": {
+      "shipment_id": "SHP-005",
+      "overall_risk": "Low",
+      "outcome": "ESCALATE",
+      "hold_shipment": true,
+      "needs_human": true,
+      "flags": [
+        "Low AI confidence",
+        "Conflicting sources",
+        "AI flagged: MISSING_DATA",
+        "Cautionary Override"
+      ],
+      "actions": [
+        "Require human dispatcher sign-off",
+        "Route to human review queue"
+      ],
+      "alerts": [],
+      "rationale": [
+        "Confidence 0.00 is below 0.60",
+        "AI reported conflicting or missing information",
+        "Rule 1b: MISSING_DATA none/High @Route -> human review",
+        "Rule 3: AI says Low but 2 shipment(s) on route AEJEA-HKHKG were flagged or delayed in the last 21 days"
+      ]
+    },
+    "saved_at": "2026-10-13T16:50:22.501552",
+    "flagged": true,
+    "delayed": false
+  },
+  {
+    "shipment_id": "SHP-001",
+    "origin_port": "SGSIN",
+    "origin_lat": "1.266667",
+    "origin_lon": "103.833333",
+    "destination_port": "CNSHA",
+    "destination_lat": "31.216667",
+    "destination_lon": "121.5",
+    "departure_time": "01/10/2026",
+    "arrival_time": "08/10/2026",
+    "risk_factors": [],
+    "primary_risk_factor": "infrastructure_disruption",
+    "affected_location": "Unknown",
+    "expected_impact": "None",
+    "confidence_score": 0.0,
+    "sources": [],
+    "conflicting_sources": true,
+    "extreme_event": "none",
+    "insights": [
+      {
+        "code": "MISSING_DATA",
+        "risk_type": "none",
+        "severity": "High",
+        "location": "Route",
+        "estimated_delay_days": 0
+      }
+    ],
+    "alternative_route": null,
+    "external_data_fetched_at": "2026-10-13T16:51:44",
+    "route_id": "SGSIN-CNSHA",
+    "origin": "Singapore",
+    "destination": "Shanghai",
+    "transport_type": "Cargo Vessel",
+    "goods": {},
+    "baseline_distance_km": 3813.5,
+    "decision": {
+      "shipment_id": "SHP-001",
+      "overall_risk": "Low",
+      "outcome": "ESCALATE",
+      "hold_shipment": true,
+      "needs_human": true,
+      "flags": [
+        "Low AI confidence",
+        "Conflicting sources",
+        "AI flagged: MISSING_DATA",
+        "Cautionary Override"
+      ],
+      "actions": [
+        "Require human dispatcher sign-off",
+        "Route to human review queue"
+      ],
+      "alerts": [],
+      "rationale": [
+        "Confidence 0.00 is below 0.60",
+        "AI reported conflicting or missing information",
+        "Rule 1b: MISSING_DATA none/High @Route -> human review",
+        "Rule 3: AI says Low but 3 shipment(s) on route SGSIN-CNSHA were flagged or delayed in the last 21 days"
+      ]
+    },
+    "saved_at": "2026-10-13T16:53:26.056059",
+    "flagged": true,
+    "delayed": false
+  },
+  {
+    "shipment_id": "SHP-002",
+    "origin_port": "SGSIN",
+    "origin_lat": "1.266667",
+    "origin_lon": "103.833333",
+    "destination_port": "NLRTM",
+    "destination_lat": "51.933333",
+    "destination_lon": "4.133333",
+    "departure_time": "03/10/2026",
+    "arrival_time": "27/10/2026",
+    "risk_factors": [],
+    "primary_risk_factor": "infrastructure_disruption",
+    "affected_location": "Unknown",
+    "expected_impact": "None",
+    "confidence_score": 0.0,
+    "sources": [],
+    "conflicting_sources": true,
+    "extreme_event": "none",
+    "insights": [
+      {
+        "code": "MISSING_DATA",
+        "risk_type": "none",
+        "severity": "High",
+        "location": "Route",
+        "estimated_delay_days": 0
+      }
+    ],
+    "alternative_route": null,
+    "external_data_fetched_at": "2026-10-13T16:52:10",
+    "route_id": "SGSIN-NLRTM",
+    "origin": "Singapore",
+    "destination": "Rotterdam",
+    "transport_type": "Cargo Vessel",
+    "goods": {},
+    "baseline_distance_km": 10559.1,
+    "decision": {
+      "shipment_id": "SHP-002",
+      "overall_risk": "Low",
+      "outcome": "ESCALATE",
+      "hold_shipment": true,
+      "needs_human": true,
+      "flags": [
+        "Low AI confidence",
+        "Conflicting sources",
+        "AI flagged: MISSING_DATA",
+        "Cautionary Override"
+      ],
+      "actions": [
+        "Require human dispatcher sign-off",
+        "Route to human review queue"
+      ],
+      "alerts": [],
+      "rationale": [
+        "Confidence 0.00 is below 0.60",
+        "AI reported conflicting or missing information",
+        "Rule 1b: MISSING_DATA none/High @Route -> human review",
+        "Rule 3: AI says Low but 3 shipment(s) on route SGSIN-NLRTM were flagged or delayed in the last 21 days"
+      ]
+    },
+    "saved_at": "2026-10-13T16:53:26.056118",
+    "flagged": true,
+    "delayed": false
+  },
+  {
+    "shipment_id": "SHP-003",
+    "origin_port": "MYPKG",
+    "origin_lat": "3.0",
+    "origin_lon": "101.4",
+    "destination_port": "SGSIN",
+    "destination_lat": "1.266667",
+    "destination_lon": "103.833333",
+    "departure_time": "05/10/2026",
+    "arrival_time": "06/10/2026",
+    "risk_factors": [],
+    "primary_risk_factor": "infrastructure_disruption",
+    "affected_location": "Unknown",
+    "expected_impact": "None",
+    "confidence_score": 0.0,
+    "sources": [],
+    "conflicting_sources": true,
+    "extreme_event": "none",
+    "insights": [
+      {
+        "code": "MISSING_DATA",
+        "risk_type": "none",
+        "severity": "High",
+        "location": "Route",
+        "estimated_delay_days": 0
+      }
+    ],
+    "alternative_route": null,
+    "external_data_fetched_at": "2026-10-13T16:52:31",
+    "route_id": "MYPKG-SGSIN",
+    "origin": "Port Klang",
+    "destination": "Singapore",
+    "transport_type": "Cargo Vessel",
+    "goods": {},
+    "baseline_distance_km": 332.0,
+    "decision": {
+      "shipment_id": "SHP-003",
+      "overall_risk": "Low",
+      "outcome": "ESCALATE",
+      "hold_shipment": true,
+      "needs_human": true,
+      "flags": [
+        "Low AI confidence",
+        "Conflicting sources",
+        "AI flagged: MISSING_DATA",
+        "Cautionary Override"
+      ],
+      "actions": [
+        "Require human dispatcher sign-off",
+        "Route to human review queue"
+      ],
+      "alerts": [],
+      "rationale": [
+        "Confidence 0.00 is below 0.60",
+        "AI reported conflicting or missing information",
+        "Rule 1b: MISSING_DATA none/High @Route -> human review",
+        "Rule 3: AI says Low but 3 shipment(s) on route MYPKG-SGSIN were flagged or delayed in the last 21 days"
+      ]
+    },
+    "saved_at": "2026-10-13T16:53:26.056154",
+    "flagged": true,
+    "delayed": false
+  },
+  {
+    "shipment_id": "SHP-004",
+    "origin_port": "KRPUS",
+    "origin_lat": "35.1",
+    "origin_lon": "129.033333",
+    "destination_port": "SGSIN",
+    "destination_lat": "1.266667",
+    "destination_lon": "103.833333",
+    "departure_time": "07/10/2026",
+    "arrival_time": "13/10/2026",
+    "risk_factors": [],
+    "primary_risk_factor": "infrastructure_disruption",
+    "affected_location": "Unknown",
+    "expected_impact": "None",
+    "confidence_score": 0.0,
+    "sources": [],
+    "conflicting_sources": true,
+    "extreme_event": "none",
+    "insights": [
+      {
+        "code": "MISSING_DATA",
+        "risk_type": "none",
+        "severity": "High",
+        "location": "Route",
+        "estimated_delay_days": 0
+      }
+    ],
+    "alternative_route": null,
+    "external_data_fetched_at": "2026-10-13T16:53:00",
+    "route_id": "KRPUS-SGSIN",
+    "origin": "Busan",
+    "destination": "Singapore",
+    "transport_type": "Cargo Vessel",
+    "goods": {},
+    "baseline_distance_km": 4577.4,
+    "decision": {
+      "shipment_id": "SHP-004",
+      "overall_risk": "Low",
+      "outcome": "ESCALATE",
+      "hold_shipment": true,
+      "needs_human": true,
+      "flags": [
+        "Low AI confidence",
+        "Conflicting sources",
+        "AI flagged: MISSING_DATA",
+        "Cautionary Override"
+      ],
+      "actions": [
+        "Require human dispatcher sign-off",
+        "Route to human review queue"
+      ],
+      "alerts": [],
+      "rationale": [
+        "Confidence 0.00 is below 0.60",
+        "AI reported conflicting or missing information",
+        "Rule 1b: MISSING_DATA none/High @Route -> human review",
+        "Rule 3: AI says Low but 3 shipment(s) on route KRPUS-SGSIN were flagged or delayed in the last 21 days"
+      ]
+    },
+    "saved_at": "2026-10-13T16:53:26.056183",
+    "flagged": true,
+    "delayed": false
+  },
+  {
+    "shipment_id": "SHP-005",
+    "origin_port": "AEJEA",
+    "origin_lat": "25.016667",
+    "origin_lon": "55.05",
+    "destination_port": "HKHKG",
+    "destination_lat": "22.283333",
+    "destination_lon": "114.15",
+    "departure_time": "10/10/2026",
+    "arrival_time": "22/10/2026",
+    "risk_factors": [],
+    "primary_risk_factor": "infrastructure_disruption",
+    "affected_location": "Unknown",
+    "expected_impact": "None",
+    "confidence_score": 0.0,
+    "sources": [],
+    "conflicting_sources": true,
+    "extreme_event": "none",
+    "insights": [
+      {
+        "code": "MISSING_DATA",
+        "risk_type": "none",
+        "severity": "High",
+        "location": "Route",
+        "estimated_delay_days": 0
+      }
+    ],
+    "alternative_route": null,
+    "external_data_fetched_at": "2026-10-13T16:53:20",
+    "route_id": "AEJEA-HKHKG",
+    "origin": "Jebel Ali (Dubai)",
+    "destination": "Hong Kong",
+    "transport_type": "Cargo Vessel",
+    "goods": {},
+    "baseline_distance_km": 5979.5,
+    "decision": {
+      "shipment_id": "SHP-005",
+      "overall_risk": "Low",
+      "outcome": "ESCALATE",
+      "hold_shipment": true,
+      "needs_human": true,
+      "flags": [
+        "Low AI confidence",
+        "Conflicting sources",
+        "AI flagged: MISSING_DATA",
+        "Cautionary Override"
+      ],
+      "actions": [
+        "Require human dispatcher sign-off",
+        "Route to human review queue"
+      ],
+      "alerts": [],
+      "rationale": [
+        "Confidence 0.00 is below 0.60",
+        "AI reported conflicting or missing information",
+        "Rule 1b: MISSING_DATA none/High @Route -> human review",
+        "Rule 3: AI says Low but 3 shipment(s) on route AEJEA-HKHKG were flagged or delayed in the last 21 days"
+      ]
+    },
+    "saved_at": "2026-10-13T16:53:26.056209",
+    "flagged": true,
+    "delayed": false
+  },
+  {
+    "shipment_id": "SHP-001",
+    "origin_port": "SGSIN",
+    "origin_lat": "1.266667",
+    "origin_lon": "103.833333",
+    "destination_port": "CNSHA",
+    "destination_lat": "31.216667",
+    "destination_lon": "121.5",
+    "departure_time": "01/10/2026",
+    "arrival_time": "08/10/2026",
+    "risk_factors": [],
+    "primary_risk_factor": "infrastructure_disruption",
+    "affected_location": "Unknown",
+    "expected_impact": "None",
+    "confidence_score": 0.0,
+    "sources": [],
+    "conflicting_sources": true,
+    "extreme_event": "none",
+    "insights": [
+      {
+        "code": "MISSING_DATA",
+        "risk_type": "none",
+        "severity": "High",
+        "location": "Route",
+        "estimated_delay_days": 0
+      }
+    ],
+    "alternative_route": null,
+    "external_data_fetched_at": "2026-10-13T18:12:33",
+    "route_id": "SGSIN-CNSHA",
+    "origin": "Singapore",
+    "destination": "Shanghai",
+    "transport_type": "Cargo Vessel",
+    "goods": {},
+    "baseline_distance_km": 3813.5,
+    "decision": {
+      "shipment_id": "SHP-001",
+      "overall_risk": "Low",
+      "outcome": "ESCALATE",
+      "hold_shipment": true,
+      "needs_human": true,
+      "flags": [
+        "Low AI confidence",
+        "Conflicting sources",
+        "AI flagged: MISSING_DATA",
+        "Cautionary Override"
+      ],
+      "actions": [
+        "Require human dispatcher sign-off",
+        "Route to human review queue"
+      ],
+      "alerts": [],
+      "rationale": [
+        "Confidence 0.00 is below 0.60",
+        "AI reported conflicting or missing information",
+        "Rule 1b: MISSING_DATA none/High @Route -> human review",
+        "Rule 3: AI says Low but 4 shipment(s) on route SGSIN-CNSHA were flagged or delayed in the last 21 days"
+      ]
+    },
+    "saved_at": "2026-10-13T18:14:05.764651",
+    "flagged": true,
+    "delayed": false
+  },
+  {
+    "shipment_id": "SHP-002",
+    "origin_port": "SGSIN",
+    "origin_lat": "1.266667",
+    "origin_lon": "103.833333",
+    "destination_port": "NLRTM",
+    "destination_lat": "51.933333",
+    "destination_lon": "4.133333",
+    "departure_time": "03/10/2026",
+    "arrival_time": "27/10/2026",
+    "risk_factors": [],
+    "primary_risk_factor": "infrastructure_disruption",
+    "affected_location": "Unknown",
+    "expected_impact": "None",
+    "confidence_score": 0.0,
+    "sources": [],
+    "conflicting_sources": true,
+    "extreme_event": "none",
+    "insights": [
+      {
+        "code": "MISSING_DATA",
+        "risk_type": "none",
+        "severity": "High",
+        "location": "Route",
+        "estimated_delay_days": 0
+      }
+    ],
+    "alternative_route": null,
+    "external_data_fetched_at": "2026-10-13T18:12:56",
+    "route_id": "SGSIN-NLRTM",
+    "origin": "Singapore",
+    "destination": "Rotterdam",
+    "transport_type": "Cargo Vessel",
+    "goods": {},
+    "baseline_distance_km": 10559.1,
+    "decision": {
+      "shipment_id": "SHP-002",
+      "overall_risk": "Low",
+      "outcome": "ESCALATE",
+      "hold_shipment": true,
+      "needs_human": true,
+      "flags": [
+        "Low AI confidence",
+        "Conflicting sources",
+        "AI flagged: MISSING_DATA",
+        "Cautionary Override"
+      ],
+      "actions": [
+        "Require human dispatcher sign-off",
+        "Route to human review queue"
+      ],
+      "alerts": [],
+      "rationale": [
+        "Confidence 0.00 is below 0.60",
+        "AI reported conflicting or missing information",
+        "Rule 1b: MISSING_DATA none/High @Route -> human review",
+        "Rule 3: AI says Low but 4 shipment(s) on route SGSIN-NLRTM were flagged or delayed in the last 21 days"
+      ]
+    },
+    "saved_at": "2026-10-13T18:14:05.764704",
+    "flagged": true,
+    "delayed": false
+  },
+  {
+    "shipment_id": "SHP-003",
+    "origin_port": "MYPKG",
+    "origin_lat": "3.0",
+    "origin_lon": "101.4",
+    "destination_port": "SGSIN",
+    "destination_lat": "1.266667",
+    "destination_lon": "103.833333",
+    "departure_time": "05/10/2026",
+    "arrival_time": "06/10/2026",
+    "risk_factors": [],
+    "primary_risk_factor": "infrastructure_disruption",
+    "affected_location": "Unknown",
+    "expected_impact": "None",
+    "confidence_score": 0.0,
+    "sources": [],
+    "conflicting_sources": true,
+    "extreme_event": "none",
+    "insights": [
+      {
+        "code": "MISSING_DATA",
+        "risk_type": "none",
+        "severity": "High",
+        "location": "Route",
+        "estimated_delay_days": 0
+      }
+    ],
+    "alternative_route": null,
+    "external_data_fetched_at": "2026-10-13T18:13:18",
+    "route_id": "MYPKG-SGSIN",
+    "origin": "Port Klang",
+    "destination": "Singapore",
+    "transport_type": "Cargo Vessel",
+    "goods": {},
+    "baseline_distance_km": 332.0,
+    "decision": {
+      "shipment_id": "SHP-003",
+      "overall_risk": "Low",
+      "outcome": "ESCALATE",
+      "hold_shipment": true,
+      "needs_human": true,
+      "flags": [
+        "Low AI confidence",
+        "Conflicting sources",
+        "AI flagged: MISSING_DATA",
+        "Cautionary Override"
+      ],
+      "actions": [
+        "Require human dispatcher sign-off",
+        "Route to human review queue"
+      ],
+      "alerts": [],
+      "rationale": [
+        "Confidence 0.00 is below 0.60",
+        "AI reported conflicting or missing information",
+        "Rule 1b: MISSING_DATA none/High @Route -> human review",
+        "Rule 3: AI says Low but 4 shipment(s) on route MYPKG-SGSIN were flagged or delayed in the last 21 days"
+      ]
+    },
+    "saved_at": "2026-10-13T18:14:05.764737",
+    "flagged": true,
+    "delayed": false
+  },
+  {
+    "shipment_id": "SHP-004",
+    "origin_port": "KRPUS",
+    "origin_lat": "35.1",
+    "origin_lon": "129.033333",
+    "destination_port": "SGSIN",
+    "destination_lat": "1.266667",
+    "destination_lon": "103.833333",
+    "departure_time": "07/10/2026",
+    "arrival_time": "13/10/2026",
+    "risk_factors": [],
+    "primary_risk_factor": "infrastructure_disruption",
+    "affected_location": "Unknown",
+    "expected_impact": "None",
+    "confidence_score": 0.0,
+    "sources": [],
+    "conflicting_sources": true,
+    "extreme_event": "none",
+    "insights": [
+      {
+        "code": "MISSING_DATA",
+        "risk_type": "none",
+        "severity": "High",
+        "location": "Route",
+        "estimated_delay_days": 0
+      }
+    ],
+    "alternative_route": null,
+    "external_data_fetched_at": "2026-10-13T18:13:40",
+    "route_id": "KRPUS-SGSIN",
+    "origin": "Busan",
+    "destination": "Singapore",
+    "transport_type": "Cargo Vessel",
+    "goods": {},
+    "baseline_distance_km": 4577.4,
+    "decision": {
+      "shipment_id": "SHP-004",
+      "overall_risk": "Low",
+      "outcome": "ESCALATE",
+      "hold_shipment": true,
+      "needs_human": true,
+      "flags": [
+        "Low AI confidence",
+        "Conflicting sources",
+        "AI flagged: MISSING_DATA",
+        "Cautionary Override"
+      ],
+      "actions": [
+        "Require human dispatcher sign-off",
+        "Route to human review queue"
+      ],
+      "alerts": [],
+      "rationale": [
+        "Confidence 0.00 is below 0.60",
+        "AI reported conflicting or missing information",
+        "Rule 1b: MISSING_DATA none/High @Route -> human review",
+        "Rule 3: AI says Low but 4 shipment(s) on route KRPUS-SGSIN were flagged or delayed in the last 21 days"
+      ]
+    },
+    "saved_at": "2026-10-13T18:14:05.764766",
+    "flagged": true,
+    "delayed": false
+  },
+  {
+    "shipment_id": "SHP-005",
+    "origin_port": "AEJEA",
+    "origin_lat": "25.016667",
+    "origin_lon": "55.05",
+    "destination_port": "HKHKG",
+    "destination_lat": "22.283333",
+    "destination_lon": "114.15",
+    "departure_time": "10/10/2026",
+    "arrival_time": "22/10/2026",
+    "risk_factors": [],
+    "primary_risk_factor": "infrastructure_disruption",
+    "affected_location": "Unknown",
+    "expected_impact": "None",
+    "confidence_score": 0.0,
+    "sources": [],
+    "conflicting_sources": true,
+    "extreme_event": "none",
+    "insights": [
+      {
+        "code": "MISSING_DATA",
+        "risk_type": "none",
+        "severity": "High",
+        "location": "Route",
+        "estimated_delay_days": 0
+      }
+    ],
+    "alternative_route": null,
+    "external_data_fetched_at": "2026-10-13T18:14:01",
+    "route_id": "AEJEA-HKHKG",
+    "origin": "Jebel Ali (Dubai)",
+    "destination": "Hong Kong",
+    "transport_type": "Cargo Vessel",
+    "goods": {},
+    "baseline_distance_km": 5979.5,
+    "decision": {
+      "shipment_id": "SHP-005",
+      "overall_risk": "Low",
+      "outcome": "ESCALATE",
+      "hold_shipment": true,
+      "needs_human": true,
+      "flags": [
+        "Low AI confidence",
+        "Conflicting sources",
+        "AI flagged: MISSING_DATA",
+        "Cautionary Override"
+      ],
+      "actions": [
+        "Require human dispatcher sign-off",
+        "Route to human review queue"
+      ],
+      "alerts": [],
+      "rationale": [
+        "Confidence 0.00 is below 0.60",
+        "AI reported conflicting or missing information",
+        "Rule 1b: MISSING_DATA none/High @Route -> human review",
+        "Rule 3: AI says Low but 4 shipment(s) on route AEJEA-HKHKG were flagged or delayed in the last 21 days"
+      ]
+    },
+    "saved_at": "2026-10-13T18:14:05.764792",
     "flagged": true,
     "delayed": false
   }

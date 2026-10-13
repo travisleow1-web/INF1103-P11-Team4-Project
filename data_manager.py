@@ -9,10 +9,13 @@ def load_records(file_path):
     """Startup: load all records."""
     try:
       with open(file_path, "r", encoding="utf-8") as f:
+        print("Sucessfully loaded")
         return json.load(f)
-    except FileNotFoundError: #File Doesn't exist or is missing
+    except FileNotFoundError:
+      print("File Doesn't exist or is missing")
       return []
-    except (json.JSONDecodeError, OSError) as exc: #File is corrupted or any other errors
+    except (json.JSONDecodeError, OSError) as exc: #
+      print("File is corrupted or another error occured")
       return []
 
 def save_records(db_records, file_path):
@@ -49,16 +52,19 @@ def get_route_history(db_records, route_id, since):
 
 def query_records(db_records, filter):
   """Used by IO Manager filter/query."""
+
+  
   risk = filter.get("risk")
   outcome = filter.get("outcome")
   needs_human = filter.get("needs_human")
-  text = filter.get("text")
-  text_lower = text.lower() if text else None
+  #origin_port = filter.get("origin_port")
+  #dest_port = filter.get("dest_port")
 
   # Fast-path: if no filters applied, return shallow full list
-  if not (risk or outcome or (needs_human is not None) or text_lower):
+  if risk == "" and outcome == "" and needs_human == "":
+    print("No Filters Used, Returning all Records")
     return db_records
-
+  print("Filters Used, Returning Records")
   result = []
   for r in db_records:
     decision = r["decision"]
@@ -67,8 +73,9 @@ def query_records(db_records, filter):
         #filtered criteria is not empty and record matches criteria
         (risk and decision.get("overall_risk") == risk) or 
         (outcome and decision.get("outcome") == outcome) or 
-        (needs_human is not None and decision.get("needs_human") == needs_human) or
-        (text_lower and (text_lower in r["origin"].lower() or text_lower in r["destination"].lower()))
+        (needs_human is not None and decision.get("needs_human") == needs_human) #or
+        #(origin_port and (origin_port in r["origin"].lower())) or 
+        #(dest_port and (dest_port in r["destination"].lower()))
     )
     if matched_record:
         result.append(r)
