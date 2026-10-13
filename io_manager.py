@@ -2,7 +2,9 @@ import os
 
 import pandas as pd
 import questionary
-
+import ai_manager
+import data_manager
+import logic_manager
 import validator
 
 
@@ -119,7 +121,6 @@ def manual_shipments():
         }
     )
 
-
 def assign_shipment_ids(df):
     """Return df with a shipment_id column first, numbered SHP-001, SHP-002, ... in row order.
 
@@ -129,7 +130,6 @@ def assign_shipment_ids(df):
     df = df.drop(columns="shipment_id", errors="ignore")
     df.insert(0, "shipment_id", [f"SHP-{i:03d}" for i in range(1, len(df) + 1)])
     return df
-
 
 def input_method():
     """Ask whether shipments are entered manually or loaded from a CSV file.
@@ -144,6 +144,26 @@ def input_method():
         return assign_shipment_ids(csv_shipments())
     return assign_shipment_ids(manual_shipments())
 
+
+def main_menu():
+    """main menu when running main.py"""
+    selection = questionary.select(
+        "Main Menu",
+        choices=["Add Shipment", "Show Dashboard", "Quit"],
+    ).ask()
+    match selection:
+        case "Add Shipment":
+            shipments = input_method()
+            assessments = ai_manager.assess_shipments(shipments)
+            results = logic_manager.evaluate_shipments(assessments, db_records)
+            data_manager.add_record(data_manager.DB_FILE, db_records, results)                             
+            show_summary(assessments)
+            show_details(assessments)
+            show_decisions(results)
+        case "Show Dashboard":
+            print("Dashboard Placeholder")
+        case "Quit":
+            return False
 
 def csv_shipments():
     """Load shipments from a CSV file and return them as a DataFrame.
@@ -243,7 +263,9 @@ def show_decisions(results):
             for reason in d['rationale']:
                 print(f"    - {reason}")
 
-
-if __name__ == "__main__":
-    print(input_method())
-
+db_records = data_manager.load_records(data_manager.DB_FILE)
+while True:
+    if main_menu() == False:
+        break
+    else:
+        main_menu()
