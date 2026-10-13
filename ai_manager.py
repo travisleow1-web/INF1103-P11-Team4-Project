@@ -430,7 +430,31 @@ def fetch_news(shipment: Dict[str, Any]) -> Optional[List[Dict[str, Any]]]:
         log.warning("news feed failed for %s: %s", shipment.get("shipment_id"), exc)
         return None
 
+def enrich_record(record: Dict[Any, Any]) -> Dict[str, Any]:
+    """Enrich ONE shipment: cache check, else feeds + Gemini. Always returns a dict.
 
+    Failures are never cached; they get FALLBACK_AI_RESPONSE instead.
+    """
+    shipment = fill_coordinates(record)
+    key = get_cache_key(extract_shipment(shipment))
+
+    cached = cache_get(key)
+    if cached:
+        log.info("cache hit for %s", shipment.get("shipment_id"))
+        return {**shipment, **cached["result"],
+                "external_data_fetched_at": cached["fetched_at"]}
+
+    external = {"weather": get_shipment_weather(shipment), "news": fetch_news(shipment)}
+    fetched_at = datetime.now().isoformat(timespec="seconds")
+    try:
+        result = call_gemini(build_prompt(shipment, external))
+        if not all(k in result for k in RESPONSE_SCHEMA["required"]):
+            raise ValueError("Gemini response missing required fields")
+        cache_set(key, {"result": result, "fetched_at": fetched_at})
+    except Exception as exc:
+        log.error("AI assessment failed for %s: %s", shipment.get("shipment_id"), exc)
+        result = dict(FALLBACK_AI_RESPONSE)
+    return {**shipment, **result, "external_data_fetched_at": fetched_at}
 # --------------------------------------------------------------------------
 # Main entry point
 # --------------------------------------------------------------------------
@@ -446,26 +470,5 @@ def assess_shipments(shipments: pd.DataFrame) -> pd.DataFrame:
     Nothing is saved to shipments.json here: main.py saves each row through
     data_manager.add_record once the Logic Manager has made its decision.
     """
-    rows = []
-    for shipment in shipments.to_dict("records"):
-        shipment = fill_coordinates(shipment)
-        key = get_cache_key(extract_shipment(shipment))
-        cached = cache_get(key)
-        if cached:
-            log.info("cache hit for %s", shipment["shipment_id"])
-            rows.append({**shipment, **cached["result"],
-                         "external_data_fetched_at": cached["fetched_at"]})
-            continue
-
-        external = {"weather": get_shipment_weather(shipment), "news": fetch_news(shipment)}
-        fetched_at = datetime.now().isoformat(timespec="seconds")
-        try:
-            result = call_gemini(build_prompt(shipment, external))
-            if not all(k in result for k in RESPONSE_SCHEMA["required"]):
-                raise ValueError("Gemini response missing required fields")
-            cache_set(key, {"result": result, "fetched_at": fetched_at})
-        except Exception as exc:
-            log.error("AI assessment failed for %s: %s", shipment["shipment_id"], exc)
-            result = dict(FALLBACK_AI_RESPONSE)
-        rows.append({**shipment, **result, "external_data_fetched_at": fetched_at})
+    rows = [enrich_record(s) for s in shipments.to_dict("records")]
     return pd.DataFrame(rows)
