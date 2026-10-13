@@ -325,11 +325,10 @@ def main_menu(db_records):
         case "Search by Criteria":
             get_search_criteria(db_records)
         case "Quit":
-            return False
+            return True
 
 db_records = data_manager.load_records(data_manager.DB_FILE)
 while True:
-    if main_menu(db_records) == False:
+    quit = main_menu(db_records)
+    if quit == True:
         break
-    else:
-        main_menu(db_records)
