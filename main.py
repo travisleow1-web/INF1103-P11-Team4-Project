@@ -16,14 +16,8 @@ def main():
     db_records = data_manager.load_records(data_manager.DB_FILE)
     results = logic_manager.evaluate_shipments(assessments, db_records)
     
-    for record, decision in results:
-        try:
-            data_manager.add_record(
-                data_manager.DB_FILE, db_records, record,
-                logic_manager.decision_to_dict(decision),
-            )
-        except (OSError, TypeError) as exc:
-            print(f"Warning: could not save {decision['shipment_id']}: {exc}")
+    data_manager.add_record(data_manager.DB_FILE, db_records, results)
+                
 
     io_manager.show_summary(assessments)
     io_manager.show_details(assessments)

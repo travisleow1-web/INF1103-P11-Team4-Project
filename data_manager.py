@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import logic_manager
 from datetime import datetime
 
 DB_FILE = "shipments.json"
@@ -20,17 +21,22 @@ def save_records(db_records, file_path):
   with open(file_path, "w", encoding="utf-8") as f:
     json.dump(db_records, f, indent=2)
 
-def add_record(file_path, db_records, record, decision):
+def add_record(file_path, db_records, results):
   """decision is a dict. Stores both, plus fields used for history look-ups."""
 
-  entry = {
-    **record,
-    "decision": decision,
-    "saved_at": datetime.now().isoformat(),
-    "flagged": decision["needs_human"] or decision["overall_risk"] != "Low",
-    "delayed": decision["outcome"] == "DELAY",
-  }
-  db_records.append(json.loads(json.dumps(entry, default=str)))
+  for record, decision in results:
+    try:
+      decision = logic_manager.decision_to_dict(decision)
+      entry = {
+          **record,
+          "decision": decision,
+          "saved_at": datetime.now().isoformat(),
+          "flagged": decision["needs_human"] or decision["overall_risk"] != "Low",
+          "delayed": decision["outcome"] == "DELAY",
+        }
+      db_records.append(json.loads(json.dumps(entry, default=str)))
+    except (OSError, TypeError) as exc:
+        print(f"Warning: could not save {decision['shipment_id']}: {exc}")  
   save_records(db_records, file_path)
 
 def get_route_history(db_records, route_id, since):
