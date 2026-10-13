@@ -1,5 +1,3 @@
-import os
-
 import pandas as pd
 import questionary
 import ai_manager
@@ -203,16 +201,6 @@ def show_details(assessments):
         for insight in a["insights"]:
             print(f"    - {insight}")
 
-def show_risk_factors(assessments):
-    """Print one row per (shipment, risk factor) pair, for sorting or filtering by severity."""
-    print(
-        pd.json_normalize(
-            assessments.to_dict("records"),
-            record_path="risk_factors",
-            meta=["shipment_id", "expected_impact", "confidence_score"],
-        ).to_string(index=False)
-    )
-
 def show_decisions(results):
     """Print the Logic Manager's decision for each shipment.
 
@@ -241,7 +229,6 @@ def get_search_criteria(db_records):
     risk = ""
     outcome = ""
     needs_human = ""
-    Add_Criteria = ""
     Add_Criteria = questionary.select(
         "Would you like to add a filter",
         choices=["Yes","No (Run Search)"]
@@ -254,7 +241,6 @@ def get_search_criteria(db_records):
                 print(f"Outcome : {outcome}")
                 print(f"Needs Human : {needs_human}")
 
-                Criteria = ""
                 Criteria = questionary.select(
                     "Filters",
                     choices=["Risk","Outcome","Needs Human","Back (Finished Adding Filter)"]

@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 import data_manager
 import validator
-from config import (ALLOWED_EXTREME_EVENTS, ALLOWED_IMPACT, ALLOWED_LOCATIONS, ALLOWED_RISK_TYPES,
+from config import (ALLOWED_IMPACT, ALLOWED_LOCATIONS, ALLOWED_RISK_TYPES,
                         ALLOWED_SEVERITY, INSIGHT_CODES, INSIGHT_RISK_TYPES)
 
 # Thresholds and rule inputs (change them here, not inside the rules)
@@ -172,7 +172,7 @@ def rule_inventory_replacement(r, d):
         _note(d, f"Rule 5: Cargo Destruction @{r['origin_port']} (origin)", "Procurement Alert",
               "Reorder goods immediately: the goods on this shipment")
 
-def decide_outcome(r, d):
+def decide_outcome(d):
     """Turn the flags into one outcome: Procurement Alert or High risk -> DELAY, insurance -> INSURE."""
     if "Procurement Alert" in d["flags"]:
         d["outcome"] = "DELAY"
@@ -198,8 +198,8 @@ def evaluate_shipment(ai_record, db_records, now=None):
         for rule in (rule_perfect_storm, rule_ai_insights, rule_dynamic_insurance):
             rule(r, d)
         rule_low_risk_validation(r, d, db_records, now)  # after the risk-raising rules: only checks "Low"
-        for rule in (rule_inventory_replacement, decide_outcome):
-            rule(r, d)
+        rule_inventory_replacement(r, d)
+        decide_outcome(d)
         if d["needs_human"]:  # final gate: anything needing a human is never fully automatic
             d["outcome"] = "ESCALATE" if d["outcome"] == "PROCEED" else d["outcome"]
             d["actions"].append("Route to human review queue")

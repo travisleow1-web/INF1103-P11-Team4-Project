@@ -9,7 +9,7 @@ BASE = {
     "shipment_id": "SHP-001", "origin_port": "SGSIN", "origin_lat": 1.266667, "origin_lon": 103.833333,
     "destination_port": "NLRTM", "destination_lat": 51.933333, "destination_lon": 4.133333,
     "departure_time": "01/10/2026", "arrival_time": "30/10/2026",
-    "risk_factors": [], "primary_risk_factor": "weather", "affected_location": "Strait of Malacca",
+    "risk_factors": [], "primary_risk_factor": "weather", "affected_location": "Route",
     "expected_impact": "Delay", "confidence_score": 0.82, "sources": ["open_meteo_weather", "gdelt_news"],
     "conflicting_sources": False, "insights": [],
     "external_data_fetched_at": (NOW - timedelta(hours=1)).isoformat(),
@@ -54,7 +54,7 @@ SCENARIOS = {
         {**BASE, "risk_factors": [factor("weather", "Low", "wind_gust_kmh=20")]},
         "ESCALATE", "Low", ["Cautionary Override"]),
     "Rule 4: Piracy needs insurance": (
-        {**BASE, "primary_risk_factor": "piracy_threat", "affected_location": "Singapore Strait",
+        {**BASE, "primary_risk_factor": "piracy_threat", "affected_location": "Route",
          "risk_factors": [factor("piracy_threat", "High", "news_articles=4")]},
         "INSURE", "High", ["Premium Increase Required"]),
     "Rule 5: Cargo destruction at origin": (

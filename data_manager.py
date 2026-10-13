@@ -1,6 +1,4 @@
 import json
-import logging
-import os
 from datetime import datetime
 
 DB_FILE = "shipments.json"
@@ -14,7 +12,7 @@ def load_records(file_path):
     except FileNotFoundError:
       print("File Doesn't exist or is missing")
       return []
-    except (json.JSONDecodeError, OSError) as exc: #
+    except (json.JSONDecodeError, OSError):
       print("File is corrupted or another error occured")
       return []
 
@@ -57,8 +55,6 @@ def query_records(db_records, filter):
   risk = filter.get("risk")
   outcome = filter.get("outcome")
   needs_human = filter.get("needs_human")
-  #origin_port = filter.get("origin_port")
-  #dest_port = filter.get("dest_port")
 
   # Fast-path: if no filters applied, return shallow full list
   if risk == "" and outcome == "" and needs_human == "":
