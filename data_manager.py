@@ -51,7 +51,7 @@ def get_route_history(db_records, route_id, since):
 def query_records(db_records, filter):
   """Return the records matching every filter that is set; "" means not set."""
 
-  
+  #Get search criteria from filter dict
   risk = filter.get("risk")
   outcome = filter.get("outcome")
   needs_human = filter.get("needs_human")
@@ -65,7 +65,7 @@ def query_records(db_records, filter):
   for r in db_records:
     decision = r["decision"]
 
-    # A filter left as "" was never set, so it matches every record.
+    #checks if filter is not empty, then checks if the record matches the record, records must match ALL filters
     if risk != "" and decision.get("overall_risk") != risk:
       continue
     if outcome != "" and decision.get("outcome") != outcome:
@@ -73,5 +73,6 @@ def query_records(db_records, filter):
     if needs_human != "" and decision.get("needs_human") != needs_human:
       continue
     result.append(r)
-
+  if result == []:
+    print("No Records found matching Filter")
   return result
