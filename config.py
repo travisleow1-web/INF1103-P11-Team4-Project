@@ -57,6 +57,7 @@ Rules:
   Use MULTIPLE_RISKS when two or more risk factors are Medium or higher."""
 
 RESPONSE_SCHEMA = {
+    #   
     "type": "OBJECT",
     "properties": {
         "risk_factors": {
@@ -102,6 +103,7 @@ RESPONSE_SCHEMA = {
 }
 
 FALLBACK_AI_RESPONSE = {
+    # This is a fallback response used when the AI assessment fails, ensuring that the system can continue processing other shipments without interruption.
     "risk_factors": [],
     "primary_risk_factor": "infrastructure_disruption",
     "affected_location": "Unknown",
