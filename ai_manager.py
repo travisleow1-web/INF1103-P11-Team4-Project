@@ -18,7 +18,6 @@ from feeds import get_shipment_weather, fetch_news
 
 
 # Logging Setup
-
 log = logging.getLogger("ai_manager")
 log.setLevel(logging.DEBUG)
 
@@ -117,7 +116,6 @@ def call_gemini(prompt: str) -> Dict[str, Any]:
     return json.loads(raw_text)
 
 # Core Pipeline & Main Entry Points
-
 def enrich_record(record: Dict[Any, Any]) -> Dict[str, Any]:
     # Enrich a single shipment record with external data and an AI assessment, using caching to avoid redundant API calls.
     shipment = fill_coordinates(record)

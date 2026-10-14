@@ -10,7 +10,6 @@ from config import CACHE_FILE, SCHEMA_VERSION, TIMEZONE
 log = logging.getLogger("ai_manager")
 _cache: Optional[Dict[str, Any]] = None
 
-
 def _load_cache() -> Dict[str, Any]:
     # Load the AI response cache from the specified CACHE_FILE, returning an empty dictionary if the file does not exist or is unreadable.
     if not os.path.exists(CACHE_FILE):

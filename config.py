@@ -4,7 +4,7 @@ import validator
 CACHE_FILE = "ai_cache.json"
 MAX_RETRIES = 3
 HTTP_TIMEOUT = 20
-HISTORY_DAYS = 90  # shipments that departed this recently get historical weather
+HISTORY_DAYS = 90  # Shipments that departed this recently get historical weather
 TIMEZONE = "Asia/Singapore"
 SCHEMA_VERSION = 3
 
@@ -103,7 +103,7 @@ RESPONSE_SCHEMA = {
 }
 
 FALLBACK_AI_RESPONSE = {
-    # This is a fallback response used when the AI assessment fails, ensuring that the system can continue processing other shipments without interruption.
+    # Fallback response used when the AI assessment fails, ensuring that the system can continue processing other shipments without interruption.
     "risk_factors": [],
     "primary_risk_factor": "infrastructure_disruption",
     "affected_location": "Unknown",
