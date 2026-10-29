@@ -5,8 +5,9 @@ from datetime import datetime
 
 class DataManager:
   DB_FILE = "shipments.json"
+  records = []
 
-  def __init__(self, records):
+  def __init__(self):
     self.records = self.load_csv()
 
   def load_csv(self):
@@ -43,10 +44,10 @@ class DataManager:
         print(f"Warning: could not save {decision['shipment_id']}: {exc}")
     self.save_records()
 
-  def get_route_history(db_records, route_id, since):
+  def get_route_history(self, route_id, since):
     """Used by Logic Manager Rule 3 (last 21 days on the same route)."""
     out = []
-    for r in db_records:
+    for r in self.records:
       if r.get("route_id") != route_id:
         continue
       saved = datetime.fromisoformat(r["saved_at"])
