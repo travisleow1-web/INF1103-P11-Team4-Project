@@ -214,6 +214,7 @@ def get_search_criteria(Data_Manager):
         "risk" : risk,
         "outcome" : outcome,
         "needs_human" : needs_human,
+        "operator" : "!="
     }
     results = Data_Manager.query_records(search_filter)
     show_decisions([(record, record["decision"]) for record in results])
@@ -231,6 +232,7 @@ def main_menu(Data_Manager):
                 shipments = input_method()
                 if shipments is None:  # the user chose Back
                     return True
+               
                 assessments = ai_manager.assess_shipments(shipments)
                 results = logic_manager.evaluate_shipments(assessments, Data_Manager)
                 Data_Manager.add_record(results)

@@ -150,7 +150,13 @@ def rule_low_risk_validation(r, d, Data_Manager, now):
     if d["overall_risk"] != "Low":
         return
     try:
-        past = Data_Manager.get_route_history(r["route_id"], now - timedelta(days=HISTORY_WINDOW_DAYS))
+
+        search_filter = {
+            "route_id" : r["route_id"],
+            "saved_at" : now - timedelta(days=HISTORY_WINDOW_DAYS),
+            "operator" : ">="
+        }
+        past = Data_Manager.get_route_history(search_filter)
     except (KeyError, TypeError, ValueError) as exc:
         return _note(d, f"Rule 3: could not read route history ({exc}), needs human",
                      "Route history unavailable", human=True)

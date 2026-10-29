@@ -1,8 +1,20 @@
 import json
 from datetime import datetime
+import operator
+
+# Define a mapping from string representations to comparison functions
+
 
 class DataManager:
   DB_FILE = "shipments.json"
+  OPS = {
+    "==": operator.eq,
+    "!=": operator.ne,
+    "<":  operator.lt,
+    "<=": operator.le,
+    ">":  operator.gt,
+    ">=": operator.ge,
+  }
   records = []
 
   def __init__(self):
@@ -70,7 +82,7 @@ class DataManager:
 
       #checks if filter is not empty, then checks if the record matches the record, records must match ALL filters
       for F in filter_options:
-        if decision.get(F) != filter.get(F):
+        if self.OPS[filter.get("operator")](decision.get(F),filter.get(F)):
           break     
       else:
         result.append(r)
