@@ -232,7 +232,7 @@ def main_menu(Data_Manager):
                 if shipments is None:  # the user chose Back
                     return True
                 assessments = ai_manager.assess_shipments(shipments)
-                results = logic_manager.evaluate_shipments(assessments, Data_Manager.records)
+                results = logic_manager.evaluate_shipments(assessments, Data_Manager)
                 Data_Manager.add_record(results)
                 show_summary(assessments)
                 show_details(assessments)
