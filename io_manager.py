@@ -161,7 +161,7 @@ def show_decisions(results):
             for reason in d['rationale']:
                 print(f"    - {reason}")
 
-def get_search_criteria(db_records):
+def get_search_criteria(Data_Manager):
     risk = ""
     outcome = ""
     needs_human = ""
@@ -215,10 +215,10 @@ def get_search_criteria(db_records):
         "outcome" : outcome,
         "needs_human" : needs_human,
     }
-    results = data_manager.query_records(db_records, search_filter)
+    results = Data_Manager.query_records(search_filter)
     show_decisions([(record, record["decision"]) for record in results])
 
-def main_menu(db_records):
+def main_menu(Data_Manager):
     """Show the main menu and run the chosen action. Returns False when the user quits, otherwise True."""
     selection = questionary.select(
         "Main Menu",
@@ -232,13 +232,13 @@ def main_menu(db_records):
                 if shipments is None:  # the user chose Back
                     return True
                 assessments = ai_manager.assess_shipments(shipments)
-                results = logic_manager.evaluate_shipments(assessments, db_records)
-                data_manager.add_record(data_manager.DB_FILE, db_records, results)
+                results = logic_manager.evaluate_shipments(assessments, Data_Manager.records)
+                Data_Manager.add_record(results)
                 show_summary(assessments)
                 show_details(assessments)
                 show_decisions(results)
             case "Search by Criteria":
-                get_search_criteria(db_records)
+                get_search_criteria(Data_Manager)
             case "Quit" | None:  # None: the user pressed Ctrl+C at the prompt
                 return False
     except KeyboardInterrupt:  # Ctrl+C inside an action: back to the menu
@@ -247,6 +247,6 @@ def main_menu(db_records):
 
 if __name__ == "__main__":
     # Past records are loaded once so Rule 3 can check the last 21 days.
-    db_records = data_manager.load_records(data_manager.DB_FILE)
-    while main_menu(db_records):
+    Data_Manager = data_manager.DataManager()
+    while main_menu(Data_Manager):
         pass
