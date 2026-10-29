@@ -71,9 +71,9 @@ class DataManager:
       #checks if filter is not empty, then checks if the record matches the record, records must match ALL filters
       for F in filter_options:
         if decision.get(F) != filter.get(F):
-          continue
-      
-      result.append(r)
+          break     
+      else:
+        result.append(r)
     if result == []:
       print("No Records found matching Filter")
     return result
