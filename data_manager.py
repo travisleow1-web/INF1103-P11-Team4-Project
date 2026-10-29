@@ -1,8 +1,6 @@
 import json
 from datetime import datetime
 
-
-
 class DataManager:
   DB_FILE = "shipments.json"
   records = []
@@ -58,27 +56,23 @@ class DataManager:
   def query_records(self, filter):
     """Return the records matching every filter that is set; "" means not set."""
 
-    #Get search criteria from filter dict
-    risk = filter.get("risk")
-    outcome = filter.get("outcome")
-    needs_human = filter.get("needs_human")
-
-    # No filters set: return everything
-    if risk == "" and outcome == "" and needs_human == "":
+    filter_options = []
+    for conditions in filter:
+      if filter.get(conditions) != "":
+        filter_options.append(filter.get(conditions))
+    if filter_options == []:
       print("No Filters Used, Returning all Records")
       return self.records
-    print("Filters Used, Returning Records")
+
     result = []
     for r in self.records:
       decision = r["decision"]
 
       #checks if filter is not empty, then checks if the record matches the record, records must match ALL filters
-      if risk != "" and decision.get("overall_risk") != risk:
-        continue
-      if outcome != "" and decision.get("outcome") != outcome:
-        continue
-      if needs_human != "" and decision.get("needs_human") != needs_human:
-        continue
+      for F in filter_options:
+        if decision.get(F) != filter.get(F):
+          continue
+      
       result.append(r)
     if result == []:
       print("No Records found matching Filter")
