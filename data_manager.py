@@ -49,7 +49,7 @@ class DataManager:
           "flagged": decision["needs_human"] or decision["overall_risk"] != "Low",
           "delayed": decision["outcome"] == "DELAY",
         }
-        self.records.append(json.loads(json.dumps(entry, default=str)))
+        self.records.append(entry)
       except (OSError, TypeError) as exc:
         print(f"Warning: could not save {decision['shipment_id']}: {exc}")
     self.save_records()
@@ -68,11 +68,12 @@ class DataManager:
   def query_records(self, filter):
     """Return the records matching every filter that is set; "" means not set."""
 
+    #initialise empty records array
     filter_options = []
-    for conditions in filter:
+    for conditions in filter: # for each non-empty filter in filter, add it to filter options
       if filter.get(conditions) != "":
         filter_options.append(filter.get(conditions))
-    if filter_options == []:
+    if filter_options == []: # if no filters were added, return all records
       print("No Filters Used, Returning all Records")
       return self.records
 
