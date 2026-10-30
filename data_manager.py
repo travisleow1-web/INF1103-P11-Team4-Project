@@ -83,8 +83,10 @@ class DataManager:
 
       #checks if filter is not empty, then checks if the record matches the record, records must match ALL filters
       for F in filter_options:
-        if self.OPS[filter.get("operator")](decision.get(F),filter.get(F)):
-          break     
+        if decision.get(F) != filter.get(F):
+          break  
+        #if self.OPS[filter.get("operator")](decision.get(F),filter.get(F)):
+          #break     
       else:
         result.append(r)
     if result == []:
