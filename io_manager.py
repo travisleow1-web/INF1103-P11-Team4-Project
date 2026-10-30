@@ -213,10 +213,14 @@ def get_search_criteria(Data_Manager):
     search_filter = {
         "risk" : risk,
         "outcome" : outcome,
-        "needs_human" : needs_human,
-        "operator" : "!="
+        "needs_human" : needs_human
     }
-    results = Data_Manager.query_records(search_filter)
+    operations = {
+        "risk" : "!=",
+        "outcome" : "!=",
+        "needs_human" : "!="
+    }
+    results = Data_Manager.query_records(search_filter, operations)
     show_decisions([(record, record["decision"]) for record in results])
 
 def main_menu(Data_Manager):

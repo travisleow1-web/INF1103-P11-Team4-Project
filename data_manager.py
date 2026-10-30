@@ -54,6 +54,7 @@ class DataManager:
         print(f"Warning: could not save {decision['shipment_id']}: {exc}")
     self.save_records()
 
+  
   def get_route_history(self, route_id, since):
     """Used by Logic Manager Rule 3 (last 21 days on the same route)."""
     out = []
@@ -62,10 +63,10 @@ class DataManager:
         continue
       saved = datetime.fromisoformat(r["saved_at"])
       if saved >= since:
-        out.append({"date": saved, "flagged": r["flagged"], "delayed": r["delayed"]})
+        out.append({"date": datetime.fromisoformat(r["saved_at"]), "flagged": r["flagged"], "delayed": r["delayed"]})
     return out
 
-  def query_records(self, filter):
+  def query_records(self, filter, opr):
     """Return the records matching every filter that is set; "" means not set."""
 
     #initialise empty records array
@@ -83,10 +84,8 @@ class DataManager:
 
       #checks if filter is not empty, then checks if the record matches the record, records must match ALL filters
       for F in filter_options:
-        if decision.get(F) != filter.get(F):
-          break  
-        #if self.OPS[filter.get("operator")](decision.get(F),filter.get(F)):
-          #break     
+        if self.OPS[opr.get(F)](decision.get(F),filter.get(F)):
+          break     
       else:
         result.append(r)
     if result == []:

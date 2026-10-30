@@ -153,10 +153,17 @@ def rule_low_risk_validation(r, d, Data_Manager, now):
 
         search_filter = {
             "route_id" : r["route_id"],
-            "saved_at" : now - timedelta(days=HISTORY_WINDOW_DAYS),
-            "operator" : ">="
+            "saved_at" : now - timedelta(days=HISTORY_WINDOW_DAYS)
         }
-        past = Data_Manager.get_route_history(search_filter)
+        operator = {
+            "route_id" : "!=",
+            "saved_at" : "<",
+        }
+        past = Data_Manager.get_route_history(search_filter, operator)
+        out = []
+        for r in past:           
+            out.append({"date": datetime.fromisoformat(r["saved_at"]), "flagged": r["flagged"], "delayed": r["delayed"]})
+        past = out
     except (KeyError, TypeError, ValueError) as exc:
         return _note(d, f"Rule 3: could not read route history ({exc}), needs human",
                      "Route history unavailable", human=True)
