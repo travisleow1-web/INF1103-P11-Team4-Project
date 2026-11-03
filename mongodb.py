@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 from pymongo import MongoClient
 from bson import ObjectId
+from datetime import datetime
 
 #reads .env file from the current dir and injects variables onto os.environment
 load_dotenv()
@@ -23,8 +24,15 @@ class MongoDataManager:
     self.collection = db["records"]
 
   def InsertRecord(self, records):
-    for record in records:
-      result = self.collection.insert_one(record)
+    for record, decision in records:
+      entry = {
+        **record,
+        "decision": decision,
+        "saved_at": datetime.now().isoformat(),
+        "flagged": decision["needs_human"] or decision["overall_risk"] != "Low",
+        "delayed": decision["outcome"] == "DELAY",
+      }
+      result = self.collection.insert_one(entry)
       if result.acknowledged == True:
         print("Insertion Successful")
       else:
