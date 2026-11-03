@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 from pymongo import MongoClient
+from bson import ObjectId
 
 #reads .env file from the current dir and injects variables onto os.environment
 load_dotenv()
@@ -37,10 +38,14 @@ class MongoDataManager:
       else:
         print("Uh Oh Stinky")
 
-MDM = MongoDataManager()
-Record = [{
-  "Name" : "Marcus",
-  "Age" : 10
-}]
-MDM.InsertRecord(Record)
-MDM.DeleteRecord
+  def FindRecord(self, query):
+    result = list(self.collection.find(query))
+    return result
+
+  def UpdateRecord(self, id, update):
+    self.collection.update_one(
+      {"_id": ObjectId(id)},
+      {"$set":{
+        update
+      }}
+    )
