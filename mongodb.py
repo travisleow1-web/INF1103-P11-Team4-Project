@@ -39,6 +39,7 @@ class MongoDataManager:
         print("Uh Oh Stinky")
 
   def FindRecord(self, query):
+    """Find Record(query) will query mongodb based on a dictionary query"""
     result = list(self.collection.find(query))
     return result
 

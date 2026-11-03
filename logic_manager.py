@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-import data_manager
 import validator
 from config import (ALLOWED_IMPACT, ALLOWED_LOCATIONS, ALLOWED_RISK_TYPES,
                         ALLOWED_SEVERITY, INSIGHT_CODES, INSIGHT_RISK_TYPES)
@@ -145,21 +144,17 @@ def rule_dynamic_insurance(r, d):
         _note(d, f"Rule 4: {', '.join(sorted(triggered))} detected, holding until insurance confirmed",
               "Premium Increase Required", "Update financial profile: extended insurance needed", human=True)
 
-def rule_low_risk_validation(r, d, Data_Manager, now):
+def rule_low_risk_validation(r, d, Mongo_DM, now):
     """Rule 3: a 'Low' route flagged or delayed in the last 21 days needs dispatcher sign-off."""
     if d["overall_risk"] != "Low":
         return
     try:
-
-        search_filter = {
+        query = {
             "route_id" : r["route_id"],
-            "saved_at" : now - timedelta(days=HISTORY_WINDOW_DAYS)
+            "saved_at" : {"lt",(now - timedelta(days=HISTORY_WINDOW_DAYS))}
         }
-        operator = {
-            "route_id" : "!=",
-            "saved_at" : "<",
-        }
-        past = Data_Manager.get_route_history(search_filter, operator)
+        past = Mongo_DM.FindRecord(query)
+        #past = Data_Manager.get_route_history(search_filter, operator)
         out = []
         for r in past:           
             out.append({"date": datetime.fromisoformat(r["saved_at"]), "flagged": r["flagged"], "delayed": r["delayed"]})
@@ -202,7 +197,7 @@ def decide_outcome(d):
     if d["hold_shipment"] and d["outcome"] == "PROCEED":
         d["outcome"] = "ESCALATE"
 
-def evaluate_shipment(ai_record, Data_Manager, now=None):
+def evaluate_shipment(ai_record, Mongo_DM, now=None):
     """Run one AI row through every rule. Returns (prepared record, decision dict)."""
     now = now or datetime.now()
     r = prepare_record(ai_record)
@@ -210,7 +205,7 @@ def evaluate_shipment(ai_record, Data_Manager, now=None):
     if validate_record(r, d, now):
         for rule in (rule_perfect_storm, rule_ai_insights, rule_dynamic_insurance):
             rule(r, d)
-        rule_low_risk_validation(r, d, Data_Manager, now)  # after the risk-raising rules: only checks "Low"
+        rule_low_risk_validation(r, d, Mongo_DM, now)  # after the risk-raising rules: only checks "Low"
         rule_inventory_replacement(r, d)
         decide_outcome(d)
         if d["needs_human"]:  # final gate: anything needing a human is never fully automatic
@@ -219,12 +214,12 @@ def evaluate_shipment(ai_record, Data_Manager, now=None):
     r.pop("_dropped_items", None)
     return r, d
 
-def evaluate_shipments(assessments, Data_Manager, now=None):
+def evaluate_shipments(assessments, Mongo_DM, now=None):
     """Evaluate every row of ai_manager.assess_shipments(); returns [(record, decision), ...]."""
     results = []
     for row in assessments.to_dict("records"):
         try:
-            results.append(evaluate_shipment(row, Data_Manager, now))
+            results.append(evaluate_shipment(row, Mongo_DM, now))
         except Exception as exc:
             d = new_decision(str(row.get("shipment_id", "UNKNOWN")))
             d["outcome"] = "REJECT"
