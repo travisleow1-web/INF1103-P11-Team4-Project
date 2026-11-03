@@ -55,16 +55,16 @@ class DataManager:
     self.save_records()
 
   
-  def get_route_history(self, route_id, since):
-    """Used by Logic Manager Rule 3 (last 21 days on the same route)."""
-    out = []
-    for r in self.records:
-      if r.get("route_id") != route_id:
-        continue
-      saved = datetime.fromisoformat(r["saved_at"])
-      if saved >= since:
-        out.append({"date": datetime.fromisoformat(r["saved_at"]), "flagged": r["flagged"], "delayed": r["delayed"]})
-    return out
+  # def get_route_history(self, route_id, since):
+  #   """Used by Logic Manager Rule 3 (last 21 days on the same route)."""
+  #   out = []
+  #   for r in self.records:
+  #     if r.get("route_id") != route_id:
+  #       continue
+  #     saved = datetime.fromisoformat(r["saved_at"])
+  #     if saved >= since:
+  #       out.append({"date": datetime.fromisoformat(r["saved_at"]), "flagged": r["flagged"], "delayed": r["delayed"]})
+  #   return out
 
   def query_records(self, filter, opr):
     """Return the records matching every filter that is set; "" means not set."""
@@ -83,6 +83,7 @@ class DataManager:
       decision = r["decision"]
 
       #checks if filter is not empty, then checks if the record matches the record, records must match ALL filters
+      #each filter has its own opr inside, its hardcoded tho
       for F in filter_options:
         if self.OPS[opr.get(F)](decision.get(F),filter.get(F)):
           break     
