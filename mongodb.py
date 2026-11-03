@@ -26,6 +26,16 @@ class MongoDataManager:
       result = self.collection.insert_one(record)
       if result.acknowledged == True:
         print("Insertion Successful")
+      else:
+        print("Uh Oh Stinky")
+
+  def DeleteRecord(self, ids):
+    for id in ids:
+      result = self.collection.delete_one(id)
+      if result.acknowledged == True:
+        print("Deletion Successful")
+      else:
+        print("Uh Oh Stinky")
 
 MDM = MongoDataManager()
 Record = [{
@@ -33,3 +43,4 @@ Record = [{
   "Age" : 10
 }]
 MDM.InsertRecord(Record)
+MDM.DeleteRecord
