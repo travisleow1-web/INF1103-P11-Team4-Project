@@ -8,6 +8,7 @@ import validator
 import pandas as pd
 from datetime import datetime
 from typing import Optional, Dict, Any, Callable
+from abc import ABC, abstractmethod 
 from config import (
     MAX_RETRIES, HTTP_TIMEOUT, SHIPMENT_FIELDS, 
     SYSTEM_PROMPT, RESPONSE_SCHEMA, FALLBACK_AI_RESPONSE, GEMINI_URL
