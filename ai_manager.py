@@ -159,12 +159,29 @@ class GeminiAIManager(BaseAIManager):
         external = {"weather": get_shipment_weather(shipment), "news": fetch_news(shipment)}
         fetched_at = datetime.now().isoformat(timespec="seconds")
         # Call the Gemini API with the constructed prompt and handle any exceptions, falling back to a default response if necessary.
+        
         try:
             result = self.call_gemini(self.build_prompt(shipment, external))
             if not all(k in result for k in RESPONSE_SCHEMA["required"]):
                 raise ValueError("Gemini response missing required fields")
+            # Confidence-Based Human Route: If the AI's confidence score is low or there are conflicting sources, log a warning and add an insight indicating that human review is needed.
+            confidence_score = result.get("confidence_score", 1.0)
+            conflicting_sources = result.get("conflicting_sources", False)
+            
+            if confidence_score < 0.5 or conflicting_sources:
+                log.warning("Low confidence or conflicting sources for %s: score=%s, conflicting=%s",
+                            shipment.get("shipment_id"), confidence_score, conflicting_sources)
+                result["insights"].append({
+                    "insight_code": "NEEDS_HUMAN_REVIEW",
+                    "risk_type": "Unknown",
+                    "severity": "High",
+                    "location": "Route",
+                    "estimated_delay_days": 0,
+                })
+                
             cache_set(key, {"result": result, "fetched_at": fetched_at})
             # Log the successful assessment and return the enriched record.
+            
         except Exception as exc:
                 log.error("AI assessment failed for %s: %s", shipment.get("shipment_id"), exc)
                 result = dict(FALLBACK_AI_RESPONSE)
