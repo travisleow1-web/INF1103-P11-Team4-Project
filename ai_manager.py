@@ -78,7 +78,7 @@ def fill_coordinates(shipment: Dict[str, Any]) -> Dict[str, Any]:
             shipment[f"{end}_lat"], shipment[f"{end}_lon"] = validator.port_coordinates(code)
     return shipment
 
-class AIManager(ABC):
+class BaseAIManager(ABC):
     
     "Abstract base class for managing AI assessments of shipment records, providing methods for enrichment and batch processing."
     
@@ -100,6 +100,16 @@ class AIManager(ABC):
                              "external_data_fetched_at": datetime.now().isoformat(timespec="seconds")})
             
         return pd.DataFrame(rows)
+    
+class GeminiAIManager(BaseAIManager):
+    def __init__(self):
+        
+        self.http_session = requests.Session()
+        
+        self.api_key = get_api_key()
+        
+        if self.api_key is None:
+            logging.warning("GEMINI_API_KEY is not set; AI calls will use the fallback response.")
     
 def build_prompt(shipment: Dict[str, Any], external: Dict[str, Any]) -> str:
     # Format shipment parameters and live external data into a unified prompt string.
