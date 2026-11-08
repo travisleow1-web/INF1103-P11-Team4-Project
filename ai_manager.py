@@ -111,41 +111,39 @@ class GeminiAIManager(BaseAIManager):
         if self.api_key is None:
             logging.warning("GEMINI_API_KEY is not set; AI calls will use the fallback response.")
     
-def build_prompt(shipment: Dict[str, Any], external: Dict[str, Any]) -> str:
-    # Format shipment parameters and live external data into a unified prompt string.
-    return (
-        "SHIPMENT:\n" + json.dumps(shipment, default=str)
-        + "\n\nEXTERNAL DATA:\n" + json.dumps(external, default=str)
-    )
+    def build_prompt(self,shipment: Dict[str, Any], external: Dict[str, Any]) -> str:
+        # Format shipment parameters and live external data into a unified prompt string.
+        return (
+            "SHIPMENT:\n" + json.dumps(shipment, default=str)
+            + "\n\nEXTERNAL DATA:\n" + json.dumps(external, default=str)
+        )
 
-@retry_with_smart_delay(max_retries=MAX_RETRIES)
-def call_gemini(prompt: str) -> Dict[str, Any]:
-    # Call the Gemini API with the given prompt, returning the parsed JSON response.
-    api_key = get_api_key()
-    if api_key is None:
-        raise RuntimeError("GEMINI_API_KEY is not set")
-    # Build the request body according to Gemini's expected schema, including system instructions and generation configuration.
-    body = {
-        "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
-        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "temperature": 0,
-            "seed": 0,
-            "responseMimeType": "application/json",
-            "responseSchema": RESPONSE_SCHEMA,
-        },
-    }
-    # Send the request to Gemini and parse the response, raising an exception on failure.
-    r = http_session.post(
-        GEMINI_URL,
-        headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
-        json=body,
-        timeout=HTTP_TIMEOUT * 2,
-    )
-    # Raise an exception for any HTTP error responses, then extract and parse the JSON content from the first candidate in the response.
-    r.raise_for_status()
-    raw_text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
-    return json.loads(raw_text)
+    @retry_with_smart_delay(max_retries=MAX_RETRIES)
+    def call_gemini(self, prompt: str) -> Dict[str, Any]:
+        # Call the Gemini API with the given prompt, returning the parsed JSON response.
+        if not self.api_key:
+            raise RuntimeError("GEMINI_API_KEY is not set")
+        # Build the request body according to Gemini's expected schema, including system instructions and generation configuration.
+        body = {
+            "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "temperature": 0,
+                "seed": 0,
+                "responseMimeType": "application/json",
+                "responseSchema": RESPONSE_SCHEMA,
+            },
+        }
+        # Send the request to Gemini and parse the response, raising an exception on failure.
+        r = self.http_session.post(
+            GEMINI_URL,
+            headers={"x-goog-api-key": self.api_key, "Content-Type": "application/json"},
+            json=body, timeout=HTTP_TIMEOUT * 2,
+        )
+        # Raise an exception for any HTTP error responses, then extract and parse the JSON content from the first candidate in the response.
+        r.raise_for_status()
+        raw_text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
+        return json.loads(raw_text)
 
 # Core Pipeline & Main Entry Points
 def enrich_record(record: Dict[Any, Any]) -> Dict[str, Any]:
