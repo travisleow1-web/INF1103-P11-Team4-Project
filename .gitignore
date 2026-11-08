@@ -4,3 +4,7 @@ app.log
 
 shipments.json
 ai_cache.json
+
+#Environment Variables
+.env
+.env.local

@@ -4,6 +4,7 @@ import ai_manager
 import data_manager
 import logic_manager
 import validator
+from mongodb import MongoDataManager
 
 
 def ask_port(message, validate=validator.validate_port):
@@ -161,64 +162,52 @@ def show_decisions(results):
             for reason in d['rationale']:
                 print(f"    - {reason}")
 
-def get_search_criteria(db_records):
-    risk = ""
-    outcome = ""
-    needs_human = ""
-    Add_Criteria = questionary.select(
-        "Would you like to add a filter",
-        choices=["Yes","No (Run Search)","Back"],
-        erase_when_done=True,
-    ).unsafe_ask()
-    if Add_Criteria == "Back":
-        return
-    match Add_Criteria:
-        case "Yes":
-            while True:
-                print("Current Filters")
-                print(f"Risk : {risk}")
-                print(f"Outcome : {outcome}")
-                print(f"Needs Human : {needs_human}")
+def mongo_search(Mongo_DM):
+    """Find Shipment Record via a filter"""
 
-                Criteria = questionary.select(
-                    "Filters",
-                    choices=["Risk","Outcome","Needs Human","Back (Finished Adding Filter)"],
-                    erase_when_done=True,
-                ).unsafe_ask()
-                match Criteria:
-                    case "Risk":
-                        risk = questionary.select(
-                            "Risk",
-                            choices=["Low", "Medium", "High"],
-                            erase_when_done=True,
-                        ).unsafe_ask()
-                    case "Outcome":
-                        outcome = questionary.select(
-                            "Outcome",
-                            choices=["DELAY","INSURE","PROCEED","ESCALATE","REJECT"],
-                            erase_when_done=True,
-                        ).unsafe_ask()
-                    case "Needs Human":
-                        needs_human = questionary.select(
-                            "Needs Human",
-                            choices=["YES","NO"],
-                            erase_when_done=True,
-                        ).unsafe_ask()
-                    case "Back (Finished Adding Filter)":
-                        break
-    if needs_human == "YES":
-        needs_human = True
-    elif needs_human == "NO":
-        needs_human = False
-    search_filter = {
-        "risk" : risk,
-        "outcome" : outcome,
-        "needs_human" : needs_human,
-    }
-    results = data_manager.query_records(db_records, search_filter)
+    # Returns a Python list of selected strings, e.g. ['origin_port', 'departure_time']
+    chosen_filters = questionary.checkbox(
+    "Select fields to modify (Space to select, Enter to finish):",
+    choices=[
+        questionary.Choice(title="Shipment ID", value="shipment_id"),
+        questionary.Choice(title="Route ID", value="route_id"),
+        questionary.Choice(title="Origin", value="origin"),
+        questionary.Choice(title="Overall Risk", value="overall_risk"),
+        questionary.Choice(title="Outcome", value="outcome"),
+        questionary.Choice(title="Needs Human", value="needs_human"),
+    ]).ask()
+
+    field_labels = {
+    "shipment_id": "Shipment ID",
+    "route_id": "Route ID",
+    "origin": "Origin",
+    "overall_risk": "Overall Risk",
+    "outcome": "Outcome",
+    "needs_human": "Needs Human",
+}
+
+    filter_values = {}
+
+
+    for filter in chosen_filters:
+        label = field_labels.get(filter)
+        if filter == "needs_human":
+            filter_values[filter] = questionary.confirm("Needs Human: ", default=False).ask()
+
+        # Predefined dropdown choice for risk levels
+        elif filter == "overall_risk":
+             filter_values[filter] = questionary.select(
+            "Overall Risk: ",
+            choices=["Low", "Medium", "High"]
+        ).ask()
+        else:
+            filter_values[filter] = questionary.text(f"Enter {label}: ").ask()
+    
+    results = Mongo_DM.FindRecord(filter_values)
     show_decisions([(record, record["decision"]) for record in results])
+    
 
-def main_menu(db_records):
+def main_menu(Mongo_DM):
     """Show the main menu and run the chosen action. Returns False when the user quits, otherwise True."""
     selection = questionary.select(
         "Main Menu",
@@ -231,14 +220,15 @@ def main_menu(db_records):
                 shipments = input_method()
                 if shipments is None:  # the user chose Back
                     return True
+               
                 assessments = ai_manager.assess_shipments(shipments)
-                results = logic_manager.evaluate_shipments(assessments, db_records)
-                data_manager.add_record(data_manager.DB_FILE, db_records, results)
+                results = logic_manager.evaluate_shipments(assessments, Mongo_DM)
+                Mongo_DM.InsertRecord(results)
                 show_summary(assessments)
                 show_details(assessments)
                 show_decisions(results)
             case "Search by Criteria":
-                get_search_criteria(db_records)
+                mongo_search(Mongo_DM)
             case "Quit" | None:  # None: the user pressed Ctrl+C at the prompt
                 return False
     except KeyboardInterrupt:  # Ctrl+C inside an action: back to the menu
@@ -247,6 +237,7 @@ def main_menu(db_records):
 
 if __name__ == "__main__":
     # Past records are loaded once so Rule 3 can check the last 21 days.
-    db_records = data_manager.load_records(data_manager.DB_FILE)
-    while main_menu(db_records):
+    #Data_Manager = data_manager.DataManager()
+    Mongo_DM = MongoDataManager()
+    while main_menu(Mongo_DM):
         pass
