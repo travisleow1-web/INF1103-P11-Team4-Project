@@ -8,14 +8,12 @@ import validator
 import pandas as pd
 from datetime import datetime
 from typing import Optional, Dict, Any, Callable
-
 from config import (
     MAX_RETRIES, HTTP_TIMEOUT, SHIPMENT_FIELDS, 
     SYSTEM_PROMPT, RESPONSE_SCHEMA, FALLBACK_AI_RESPONSE, GEMINI_URL
 )
 from cache import get_cache_key, cache_get, cache_set
 from feeds import get_shipment_weather, fetch_news
-
 
 # Logging Setup
 log = logging.getLogger("ai_manager")
@@ -79,6 +77,29 @@ def fill_coordinates(shipment: Dict[str, Any]) -> Dict[str, Any]:
             shipment[f"{end}_lat"], shipment[f"{end}_lon"] = validator.port_coordinates(code)
     return shipment
 
+class AIManager(ABC):
+    
+    "Abstract base class for managing AI assessments of shipment records, providing methods for enrichment and batch processing."
+    
+    @abstractmethod
+    def enrich_record(self, record: Dict[Any, Any]) -> Dict[str, Any]:
+        """Enrich a single shipment record with external data and an AI assessment."""
+        pass
+
+    @abstractmethod
+    def assess_shipments(self, shipments: pd.DataFrame) -> pd.DataFrame:
+        """Assess a batch of shipments, enriching each record with external data and AI-generated insights."""
+        rows = []
+        for record in shipments.to_dict("records"):
+            try:
+                rows.append(self.enrich_record(record))
+            except Exception as exc:
+                logging.error("could not assess %s: %s", record.get("shipment_id"), exc)
+                rows.append({**record, **FALLBACK_AI_RESPONSE,
+                             "external_data_fetched_at": datetime.now().isoformat(timespec="seconds")})
+            
+        return pd.DataFrame(rows)
+    
 def build_prompt(shipment: Dict[str, Any], external: Dict[str, Any]) -> str:
     # Format shipment parameters and live external data into a unified prompt string.
     return (
