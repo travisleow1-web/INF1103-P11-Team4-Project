@@ -145,41 +145,27 @@ class GeminiAIManager(BaseAIManager):
         raw_text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
         return json.loads(raw_text)
 
-# Core Pipeline & Main Entry Points
-def enrich_record(record: Dict[Any, Any]) -> Dict[str, Any]:
-    # Enrich a single shipment record with external data and an AI assessment, using caching to avoid redundant API calls.
-    shipment = fill_coordinates(record)
-    key = get_cache_key(extract_shipment(shipment))
-    # Check the cache for a previous assessment of this shipment; if found, return it with the cached timestamp.
-    cached = cache_get(key)
-    if cached:
-        log.info("cache hit for %s", shipment.get("shipment_id"))
-        return {**shipment, **cached["result"], "external_data_fetched_at": cached["fetched_at"]}
-    # If not cached, fetch external data (weather and news) and call the AI model to get a new assessment, then cache the result.
-    external = {"weather": get_shipment_weather(shipment), "news": fetch_news(shipment)}
-    fetched_at = datetime.now().isoformat(timespec="seconds")
-    # Call the Gemini API with the constructed prompt and handle any exceptions, falling back to a default response if necessary.
-    try:
-        result = call_gemini(build_prompt(shipment, external))
-        if not all(k in result for k in RESPONSE_SCHEMA["required"]):
-            raise ValueError("Gemini response missing required fields")
-        cache_set(key, {"result": result, "fetched_at": fetched_at})
-        # Log the successful assessment and return the enriched record.
-    except Exception as exc:
-        log.error("AI assessment failed for %s: %s", shipment.get("shipment_id"), exc)
-        result = dict(FALLBACK_AI_RESPONSE)
-        # Log the fallback response and return it with the current timestamp.
-    return {**shipment, **result, "external_data_fetched_at": fetched_at}
-
-def assess_shipments(shipments: pd.DataFrame) -> pd.DataFrame:
-    # Assess a batch of shipments, enriching each record with external data and AI-generated insights, while handling errors gracefully.
-    rows = []
-    for record in shipments.to_dict("records"):
+    # Core Pipeline & Main Entry Points
+    def enrich_record(self, record: Dict[Any, Any]) -> Dict[str, Any]:
+        # Enrich a single shipment record with external data and an AI assessment, using caching to avoid redundant API calls.
+        shipment = fill_coordinates(record)
+        key = get_cache_key(extract_shipment(shipment))
+        # Check the cache for a previous assessment of this shipment; if found, return it with the cached timestamp.
+        cached = cache_get(key)
+        if cached:
+            log.info("cache hit for %s", shipment.get("shipment_id"))
+            return {**shipment, **cached["result"], "external_data_fetched_at": cached["fetched_at"]}
+        # If not cached, fetch external data (weather and news) and call the AI model to get a new assessment, then cache the result.
+        external = {"weather": get_shipment_weather(shipment), "news": fetch_news(shipment)}
+        fetched_at = datetime.now().isoformat(timespec="seconds")
+        # Call the Gemini API with the constructed prompt and handle any exceptions, falling back to a default response if necessary.
         try:
-            rows.append(enrich_record(record))
+            result = self.call_gemini(self.build_prompt(shipment, external))
+            if not all(k in result for k in RESPONSE_SCHEMA["required"]):
+                raise ValueError("Gemini response missing required fields")
+            cache_set(key, {"result": result, "fetched_at": fetched_at})
+            # Log the successful assessment and return the enriched record.
         except Exception as exc:
-            # Log the error and append a fallback response for this shipment, ensuring that the assessment process continues for other records.
-            log.error("could not assess %s: %s", record.get("shipment_id"), exc)
-            rows.append({**record, **FALLBACK_AI_RESPONSE,
-                         "external_data_fetched_at": datetime.now().isoformat(timespec="seconds")})
-    return pd.DataFrame(rows)
+                log.error("AI assessment failed for %s: %s", shipment.get("shipment_id"), exc)
+                result = dict(FALLBACK_AI_RESPONSE)
+        return {**shipment, **result, "external_data_fetched_at": fetched_at}
