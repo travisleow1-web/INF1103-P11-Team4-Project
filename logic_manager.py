@@ -1,43 +1,196 @@
+from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
-import data_manager
+from enum import IntEnum
+
 import validator
 from config import (ALLOWED_IMPACT, ALLOWED_LOCATIONS, ALLOWED_RISK_TYPES,
-                        ALLOWED_SEVERITY, INSIGHT_CODES, INSIGHT_RISK_TYPES)
+                    ALLOWED_SEVERITY, INSIGHT_CODES, INSIGHT_RISK_TYPES)
 
 # Thresholds and rule inputs (change them here, not inside the rules)
-LOW, MEDIUM, HIGH = 1, 2, 3
-LEVEL_FROM_TEXT = {"low": LOW, "medium": MEDIUM, "high": HIGH}
-CONFIDENCE_MIN, HISTORY_WINDOW_DAYS, PERFECT_STORM_MIN_MEDIUMS = 0.60, 21, 3
-DATA_MAX_AGE_HOURS, DELAY_DAYS_LIMIT, DELAY_DAYS_HIGH = 24, 3, 7
-PERFECT_STORM_FACTORS = {"weather", "port_congestion", "labor_shortage"}
-INSURANCE_TRIGGERS = {"piracy_threat", "severe_civil_unrest"}
-CARGO_DESTRUCTION_IMPACTS = {"Cargo Destruction"}
-DATA_QUALITY_INSIGHTS = {"CONFLICTING_DATA", "OUTDATED_DATA", "MISSING_DATA", "NEEDS_HUMAN_REVIEW"}
-REQUIRED_FIELDS = ["shipment_id", "origin_port", "destination_port", "risk_factors", "primary_risk_factor",
-                   "affected_location", "expected_impact", "confidence_score", "sources"]
-INSIGHT_KEYS = ("code", "risk_type", "severity", "location", "estimated_delay_days")
+class RiskLevel(IntEnum):
+    """Ordered risk levels, so they can be compared (LOW < MEDIUM < HIGH)."""
+    LOW = 1
+    MEDIUM = 2
+    HIGH = 3
 
-def new_decision(shipment_id):
-    """Fresh decision dict. outcome: PROCEED / DELAY / INSURE / ESCALATE / REJECT."""
-    return {"shipment_id": shipment_id, "overall_risk": "Low", "outcome": "PROCEED", "hold_shipment": False,
-            "needs_human": False, "flags": [], "actions": [], "alerts": [], "rationale": []}
+    @classmethod
+    def from_text(cls, text):
+        """'Medium' / 'medium' / 'MEDIUM' -> RiskLevel.MEDIUM. Unknown text counts as LOW."""
+        return cls.__members__.get(str(text).strip().upper(), cls.LOW)
 
-def _level(text):
-    return LEVEL_FROM_TEXT.get(str(text).strip().lower(), LOW)
+    @property
+    def label(self):
+        """Display form used in decisions: 'Low' / 'Medium' / 'High'."""
+        return self.name.capitalize()
 
-def _note(d, why, flag=None, action=None, human=False):
-    """Record why a rule fired, plus an optional flag (no duplicates), action and human-review request."""
-    if human:
-        d["needs_human"] = True
-    if flag and flag not in d["flags"]:
-        d["flags"].append(flag)
-    if action:
-        d["actions"].append(action)
-    d["rationale"].append(why)
 
-def _raise_risk(d, level):
-    if _level(level) > _level(d["overall_risk"]):
-        d["overall_risk"] = level
+class RuleConfig:
+    """Every business-rule threshold in one validated object (new feature: user-configurable rules)."""
+
+    _DEFAULTS = {
+        "confidence_min": 0.60,           # below this, AI output needs a human
+        "history_window_days": 21,        # Rule 3 look-back
+        "perfect_storm_min_mediums": 3,   # Rule 1
+        "data_max_age_hours": 24,         # external data older than this is "outdated"
+        "delay_days_limit": 3,            # Rule 1b: delay that raises risk to Medium
+        "delay_days_high": 7,             # Rule 1b: delay that raises risk to High
+    }
+    _WHOLE_NUMBER_KEYS = ("history_window_days", "perfect_storm_min_mediums",
+                          "data_max_age_hours", "delay_days_limit", "delay_days_high")
+
+    def __init__(self, **overrides):
+        unknown = set(overrides) - set(self._DEFAULTS)
+        if unknown:
+            raise ValueError(f"Unknown rule setting(s): {sorted(unknown)}")
+        values = {**self._DEFAULTS, **overrides}
+        self._validate(values)
+        self._values = values
+
+    @classmethod
+    def _validate(cls, values):
+        conf = values["confidence_min"]
+        if isinstance(conf, bool) or not isinstance(conf, (int, float)) or not 0.0 <= conf <= 1.0:
+            raise ValueError("confidence_min must be a number between 0 and 1")
+        for key in cls._WHOLE_NUMBER_KEYS:
+            value = values[key]
+            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                raise ValueError(f"{key} must be a whole number of at least 1")
+        if values["perfect_storm_min_mediums"] > len(PerfectStormRule.STORM_FACTORS):
+            raise ValueError("perfect_storm_min_mediums cannot exceed the number of storm factors (3)")
+        if values["delay_days_high"] < values["delay_days_limit"]:
+            raise ValueError("delay_days_high must be at least delay_days_limit")
+
+    @classmethod
+    def from_dict(cls, data):
+        """Rebuild a config from saved JSON data (keys not given keep their defaults)."""
+        return cls(**dict(data))
+
+    def to_dict(self):
+        return dict(self._values)
+
+    @property
+    def confidence_min(self):
+        return self._values["confidence_min"]
+
+    @property
+    def history_window_days(self):
+        return self._values["history_window_days"]
+
+    @property
+    def perfect_storm_min_mediums(self):
+        return self._values["perfect_storm_min_mediums"]
+
+    @property
+    def data_max_age_hours(self):
+        return self._values["data_max_age_hours"]
+
+    @property
+    def delay_days_limit(self):
+        return self._values["delay_days_limit"]
+
+    @property
+    def delay_days_high(self):
+        return self._values["delay_days_high"]
+
+
+class Decision:
+    """The verdict on one shipment. State is private; rules change it only through methods."""
+
+    OUTCOMES = ("PROCEED", "DELAY", "INSURE", "ESCALATE", "REJECT")
+
+    def __init__(self, shipment_id):
+        self._shipment_id = str(shipment_id)
+        self._risk = RiskLevel.LOW
+        self._outcome = "PROCEED"
+        self._hold_shipment = False
+        self._needs_human = False
+        self._flags = []
+        self._actions = []
+        self._alerts = []
+        self._rationale = []
+
+    @property
+    def shipment_id(self):
+        return self._shipment_id
+
+    @property
+    def risk_level(self):
+        return self._risk
+
+    @property
+    def overall_risk(self):
+        return self._risk.label
+
+    @property
+    def outcome(self):
+        return self._outcome
+
+    @property
+    def hold_shipment(self):
+        return self._hold_shipment
+
+    @property
+    def needs_human(self):
+        return self._needs_human
+
+    @property
+    def flags(self):
+        return tuple(self._flags)
+
+    @property
+    def actions(self):
+        return tuple(self._actions)
+
+    @property
+    def alerts(self):
+        return tuple(dict(a) for a in self._alerts)
+
+    @property
+    def rationale(self):
+        return tuple(self._rationale)
+
+    def has_flag(self, flag):
+        return flag in self._flags
+
+    def add_note(self, why, flag=None, action=None, human=False):
+        """Record why a rule fired, plus an optional flag (no duplicates), action and human-review request."""
+        if human:
+            self._needs_human = True
+        if flag and flag not in self._flags:
+            self._flags.append(flag)
+        if action:
+            self._actions.append(action)
+        self._rationale.append(why)
+
+    def add_action(self, action):
+        self._actions.append(action)
+
+    def raise_risk(self, level):
+        """Risk only ever goes up; a later rule cannot undo an earlier High."""
+        if level > self._risk:
+            self._risk = level
+
+    def hold(self):
+        self._hold_shipment = True
+
+    def require_human(self):
+        self._needs_human = True
+
+    def add_alert(self, recipient, channels, message):
+        self._alerts.append({"recipient": recipient, "channels": list(channels), "message": message})
+
+    def set_outcome(self, outcome):
+        if outcome not in self.OUTCOMES:
+            raise ValueError(f"Unknown outcome {outcome!r}")
+        self._outcome = outcome
+
+    def to_dict(self):
+        """Plain dict for the Data Manager (saving) and IO Manager (display)."""
+        return {"shipment_id": self._shipment_id, "overall_risk": self.overall_risk,
+                "outcome": self._outcome, "hold_shipment": self._hold_shipment,
+                "needs_human": self._needs_human, "flags": list(self._flags),
+                "actions": list(self._actions), "alerts": [dict(a) for a in self._alerts],
+                "rationale": list(self._rationale)}
 
 def _describe(i):
     """e.g. 'POTENTIAL_DELAY weather/High @CNSHA +8d'."""
