@@ -210,72 +210,113 @@ class DataManagerRouteHistory(RouteHistorySource):
         import data_manager  # imported here so the Logic Manager can be tested without it
         return data_manager.get_route_history(self._db_records, route_id, since)    
 
-def _describe(i):
-    """e.g. 'POTENTIAL_DELAY weather/High @CNSHA +8d'."""
-    days = f" +{i['estimated_delay_days']}d" if i["estimated_delay_days"] else ""
-    return f"{i['code']} {i['risk_type']}/{i['severity']} @{i['location']}{days}"
+class RecordPreparer:
+    """Copies an AI row and fills in route_id, port names, defaults and cleaned lists."""
 
-def _clean_list(value, keys):
-    """Keep dict items that have every key; also return how many were dropped."""
-    good = [i for i in value if isinstance(i, dict) and all(k in i for k in keys)] if isinstance(value, list) else []
-    return good, len(value) - len(good) if isinstance(value, list) else 0
+    INSIGHT_KEYS = ("code", "risk_type", "severity", "location", "estimated_delay_days")
+    FACTOR_KEYS = ("type", "severity")
 
-def prepare_record(ai_record):
-    """Copy the AI row and add route_id, port names, defaults and cleaned lists."""
-    r = dict(ai_record)
-    o, dst = r.get("origin_port", ""), r.get("destination_port", "")
-    r.setdefault("route_id", f"{o}-{dst}")
-    for key, code in (("origin", o), ("destination", dst)):
-        r.setdefault(key, validator.PORTS_BY_CODE[code]["name"] if code in validator.PORTS_BY_CODE else str(code))
-    for key, kind, default in (("sources", list, []),):
-        if not isinstance(r.get(key), kind):
-            r[key] = default
-    r["risk_factors"], bad_f = _clean_list(r.get("risk_factors"), ("type", "severity"))
-    r["insights"], bad_i = _clean_list(r.get("insights"), INSIGHT_KEYS)
-    for ins in r["insights"]:
-        try:
-            ins["estimated_delay_days"] = max(0, int(ins["estimated_delay_days"]))
-        except (TypeError, ValueError):
-            ins["estimated_delay_days"] = 0
-    r["_dropped_items"] = bad_f + bad_i
-    return r
+    def prepare(self, ai_record):
+        """Return (prepared record, number of malformed list items dropped)."""
+        record = dict(ai_record)  # never change the caller's data
+        origin, destination = record.get("origin_port", ""), record.get("destination_port", "")
+        record.setdefault("route_id", f"{origin}-{destination}")
+        for key, code in (("origin", origin), ("destination", destination)):
+            record.setdefault(key, self._port_name(code))
+        if not isinstance(record.get("sources"), list):
+            record["sources"] = []
+        record["risk_factors"], bad_factors = self._clean_list(record.get("risk_factors"), self.FACTOR_KEYS)
+        record["insights"], bad_insights = self._clean_list(record.get("insights"), self.INSIGHT_KEYS)
+        for insight in record["insights"]:
+            try:
+                insight["estimated_delay_days"] = max(0, int(insight["estimated_delay_days"]))
+            except (TypeError, ValueError):
+                insight["estimated_delay_days"] = 0
+        return record, bad_factors + bad_insights
 
-def validate_record(r, d, now):
-    """Return False (REJECT) for unusable records; flag softer problems for human review."""
-    missing = [f for f in REQUIRED_FIELDS if r.get(f) in (None, "")]
-    conf = r.get("confidence_score")
-    if missing or isinstance(conf, bool) or not isinstance(conf, (int, float)) or not 0.0 <= conf <= 1.0:
-        d["outcome"] = "REJECT"
-        if missing:
-            _note(d, f"Validation failed: missing fields {missing}", "Incomplete AI record", human=True)
-        else:
-            _note(d, "Validation failed: confidence_score not in 0-1", "Invalid confidence score", human=True)
-        return False
-    checks = [("primary_risk_factor", r.get("primary_risk_factor"), ALLOWED_RISK_TYPES),
-              ("affected_location", r.get("affected_location"), ALLOWED_LOCATIONS),
-              ("expected_impact", r.get("expected_impact"), ALLOWED_IMPACT)]
-    for f in r["risk_factors"]:
-        checks += [("risk_factors.type", f["type"], ALLOWED_RISK_TYPES),
-                   ("risk_factors.severity", f["severity"], ALLOWED_SEVERITY)]
-    for i in r["insights"]:
-        checks += [("insights.code", i["code"], INSIGHT_CODES), ("insights.risk_type", i["risk_type"],
-                   INSIGHT_RISK_TYPES), ("insights.severity", i["severity"], ALLOWED_SEVERITY)]
-    problems = [f"{n}={v!r}" for n, v, allowed in checks if v not in allowed]
-    problems += [f"{r['_dropped_items']} malformed list item(s) dropped"] if r["_dropped_items"] else []
-    try:
-        fetched = datetime.fromisoformat(str(r.get("external_data_fetched_at")))
-    except ValueError:
-        fetched = None  # missing or unreadable timestamp: skip the age check
-    for failed, flag, why in (
+    @staticmethod
+    def _port_name(code):
+        port = validator.PORTS_BY_CODE.get(code)
+        return port["name"] if port else str(code)
+
+    @staticmethod
+    def _clean_list(value, keys):
+        """Keep dict items that have every key (copied); also return how many were dropped."""
+        if not isinstance(value, list):
+            return [], 0
+        good = [dict(item) for item in value if isinstance(item, dict) and all(k in item for k in keys)]
+        return good, len(value) - len(good)
+
+
+class RecordValidator:
+    """Rejects unusable records and flags softer problems for human review."""
+
+    REQUIRED_FIELDS = ("shipment_id", "origin_port", "destination_port", "risk_factors",
+                       "primary_risk_factor", "affected_location", "expected_impact",
+                       "confidence_score", "sources")
+
+    def __init__(self, config, allowed_values=None):
+        self._config = config
+        self._allowed = allowed_values or {
+            "risk_types": ALLOWED_RISK_TYPES, "locations": ALLOWED_LOCATIONS,
+            "impacts": ALLOWED_IMPACT, "severities": ALLOWED_SEVERITY,
+            "insight_codes": INSIGHT_CODES, "insight_risk_types": INSIGHT_RISK_TYPES,
+        }
+
+    def validate(self, record, dropped_items, decision, now):
+        """Return False (and mark REJECT) when the record cannot be used at all."""
+        missing = [f for f in self.REQUIRED_FIELDS if record.get(f) in (None, "")]
+        conf = record.get("confidence_score")
+        if missing or isinstance(conf, bool) or not isinstance(conf, (int, float)) or not 0.0 <= conf <= 1.0:
+            decision.set_outcome("REJECT")
+            if missing:
+                decision.add_note(f"Validation failed: missing fields {missing}",
+                                  "Incomplete AI record", human=True)
+            else:
+                decision.add_note("Validation failed: confidence_score not in 0-1",
+                                  "Invalid confidence score", human=True)
+            return False
+
+        cfg = self._config
+        problems = self._schema_problems(record, dropped_items)
+        fetched = self._fetched_time(record)
+        checks = (
             (problems, "AI output outside schema", f"Validation: unexpected AI values {problems}"),
-            (conf < CONFIDENCE_MIN, "Low AI confidence", f"Confidence {conf:.2f} is below {CONFIDENCE_MIN:.2f}"),
-            (fetched and now - fetched > timedelta(hours=DATA_MAX_AGE_HOURS), "Outdated external data",
-             f"External data is older than {DATA_MAX_AGE_HOURS}h"),
-            (r.get("conflicting_sources") is True, "Conflicting sources",
-             "AI reported conflicting or missing information")):
-        if failed:
-            _note(d, why, flag, human=True)
-    return True
+            (conf < cfg.confidence_min, "Low AI confidence",
+             f"Confidence {conf:.2f} is below {cfg.confidence_min:.2f}"),
+            (fetched and now - fetched > timedelta(hours=cfg.data_max_age_hours), "Outdated external data",
+             f"External data is older than {cfg.data_max_age_hours}h"),
+            (record.get("conflicting_sources") is True, "Conflicting sources",
+             "AI reported conflicting or missing information"),
+        )
+        for failed, flag, why in checks:
+            if failed:
+                decision.add_note(why, flag, human=True)
+        return True
+
+    def _schema_problems(self, record, dropped_items):
+        allowed = self._allowed
+        checks = [("primary_risk_factor", record.get("primary_risk_factor"), allowed["risk_types"]),
+                  ("affected_location", record.get("affected_location"), allowed["locations"]),
+                  ("expected_impact", record.get("expected_impact"), allowed["impacts"])]
+        for factor in record["risk_factors"]:
+            checks += [("risk_factors.type", factor["type"], allowed["risk_types"]),
+                       ("risk_factors.severity", factor["severity"], allowed["severities"])]
+        for insight in record["insights"]:
+            checks += [("insights.code", insight["code"], allowed["insight_codes"]),
+                       ("insights.risk_type", insight["risk_type"], allowed["insight_risk_types"]),
+                       ("insights.severity", insight["severity"], allowed["severities"])]
+        problems = [f"{name}={value!r}" for name, value, ok in checks if value not in ok]
+        if dropped_items:
+            problems.append(f"{dropped_items} malformed list item(s) dropped")
+        return problems
+
+    @staticmethod
+    def _fetched_time(record):
+        try:
+            return datetime.fromisoformat(str(record.get("external_data_fetched_at")))
+        except ValueError:
+            return None  # missing or unreadable timestamp: skip the age check
 
 def rule_perfect_storm(r, d):
     """Rule 1: any High factor -> High; 3 Medium weather/congestion/labor factors -> High."""
