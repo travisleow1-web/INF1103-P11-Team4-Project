@@ -445,49 +445,90 @@ class ProcurementRule(BusinessRule):
             decision.add_note(f"Rule 5: Cargo Destruction @{record['origin_port']} (origin)", "Procurement Alert",
                               "Reorder goods immediately: the goods on this shipment")
 
-def decide_outcome(d):
-    """Turn the flags into one outcome: Procurement Alert or High risk -> DELAY, insurance -> INSURE."""
-    if "Procurement Alert" in d["flags"]:
-        d["outcome"] = "DELAY"
-    elif "Premium Increase Required" in d["flags"]:
-        d["outcome"] = "INSURE"
-    elif d["overall_risk"] == "High":
-        d["outcome"] = "DELAY"
-        d["actions"].append("Delay departure until conditions clear")
-        d["needs_human"] = True
-    else:
-        d["outcome"] = "PROCEED"
-        if d["overall_risk"] == "Medium":
-            d["actions"].append("Proceed with monitoring")
-    if d["hold_shipment"] and d["outcome"] == "PROCEED":
-        d["outcome"] = "ESCALATE"
+class OutcomeResolver:
+    """Turns the accumulated flags and risk into one outcome, then applies the human-review gate."""
 
-def evaluate_shipment(ai_record, db_records, now=None):
-    """Run one AI row through every rule. Returns (prepared record, decision dict)."""
-    now = now or datetime.now()
-    r = prepare_record(ai_record)
-    d = new_decision(str(r.get("shipment_id", "UNKNOWN")))
-    if validate_record(r, d, now):
-        for rule in (rule_perfect_storm, rule_ai_insights, rule_dynamic_insurance):
-            rule(r, d)
-        rule_low_risk_validation(r, d, db_records, now)  # after the risk-raising rules: only checks "Low"
-        rule_inventory_replacement(r, d)
-        decide_outcome(d)
-        if d["needs_human"]:  # final gate: anything needing a human is never fully automatic
-            d["outcome"] = "ESCALATE" if d["outcome"] == "PROCEED" else d["outcome"]
-            d["actions"].append("Route to human review queue")
-    r.pop("_dropped_items", None)
-    return r, d
+    def resolve(self, decision):
+        if decision.has_flag("Procurement Alert"):
+            decision.set_outcome("DELAY")
+        elif decision.has_flag("Premium Increase Required"):
+            decision.set_outcome("INSURE")
+        elif decision.risk_level == RiskLevel.HIGH:
+            decision.set_outcome("DELAY")
+            decision.add_action("Delay departure until conditions clear")
+            decision.require_human()
+        else:
+            decision.set_outcome("PROCEED")
+            if decision.risk_level == RiskLevel.MEDIUM:
+                decision.add_action("Proceed with monitoring")
+        if decision.hold_shipment and decision.outcome == "PROCEED":
+            decision.set_outcome("ESCALATE")
+        # Final gate: anything needing a human is never fully automatic
+        if decision.needs_human:
+            if decision.outcome == "PROCEED":
+                decision.set_outcome("ESCALATE")
+            decision.add_action("Route to human review queue")
 
-def evaluate_shipments(assessments, db_records, now=None):
-    """Evaluate every row of ai_manager.assess_shipments(); returns [(record, decision), ...]."""
-    results = []
-    for row in assessments.to_dict("records"):
-        try:
-            results.append(evaluate_shipment(row, db_records, now))
-        except Exception as exc:
-            d = new_decision(str(row.get("shipment_id", "UNKNOWN")))
-            d["outcome"] = "REJECT"
-            _note(d, f"Evaluation failed: {exc!r}", "Evaluation error", human=True)
-            results.append((row, d))
-    return results
+
+class LogicManager:
+    """Runs every AI-enriched record through preparation, validation, the rules and the resolver."""
+
+    def __init__(self, history_source, config=None, allowed_values=None):
+        self._history_source = history_source
+        self._allowed_values = allowed_values
+        self._build(config or RuleConfig())
+
+    def _build(self, config):
+        # Composition: these parts are created here and live only inside this LogicManager.
+        self._config = config
+        self._preparer = RecordPreparer()
+        self._validator = RecordValidator(config, self._allowed_values)
+        self._rules = [
+            PerfectStormRule(config),
+            AIInsightRule(config),
+            InsuranceRule(),
+            RouteHistoryRule(config, self._history_source),  # after the risk-raising rules
+            ProcurementRule(),
+        ]
+        self._resolver = OutcomeResolver()
+
+    @property
+    def config(self):
+        return self._config
+
+    @property
+    def rules(self):
+        return tuple(self._rules)
+
+    def update_config(self, config):
+        """Apply new user-chosen thresholds (new feature); rebuilds the rules with them."""
+        if not isinstance(config, RuleConfig):
+            raise TypeError("config must be a RuleConfig")
+        self._build(config)
+
+    def evaluate_shipment(self, ai_record, now=None):
+        """Run one AI row through every rule. Returns (prepared record, Decision)."""
+        now = now or datetime.now()
+        record, dropped = self._preparer.prepare(ai_record)
+        decision = Decision(record.get("shipment_id", "UNKNOWN"))
+        if self._validator.validate(record, dropped, decision, now):
+            for rule in self._rules:  # polymorphism: same call for every rule type
+                rule.apply(record, decision, now)
+            self._resolver.resolve(decision)
+        return record, decision
+
+    def evaluate_shipments(self, assessments, now=None):
+        """Evaluate every AI assessment; returns [(record, Decision), ...].
+        Accepts the AI Manager's DataFrame or a plain list of dicts.
+        One broken row is rejected on its own instead of stopping the batch."""
+        rows = assessments.to_dict("records") if hasattr(assessments, "to_dict") else list(assessments)
+        results = []
+        for row in rows:
+            try:
+                results.append(self.evaluate_shipment(row, now))
+            except Exception as exc:  # keep the batch running; the row goes to a human
+                decision = Decision(row.get("shipment_id", "UNKNOWN") if isinstance(row, dict) else "UNKNOWN")
+                decision.set_outcome("REJECT")
+                decision.add_note(f"Evaluation failed: {exc!r}", "Evaluation error", human=True)
+                results.append((row, decision))
+        return results
