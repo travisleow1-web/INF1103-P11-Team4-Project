@@ -318,71 +318,132 @@ class RecordValidator:
         except ValueError:
             return None  # missing or unreadable timestamp: skip the age check
 
-def rule_perfect_storm(r, d):
-    """Rule 1: any High factor -> High; 3 Medium weather/congestion/labor factors -> High."""
-    levels = {}
-    for f in r["risk_factors"]:
-        levels[f["type"]] = max(levels.get(f["type"], LOW), _level(f["severity"]))
-    if HIGH in levels.values():
-        d["overall_risk"] = "High"
-        _note(d, "Rule 1: at least one risk factor is High")
-    mediums = [f for f in PERFECT_STORM_FACTORS if levels.get(f, LOW) >= MEDIUM]
-    if len(mediums) >= PERFECT_STORM_MIN_MEDIUMS:
-        d["overall_risk"] = "High"
-        _note(d, f"Rule 1 (Perfect Storm): {', '.join(sorted(mediums))} all >= Medium, upgraded to High",
-              "Perfect Storm")
-    elif MEDIUM in levels.values():
-        _raise_risk(d, "Medium")
+class BusinessRule(ABC):
+    """Contract every business rule follows. LogicManager runs them in list order."""
 
-def rule_ai_insights(r, d):
-    """Rule 1b: data-quality codes -> human; delay >=3d Medium, >=7d High; High MULTIPLE_RISKS -> High."""
-    for i in r["insights"]:
-        if i["code"] in DATA_QUALITY_INSIGHTS:
-            _note(d, f"Rule 1b: {_describe(i)} -> human review", f"AI flagged: {i['code']}", human=True)
-    delays = [i for i in r["insights"] if i["code"] == "POTENTIAL_DELAY"]
-    worst = max(delays, key=lambda i: i["estimated_delay_days"]) if delays else None
-    if worst and worst["estimated_delay_days"] >= DELAY_DAYS_LIMIT:
-        _raise_risk(d, "High" if worst["estimated_delay_days"] >= DELAY_DAYS_HIGH else "Medium")
-        _note(d, f"Rule 1b: {_describe(worst)} -> risk {d['overall_risk']}", "Significant Delay Expected")
-    for i in r["insights"]:
-        if i["code"] == "MULTIPLE_RISKS" and _level(i["severity"]) == HIGH:
-            _raise_risk(d, "High")
-            _note(d, f"Rule 1b: {_describe(i)} -> risk High", "Compound Risk")
+    @abstractmethod
+    def apply(self, record, decision, now):
+        """Inspect the prepared record and update the decision."""
 
-def rule_dynamic_insurance(r, d):
+
+class PerfectStormRule(BusinessRule):
+    """Rule 1: any High factor -> High; enough Medium weather/congestion/labour factors -> High."""
+
+    STORM_FACTORS = frozenset({"weather", "port_congestion", "labor_shortage"})
+
+    def __init__(self, config):
+        self._config = config
+
+    def apply(self, record, decision, now):
+        levels = {}
+        for factor in record["risk_factors"]:
+            levels[factor["type"]] = max(levels.get(factor["type"], RiskLevel.LOW),
+                                         RiskLevel.from_text(factor["severity"]))
+        if RiskLevel.HIGH in levels.values():
+            decision.raise_risk(RiskLevel.HIGH)
+            decision.add_note("Rule 1: at least one risk factor is High")
+        mediums = [f for f in self.STORM_FACTORS if levels.get(f, RiskLevel.LOW) >= RiskLevel.MEDIUM]
+        if len(mediums) >= self._config.perfect_storm_min_mediums:
+            decision.raise_risk(RiskLevel.HIGH)
+            decision.add_note(f"Rule 1 (Perfect Storm): {', '.join(sorted(mediums))} all >= Medium, "
+                              "upgraded to High", "Perfect Storm")
+        elif RiskLevel.MEDIUM in levels.values():
+            decision.raise_risk(RiskLevel.MEDIUM)
+
+
+class AIInsightRule(BusinessRule):
+    """Rule 1b: data-quality codes -> human; long predicted delays and High MULTIPLE_RISKS raise risk."""
+
+    DATA_QUALITY_CODES = frozenset({"CONFLICTING_DATA", "OUTDATED_DATA", "MISSING_DATA", "NEEDS_HUMAN_REVIEW"})
+
+    def __init__(self, config):
+        self._config = config
+
+    def apply(self, record, decision, now):
+        insights = record["insights"]
+        for insight in insights:
+            if insight["code"] in self.DATA_QUALITY_CODES:
+                decision.add_note(f"Rule 1b: {self._describe(insight)} -> human review",
+                                  f"AI flagged: {insight['code']}", human=True)
+
+        delays = [i for i in insights if i["code"] == "POTENTIAL_DELAY"]
+        worst = max(delays, key=lambda i: i["estimated_delay_days"]) if delays else None
+        if worst and worst["estimated_delay_days"] >= self._config.delay_days_limit:
+            high = worst["estimated_delay_days"] >= self._config.delay_days_high
+            decision.raise_risk(RiskLevel.HIGH if high else RiskLevel.MEDIUM)
+            decision.add_note(f"Rule 1b: {self._describe(worst)} -> risk {decision.overall_risk}",
+                              "Significant Delay Expected")
+
+        for insight in insights:
+            if insight["code"] == "MULTIPLE_RISKS" and RiskLevel.from_text(insight["severity"]) == RiskLevel.HIGH:
+                decision.raise_risk(RiskLevel.HIGH)
+                decision.add_note(f"Rule 1b: {self._describe(insight)} -> risk High", "Compound Risk")
+
+    @staticmethod
+    def _describe(insight):
+        """e.g. 'POTENTIAL_DELAY weather/High @CNSHA +8d'."""
+        days = f" +{insight['estimated_delay_days']}d" if insight["estimated_delay_days"] else ""
+        return f"{insight['code']} {insight['risk_type']}/{insight['severity']} @{insight['location']}{days}"
+
+
+class InsuranceRule(BusinessRule):
     """Rule 4: piracy_threat / severe_civil_unrest -> hold until extended insurance is confirmed."""
-    triggered = INSURANCE_TRIGGERS & ({f["type"] for f in r["risk_factors"]} | {r["primary_risk_factor"]})
-    if triggered:
-        d["hold_shipment"], d["overall_risk"] = True, "High"
-        _note(d, f"Rule 4: {', '.join(sorted(triggered))} detected, holding until insurance confirmed",
-              "Premium Increase Required", "Update financial profile: extended insurance needed", human=True)
 
-def rule_low_risk_validation(r, d, db_records, now):
-    """Rule 3: a 'Low' route flagged or delayed in the last 21 days needs dispatcher sign-off."""
-    if d["overall_risk"] != "Low":
-        return
-    try:
-        past = data_manager.get_route_history(db_records, r["route_id"], now - timedelta(days=HISTORY_WINDOW_DAYS))
-    except (KeyError, TypeError, ValueError) as exc:
-        return _note(d, f"Rule 3: could not read route history ({exc}), needs human",
-                     "Route history unavailable", human=True)
-    problems = [p for p in past if p.get("flagged") or p.get("delayed")]
-    if not problems:
-        return _note(d, "Rule 3: Low risk and clean 21-day history, auto-approve")
-    d["hold_shipment"] = True
-    _note(d, f"Rule 3: AI says Low but {len(problems)} shipment(s) on route {r['route_id']} were flagged or "
-          f"delayed in the last {HISTORY_WINDOW_DAYS} days", "Cautionary Override",
-          "Require human dispatcher sign-off", human=True)
+    TRIGGERS = frozenset({"piracy_threat", "severe_civil_unrest"})
 
-def rule_inventory_replacement(r, d):
-    """Rule 5: Cargo Destruction predicted at the origin port -> Procurement Alert to reorder the goods."""
-    if r["expected_impact"] in CARGO_DESTRUCTION_IMPACTS and r["affected_location"] == r["origin_port"]:
-        d["hold_shipment"] = True
-        d["alerts"].append({"recipient": "procurement_team", "channels": ["email"], "message":
-                            f"Shipment {r['shipment_id']} is at risk of destruction at {r['origin']}. "
-                            "Consider reordering to avoid stock-out."})
-        _note(d, f"Rule 5: Cargo Destruction @{r['origin_port']} (origin)", "Procurement Alert",
-              "Reorder goods immediately: the goods on this shipment")
+    def apply(self, record, decision, now):
+        present = {f["type"] for f in record["risk_factors"]} | {record["primary_risk_factor"]}
+        triggered = self.TRIGGERS & present
+        if triggered:
+            decision.hold()
+            decision.raise_risk(RiskLevel.HIGH)
+            decision.add_note(f"Rule 4: {', '.join(sorted(triggered))} detected, holding until insurance "
+                              "confirmed", "Premium Increase Required",
+                              "Update financial profile: extended insurance needed", human=True)
+
+
+class RouteHistoryRule(BusinessRule):
+    """Rule 3: a 'Low' route flagged or delayed recently needs dispatcher sign-off."""
+
+    def __init__(self, config, history_source):
+        self._config = config
+        self._history = history_source  # association: used, not owned
+
+    def apply(self, record, decision, now):
+        if decision.risk_level != RiskLevel.LOW:
+            return  # only double-checks shipments that are still Low
+        window = self._config.history_window_days
+        try:
+            past = self._history.get_route_history(record["route_id"], now - timedelta(days=window))
+        except (KeyError, TypeError, ValueError) as exc:
+            decision.add_note(f"Rule 3: could not read route history ({exc}), needs human",
+                              "Route history unavailable", human=True)
+            return
+        problems = [p for p in past if p.get("flagged") or p.get("delayed")]
+        if not problems:
+            decision.add_note(f"Rule 3: Low risk and clean {window}-day history, auto-approve")
+            return
+        decision.hold()
+        decision.add_note(f"Rule 3: AI says Low but {len(problems)} shipment(s) on route {record['route_id']} "
+                          f"were flagged or delayed in the last {window} days", "Cautionary Override",
+                          "Require human dispatcher sign-off", human=True)
+
+
+class ProcurementRule(BusinessRule):
+    """Rule 5 (multi-condition): Cargo Destruction predicted AT the origin port -> reorder the goods."""
+
+    DESTRUCTION_IMPACTS = frozenset({"Cargo Destruction"})
+
+    def apply(self, record, decision, now):
+        destroyed = record["expected_impact"] in self.DESTRUCTION_IMPACTS
+        at_origin = record["affected_location"] == record["origin_port"]
+        if destroyed and at_origin:
+            decision.hold()
+            decision.add_alert("procurement_team", ["email"],
+                               f"Shipment {record['shipment_id']} is at risk of destruction at "
+                               f"{record['origin']}. Consider reordering to avoid stock-out.")
+            decision.add_note(f"Rule 5: Cargo Destruction @{record['origin_port']} (origin)", "Procurement Alert",
+                              "Reorder goods immediately: the goods on this shipment")
 
 def decide_outcome(d):
     """Turn the flags into one outcome: Procurement Alert or High risk -> DELAY, insurance -> INSURE."""
