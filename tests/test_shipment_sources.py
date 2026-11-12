@@ -14,6 +14,31 @@ def test_form_source_returns_a_copy_of_its_fields():
     assert fields["origin_port"] == "SGSIN"
 
 
+def test_many_makes_one_source_per_typed_row():
+    sources = FormSource.many({"origin_port": ["SGSIN", "MYPKG"], "destination_port": ["NLRTM", "SGSIN"],
+                               "departure_time": ["01/12/2026", "02/12/2026"],
+                               "arrival_time": ["20/12/2026", "03/12/2026"]})
+    assert [s.read()[0]["origin_port"] for s in sources] == ["SGSIN", "MYPKG"]
+    assert sources[1].read()[0] == {"origin_port": "MYPKG", "destination_port": "SGSIN",
+                                    "departure_time": "02/12/2026", "arrival_time": "03/12/2026"}
+
+
+def test_many_skips_blank_rows_but_keeps_partly_filled_ones():
+    sources = FormSource.many({"origin_port": ["", " ", "SGSIN"], "destination_port": ["", "NLRTM", ""]})
+    assert [s.read()[0] for s in sources] == [{"origin_port": " ", "destination_port": "NLRTM"},
+                                              {"origin_port": "SGSIN", "destination_port": ""}]
+
+
+def test_many_fills_short_columns_with_blanks():
+    sources = FormSource.many({"origin_port": ["SGSIN", "MYPKG"], "destination_port": ["NLRTM"]})
+    assert sources[1].read()[0] == {"origin_port": "MYPKG", "destination_port": ""}
+
+
+def test_many_with_no_rows_is_empty():
+    assert FormSource.many({}) == []
+    assert FormSource.many({"origin_port": []}) == []
+
+
 def test_csv_source_reads_rows():
     assert CsvSource(HEADER + LINE).read() == [{"origin_port": "SGSIN", "destination_port": "NLRTM",
                                                 "departure_time": "01/12/2026",

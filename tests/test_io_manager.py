@@ -142,5 +142,11 @@ def test_show_input_form_lists_the_ports():
     assert make_io().show_input_form()["ports"] == ["SGSIN - Singapore, SG", "NLRTM - Rotterdam, NL"]
 
 
+def test_show_input_form_lists_risk_labels_and_outcomes_for_the_dropdowns():
+    form = make_io().show_input_form()
+    assert form["risk_levels"] == ["Low", "Medium", "High", "Extreme"]
+    assert form["outcomes"] == ["PROCEED", "DELAY", "INSURE", "ESCALATE", "REJECT"]
+
+
 def test_search_criteria_to_dict_keeps_false_but_drops_blanks():
     assert SearchCriteria(needs_human=False, outcome="").to_dict() == {"needs_human": False}

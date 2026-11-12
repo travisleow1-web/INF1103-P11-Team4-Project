@@ -1,5 +1,7 @@
 import re
 from .preview import Preview
+from model.outcome import Outcome
+from model.risk_level import RiskLevel
 from model.search_criteria import SearchCriteria
 from model.storage_error import StorageError
 
@@ -41,7 +43,10 @@ class IOManager:
 
     # The show_* methods return the data a web template needs. They do not print.
     def show_input_form(self):
-        return {"ports": self.__ports.labels()}
+        """Choices for the input and search forms: port labels, risk labels and outcome values."""
+        return {"ports": self.__ports.labels(),
+                "risk_levels": [level.label for level in RiskLevel],
+                "outcomes": [outcome.value for outcome in Outcome]}
 
     def show_result(self, record):
         s = record.shipment
