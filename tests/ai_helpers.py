@@ -1,5 +1,8 @@
 """Stand-ins for the AI layer tests. No network, no live Gemini."""
 import json
+from datetime import date
+from helpers import ROTTERDAM, SINGAPORE
+from model.shipment import Shipment
 
 
 class FakeResponse:
@@ -63,3 +66,9 @@ def valid_raw(**changes):
     }
     raw.update(changes)
     return raw
+
+
+def make_shipment(shipment_id="SHP-001", departure=None, arrival=None):
+    """Singapore to Rotterdam, departing 01/12/2026 and arriving 20/12/2026 unless given."""
+    return Shipment(shipment_id, SINGAPORE, ROTTERDAM, departure or date(2026, 12, 1),
+                    arrival or date(2026, 12, 20))
