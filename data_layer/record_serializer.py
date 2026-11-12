@@ -36,7 +36,7 @@ class RecordSerializer:
                 self.__date(doc["arrival"]),
             )
             return ShipmentRecord(shipment, AIAssessment.from_dict(self.__mapping(doc["assessment"])),
-                                  Decision(self.__mapping(doc["decision"])), self.__time(doc["saved_at"]))
+                                  Decision.from_dict(self.__mapping(doc["decision"])), self.__time(doc["saved_at"]))
         except (KeyError, TypeError, ValueError, AttributeError) as error:
             raise StorageError(f"A saved record is damaged: {error!r}") from error
 

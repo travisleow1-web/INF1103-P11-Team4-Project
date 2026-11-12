@@ -72,10 +72,14 @@ def saved_record(shipment_id="SHP-001", risk="LOW", outcome="PROCEED", needs_hum
                  departure=date(2026, 12, 1), fallback=False, saved_at=None):
     """A real ShipmentRecord (placeholder classes) of the kind the Data manager stores."""
     from model.decision import Decision
+    from model.outcome import Outcome
     from model.shipment_record import ShipmentRecord
     shipment = Shipment(shipment_id, SINGAPORE, ROTTERDAM, departure, date(2026, 12, 28))
     assessment = AIAssessment.fallback(FETCHED_AT) if fallback else live_assessment()
-    decision = Decision({"shipment_id": shipment_id, "overall_risk": risk, "outcome": outcome,
-                         "needs_human": needs_human})
+    decision = Decision(shipment_id)
+    decision.raise_risk(RiskLevel.parse(risk))
+    decision.set_outcome(Outcome(outcome))
+    if needs_human:
+        decision.require_human()
     return ShipmentRecord(shipment, assessment, decision,
                           saved_at or datetime(2026, 11, 1, 9, 0, tzinfo=timezone.utc))
