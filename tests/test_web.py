@@ -265,6 +265,7 @@ def env(monkeypatch, tmp_path):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("DATA_BACKEND", "json")
     monkeypatch.setenv("DATA_FILE", str(tmp_path / "records.json"))
+    monkeypatch.setenv("DEMO_DATA_FILE", str(tmp_path / "demo.json"))
     return monkeypatch
 
 
@@ -335,3 +336,12 @@ def test_create_app_shows_the_banner_when_the_database_is_unavailable(env):
     page = TestClient(main.create_app()).get("/")
     assert page.status_code == 200
     assert "banner-error" in page.text and "Database unavailable" in page.text
+
+
+def test_demo_mode_keeps_its_records_apart_from_the_real_ones(env, tmp_path):
+    env.setenv("DEMO_MODE", "1")
+    env.setenv("DATA_BACKEND", "mongo")                      # ignored in demo mode
+    page = TestClient(main.create_app()).post("/submit", files={"csv_file": ("s.csv", CSV, "text/csv")})
+    assert "1 of 1" in page.text and "banner-error" not in page.text
+    assert (tmp_path / "demo.json").exists()
+    assert not (tmp_path / "records.json").exists()

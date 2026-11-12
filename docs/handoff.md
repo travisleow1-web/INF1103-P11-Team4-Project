@@ -14,7 +14,7 @@ Open http://127.0.0.1:8000, upload `sample_data/shipments.csv`, then try **Searc
 
 ## Demo mode
 
-`DEMO_MODE=1` makes `create_app()` use `FakeAI` and `FakeLogic` from `tests/fakes.py` instead of the real managers, and every page shows a yellow banner "Demo mode: fake AI and rules". The fakes give each shipment a low, medium or high weather risk based on its number. They live under `tests/` and never run unless demo mode is on.
+`DEMO_MODE=1` makes `create_app()` use `FakeAI` and `FakeLogic` from `tests/fakes.py` instead of the real managers, and every page shows a yellow banner "Demo mode: fake AI and rules". Demo records go to `DEMO_DATA_FILE` (default `demo_records.json`), never to `DATA_FILE` or MongoDB, so demo runs cannot mix with real records. The fakes give each shipment a low, medium or high weather risk based on its number. They live under `tests/` and never run unless demo mode is on.
 
 Without demo mode, the AI and Logic come from `build_ai()` and `build_logic()` in `main.py`. While those return `None`, the submit page validates the rows and then says "N shipments are valid. AI and Logic are not connected yet."
 

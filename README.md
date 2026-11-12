@@ -15,7 +15,7 @@ uvicorn main:create_app --factory --reload
 
 Open http://127.0.0.1:8000. `python main.py` starts the same app without `--reload`.
 
-- **Demo mode:** set `DEMO_MODE=1` in `.env` (or run `DEMO_MODE=1 uvicorn main:create_app --factory`). The app then uses a fake AI and fake rules, so you can try the whole flow without a Gemini key. Every page shows a yellow "Demo mode" banner.
+- **Demo mode:** set `DEMO_MODE=1` in `.env` (or run `DEMO_MODE=1 uvicorn main:create_app --factory`). The app then uses a fake AI and fake rules, so you can try the whole flow without a Gemini key. Every page shows a yellow "Demo mode" banner. Demo records are kept in `demo_records.json`, apart from real ones.
 - **Storage:** records are saved to `shipment_records.json` by default. To use MongoDB, set `DATA_BACKEND=mongo`, `MONGO_URI` and `DB_NAME`. If MongoDB cannot be reached, the app still starts and shows a red banner.
 - **Try it:** upload `sample_data/shipments.csv` (20 shipments) on the first page, then open **Search**.
 

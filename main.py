@@ -80,18 +80,20 @@ def build_mongo(ports: PortRegistry) -> MongoDataManager:
 def create_app() -> FastAPI:
     """Read .env, compose the managers and return the FastAPI app.
 
-    DEMO_MODE=1 uses the fake AI and Logic from tests/fakes.py, and every page shows a demo banner.
+    DEMO_MODE=1 uses the fake AI and Logic from tests/fakes.py and keeps its records in DEMO_DATA_FILE
+    (default demo_records.json), never in MongoDB or DATA_FILE. Every page then shows a demo banner.
     """
     from web.app import create_web_app        # here, not at the top: web.app imports assess_shipments
 
     load_dotenv()
     ports = PortRegistry.from_json()
-    data = build_data(ports)
     demo = os.getenv("DEMO_MODE", "").strip() == "1"
     if demo:
         from tests.fakes import FakeAI, FakeLogic
+        data = JsonDataManager(os.getenv("DEMO_DATA_FILE") or "demo_records.json", ports)
         ai, logic = FakeAI(), FakeLogic()
     else:
+        data = build_data(ports)
         ai, logic = build_ai(), build_logic(data, ports)
     io = IOManager(ShipmentValidator(ports), data, ports)
     notices = [data.message] if isinstance(data, UnavailableDataManager) else []

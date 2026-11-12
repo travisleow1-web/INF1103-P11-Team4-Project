@@ -9,5 +9,6 @@ ai_cache.json
 .env
 .env.local
 
-# Records saved by the web app (JSON backend)
+# Records saved by the web app (JSON backend) and by demo mode
 shipment_records.json
+demo_records.json
