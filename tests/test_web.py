@@ -319,7 +319,10 @@ def test_search_without_a_database_shows_the_message():
 
 @pytest.fixture
 def env(monkeypatch, tmp_path):
-    for name in ("DEMO_MODE", "MONGO_URI", "DB_NAME"):
+    """A clean environment: a developer's own .env and shell settings must not change the tests."""
+    monkeypatch.setattr(main, "load_dotenv", lambda *args, **kwargs: False)
+    for name in ("DEMO_MODE", "DATA_BACKEND", "DATA_FILE", "DEMO_DATA_FILE", "MONGO_URI", "DB_NAME",
+                 "GEMINI_API_KEY"):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("DATA_BACKEND", "json")
     monkeypatch.setenv("DATA_FILE", str(tmp_path / "records.json"))
@@ -461,3 +464,10 @@ def test_the_runner_passed_in_is_the_one_used(data):
     client = TestClient(create_web_app(make_io(data), FakeAI(), FakeLogic(), data, run=runner))
     assert "Done: 0 of 2" in client.post("/submit", data=good_rows(2)).text
     assert calls == [["SHP-001", "SHP-002"]]
+
+
+def test_create_app_reads_env_through_the_name_the_fixture_replaces(env):
+    calls = []
+    env.setattr(main, "load_dotenv", lambda *args, **kwargs: calls.append(args))
+    main.create_app()
+    assert calls == [()]
