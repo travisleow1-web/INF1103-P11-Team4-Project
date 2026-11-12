@@ -1,7 +1,7 @@
 """One set of tests run against every backend: they must behave the same (LSP)."""
 from datetime import date, datetime, timezone
 import pytest
-from helpers import PORTS, saved_record
+from helpers import PORTS, ROTTERDAM, SINGAPORE, saved_record
 from data_layer.json_data_manager import JsonDataManager
 from data_layer.mongo_data_manager import MongoDataManager
 from model.search_criteria import SearchCriteria
@@ -83,6 +83,39 @@ def test_saving_the_same_shipment_id_twice_is_an_error(data):
     assert len(data.find(SearchCriteria())) == 1
 
 
+# Route history (Logic Rule 3)
+
+def at(day, hour=9):
+    return datetime(2026, 11, day, hour, tzinfo=timezone.utc)
+
+
+def test_route_history_is_empty_when_nothing_is_saved(data):
+    assert data.find_route_history("SGSIN-NLRTM", at(1)) == []
+
+
+def test_route_history_keeps_the_route_and_window_newest_first(data):
+    data.save(saved_record("SHP-001", saved_at=at(1)))                      # too old
+    data.save(saved_record("SHP-002", saved_at=at(10)))                     # exactly at since
+    data.save(saved_record("SHP-003", saved_at=at(12)))
+    data.save(saved_record("SHP-004", saved_at=at(11), origin=ROTTERDAM, destination=SINGAPORE))
+    assert ids(data.find_route_history("SGSIN-NLRTM", at(10))) == ["SHP-003", "SHP-002"]
+    assert ids(data.find_route_history("NLRTM-SGSIN", at(10))) == ["SHP-004"]
+
+
+def test_route_history_skips_fallback_assessments(data):
+    data.save(saved_record("SHP-001", saved_at=at(5), fallback=True))
+    data.save(saved_record("SHP-002", saved_at=at(6), risk="HIGH", outcome="DELAY"))
+    history = data.find_route_history("SGSIN-NLRTM", at(1))
+    assert ids(history) == ["SHP-002"]
+    assert history[0].is_flagged() and history[0].is_delayed()
+
+
+def test_an_unknown_route_has_no_history(data):
+    data.save(saved_record("SHP-001", saved_at=at(5)))
+    assert data.find_route_history("SGSIN", at(1)) == []
+    assert data.find_route_history("SGSIN-XXXXX", at(1)) == []
+
+
 # JSON file problems
 
 def test_a_missing_file_is_empty_and_is_created_on_save(tmp_path):
@@ -109,6 +142,13 @@ def test_a_file_that_is_not_a_list_is_a_storage_error(tmp_path):
     path.write_text('{"a": 1}', encoding="utf-8")
     with pytest.raises(StorageError):
         JsonDataManager(path, PORTS).find(SearchCriteria())
+
+
+def test_route_history_from_a_corrupt_file_is_a_storage_error(tmp_path):
+    path = tmp_path / "records.json"
+    path.write_text("{not json", encoding="utf-8")
+    with pytest.raises(StorageError):
+        JsonDataManager(path, PORTS).find_route_history("SGSIN-NLRTM", datetime(2026, 11, 1, tzinfo=timezone.utc))
 
 
 def test_records_survive_a_new_manager_on_the_same_file(tmp_path):

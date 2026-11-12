@@ -1,5 +1,6 @@
 from datetime import date, datetime, timezone
 from pymongo.errors import DuplicateKeyError, PyMongoError
+from model.ai_status import AIStatus
 from model.storage_error import StorageError
 from .data_manager import DataManager
 from .record_serializer import RecordSerializer
@@ -33,8 +34,21 @@ class MongoDataManager(DataManager):
             raise StorageError(f"Cannot save the record: {error}") from error
 
     def find(self, criteria):
+        return self.__find_newest_first(criteria.to_query())
+
+    def find_route_history(self, route_id: str, since: datetime) -> list:
+        """Records on the route saved at or after since, skipping FALLBACK assessments, newest first."""
+        origin, _, destination = route_id.partition("-")
+        return self.__find_newest_first({
+            "origin": origin,
+            "destination": destination,
+            "saved_at": {"$gte": since},
+            "assessment.ai_status": {"$ne": AIStatus.FALLBACK.value},
+        })
+
+    def __find_newest_first(self, query):
         try:
-            cursor = self.__collection.find(criteria.to_query())
+            cursor = self.__collection.find(query)
             documents = list(cursor.sort([("saved_at", -1), ("shipment_id", -1)]))
         except PyMongoError as error:
             raise StorageError(f"Cannot search the database: {error}") from error

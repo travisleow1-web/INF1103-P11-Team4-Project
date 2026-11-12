@@ -1,5 +1,6 @@
 import json
 import os
+from datetime import datetime
 from pathlib import Path
 from model.storage_error import StorageError
 from .data_manager import DataManager
@@ -24,7 +25,17 @@ class JsonDataManager(DataManager):
     def find(self, criteria):
         records = [self.__serializer.from_document(d) for d in self.__load()]
         matching = [r for r in records if criteria.matches(r)]
-        return sorted(matching, key=lambda r: (r.saved_at, r.shipment.shipment_id), reverse=True)
+        return self.__newest_first(matching)
+
+    def find_route_history(self, route_id: str, since: datetime) -> list:
+        """Records on the route saved at or after since, skipping FALLBACK assessments, newest first."""
+        records = [self.__serializer.from_document(d) for d in self.__load()]
+        matching = [r for r in records if r.shipment.route_id() == route_id
+                    and r.saved_at >= since and not r.assessment.is_fallback()]
+        return self.__newest_first(matching)
+
+    def __newest_first(self, records):
+        return sorted(records, key=lambda r: (r.saved_at, r.shipment.shipment_id), reverse=True)
 
     def __load(self):
         """Return the saved documents. A missing file is empty; an unreadable one is an error."""
