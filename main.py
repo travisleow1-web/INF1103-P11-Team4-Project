@@ -65,7 +65,7 @@ def build_data(ports: PortRegistry) -> DataManager:
             return build_mongo(ports)
         except StorageError as error:
             logger.error("Starting without storage: %s", error)
-            return UnavailableDataManager(f"Database unavailable: {error}. Results will not be saved.")
+            return UnavailableDataManager(MongoDataManager.UNAVAILABLE)
     raise ValueError(f"DATA_BACKEND must be 'json' or 'mongo', not {backend!r}")
 
 

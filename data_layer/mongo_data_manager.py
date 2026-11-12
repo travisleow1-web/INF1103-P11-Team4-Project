@@ -1,3 +1,4 @@
+import logging
 from datetime import date, datetime, timezone
 from typing import List
 from pymongo.collection import Collection
@@ -11,8 +12,16 @@ from .data_manager import DataManager
 from .record_serializer import RecordSerializer
 
 
+logger = logging.getLogger(__name__)
+
+
 class MongoDataManager(DataManager):
-    """Keeps records in a MongoDB collection. Departure, arrival and saved_at are stored as real dates."""
+    """Keeps records in a MongoDB collection. Departure, arrival and saved_at are stored as real dates.
+
+    Driver errors are logged in full; users only see the short UNAVAILABLE message.
+    """
+
+    UNAVAILABLE = "Database unavailable. Results will not be saved."
 
     def __init__(self, collection: Collection, ports: PortRegistry):
         """Use an open collection (mongomock in tests). Makes shipment_id unique."""
@@ -21,20 +30,21 @@ class MongoDataManager(DataManager):
         try:
             collection.create_index("shipment_id", unique=True)
         except PyMongoError as error:
-            raise StorageError(f"Cannot reach the database: {error}") from error
+            raise self.__unavailable("Cannot prepare the collection", error) from error
 
     @classmethod
     def connect(cls, uri: str, db_name: str, ports: PortRegistry, collection_name: str = "shipment_records") -> "MongoDataManager":
         """Open a collection from a connection string. Nothing is read from the environment here.
 
-        Raises StorageError if the address is invalid or the server cannot be reached.
+        Raises StorageError if the address or database name is invalid or the server cannot be reached.
         """
         from pymongo import MongoClient
         try:
             client = MongoClient(uri, serverSelectionTimeoutMS=3000)
-        except PyMongoError as error:
-            raise StorageError(f"Cannot reach the database: {error}") from error
-        return cls(client[db_name][collection_name], ports)
+            collection = client[db_name][collection_name]
+        except (PyMongoError, ValueError) as error:       # ValueError: e.g. a port above 65535
+            raise cls.__unavailable("Cannot open the database", error) from error
+        return cls(collection, ports)
 
     def save(self, record: ShipmentRecord) -> None:
         """Insert the record. A shipment_id that is already saved is a StorageError."""
@@ -44,7 +54,7 @@ class MongoDataManager(DataManager):
         except DuplicateKeyError as error:
             raise StorageError(f"{record.shipment.shipment_id} is already saved") from error
         except PyMongoError as error:
-            raise StorageError(f"Cannot save the record: {error}") from error
+            raise self.__unavailable(f"Cannot save {record.shipment.shipment_id}", error) from error
 
     def find(self, criteria: SearchCriteria) -> List[ShipmentRecord]:
         """The records that match, newest first. Damaged records are skipped and logged."""
@@ -65,8 +75,14 @@ class MongoDataManager(DataManager):
             cursor = self.__collection.find(query)
             documents = list(cursor.sort([("saved_at", -1), ("shipment_id", -1)]))
         except PyMongoError as error:
-            raise StorageError(f"Cannot search the database: {error}") from error
+            raise self.__unavailable("Cannot search the database", error) from error
         return self.__serializer.from_documents(documents)
+
+    @classmethod
+    def __unavailable(cls, what: str, error: Exception) -> StorageError:
+        """Log the driver's detail and return the short error users see."""
+        logger.error("%s: %s", what, error)
+        return StorageError(cls.UNAVAILABLE)
 
     def __with_real_dates(self, document):
         """MongoDB cannot store a bare date, so days become midnight UTC datetimes."""

@@ -248,6 +248,12 @@ def test_connect_can_use_another_collection(monkeypatch):
     assert "shipment_id_1" in client["team4"]["test_records"].index_information()
 
 
-def test_connect_with_a_bad_address_is_a_storage_error():
-    with pytest.raises(StorageError):
-        MongoDataManager.connect("http://not-a-mongo-address", "team4", PORTS)     # fails before any network call
+@pytest.mark.parametrize("uri, db_name", [
+    ("http://not-a-mongo-address", "team4"),       # wrong scheme
+    ("mongodb://localhost:99999", "team4"),        # port out of range (ValueError in the driver)
+    ("mongodb://localhost:27017", "team 4"),       # invalid database name (InvalidName)
+])
+def test_bad_connection_settings_are_a_short_storage_error(uri, db_name):
+    # each of these fails before any network call
+    with pytest.raises(StorageError, match="^Database unavailable. Results will not be saved.$"):
+        MongoDataManager.connect(uri, db_name, PORTS)

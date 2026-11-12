@@ -327,11 +327,15 @@ def test_create_app_without_demo_mode_says_not_connected(env):
     assert "Demo mode" not in page.text
 
 
-def test_build_data_without_mongo_settings_is_unavailable(env):
+SHORT = "Database unavailable. Results will not be saved."
+
+
+def test_build_data_without_mongo_settings_is_unavailable(env, caplog):
     env.setenv("DATA_BACKEND", "mongo")
     data = main.build_data(PORTS)
     assert isinstance(data, UnavailableDataManager)
-    assert "MONGO_URI and DB_NAME must both be set" in data.message
+    assert data.message == SHORT
+    assert "MONGO_URI and DB_NAME must both be set" in caplog.text
 
 
 def test_build_data_falls_back_when_mongo_cannot_be_reached(env):
@@ -343,7 +347,7 @@ def test_build_data_falls_back_when_mongo_cannot_be_reached(env):
     env.setattr(main.MongoDataManager, "connect", unreachable)
     data = main.build_data(PORTS)
     assert isinstance(data, UnavailableDataManager)
-    assert "timed out" in data.message
+    assert data.message == SHORT
 
 
 def test_create_app_shows_the_banner_when_the_database_is_unavailable(env):
@@ -360,3 +364,36 @@ def test_demo_mode_keeps_its_records_apart_from_the_real_ones(env, tmp_path):
     assert "1 of 1" in page.text and "banner-error" not in page.text
     assert (tmp_path / "demo.json").exists()
     assert not (tmp_path / "records.json").exists()
+
+
+@pytest.mark.parametrize("uri, db_name, driver_text", [
+    ("mongodb://localhost:27017", "team 4", "cannot contain"),           # invalid database name
+    ("mongodb://localhost:99999", "team4", "Port must be an integer"),   # invalid port
+])
+def test_bad_database_settings_show_only_the_short_message(env, caplog, uri, db_name, driver_text):
+    env.setenv("DATA_BACKEND", "mongo")
+    env.setenv("MONGO_URI", uri)
+    env.setenv("DB_NAME", db_name)
+    client = TestClient(main.create_app())
+    home, search = client.get("/").text, client.get("/search").text
+    assert f'<div class="banner banner-error" role="alert">{SHORT}</div>' in home
+    assert f'<p class="alert alert-error" role="alert">{SHORT}</p>' in search
+    assert driver_text not in home + search
+    assert driver_text in caplog.text
+
+
+def test_a_failed_mongo_save_shows_the_short_message_on_the_row(caplog):
+    mongomock = pytest.importorskip("mongomock")
+    from pymongo.errors import AutoReconnect
+    from data_layer.mongo_data_manager import MongoDataManager
+    collection = mongomock.MongoClient().db.records
+    data = MongoDataManager(collection, PORTS)
+
+    def lost(document):
+        raise AutoReconnect("connection reset by peer")
+    collection.insert_one = lost
+    text = demo_client(data).post("/submit", data=good_rows(1)).text
+    assert '<span class="badge badge-error">Not saved</span>' in text
+    assert SHORT in text
+    assert "connection reset" not in text
+    assert "connection reset by peer" in caplog.text
