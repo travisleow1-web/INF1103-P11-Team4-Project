@@ -16,7 +16,7 @@ Open http://127.0.0.1:8000, upload `sample_data/shipments.csv`, then try **Searc
 
 `DEMO_MODE=1` makes `create_app()` use `FakeAI` and `FakeLogic` from `tests/fakes.py` instead of the real managers, and every page shows a yellow banner "Demo mode: fake AI and rules". Demo records go to `DEMO_DATA_FILE` (default `demo_records.json`), never to `DATA_FILE` or MongoDB, so demo runs cannot mix with real records. The fakes give each shipment a low, medium or high weather risk based on its number. They live under `tests/` and never run unless demo mode is on.
 
-Without demo mode, the AI and Logic come from `build_ai()` and `build_logic()` in `main.py`. While those return `None`, the submit page validates the rows and then says "N shipments are valid. AI and Logic are not connected yet."
+Without demo mode, the AI and Logic come from `build_ai()` and `build_logic()` in `main.py`. While those return `None`, the home page says so up front, and the submit page validates the rows and then says "N shipments are valid. AI and Logic are not connected yet."
 
 ## Folder map
 
@@ -27,7 +27,7 @@ Without demo mode, the AI and Logic come from `build_ai()` and `build_logic()` i
 | `data_layer/` | `DataManager` (ABC) with `JsonDataManager` (default), `MongoDataManager` and `UnavailableDataManager`; `RecordSerializer` |
 | `ai_layer/` | AI manager (PR 2) |
 | `logic_layer/` | Logic manager and rules (PR 3) |
-| `web/app.py` | `create_web_app(...)`: the FastAPI routes `GET /`, `POST /submit`, `GET /search` |
+| `web/app.py` | `create_web_app(..., run=...)`: the FastAPI routes `GET /`, `POST /submit`, `GET /search`. `main.create_app` passes `assess_shipments` as `run`, so `web/` never imports `main` |
 | `web/templates/` | Jinja templates. `_header.html` and `_footer.html` wrap every page; `_macros.html` holds the badges and the details row |
 | `web/static/` | `style.css` and `add_row.js` (the only JavaScript) |
 | `main.py` | Composition root: `assess_shipments`, `build_data`, `build_ai`, `build_logic`, `create_app` |
@@ -41,6 +41,10 @@ The flow for one submission: the route calls `io.preview(...)`. If every row is 
 - **Logic (PR 3):** fill in `build_logic(data, ports)` the same way. `evaluate(shipment, assessment, now)` returns a `Decision`. Route history comes from `data.find_route_history(route_id, since)`.
 
 Each PR edits only its own function in `main.py`, so the two do not conflict.
+
+## Storage problems
+
+If MongoDB is chosen but cannot be reached (or `MONGO_URI`/`DB_NAME` are missing or invalid), the app still starts with an `UnavailableDataManager`: every page shows a red "Database unavailable. Results will not be saved." banner, and the submit page refuses to number shipments until saved records can be read. The detail is in the log.
 
 ## How to add a page
 
@@ -61,7 +65,7 @@ Jinja autoescape is on. Never use `|safe` on data, and show risk and outcome as 
 
 ## How to add a data backend
 
-1. Subclass `DataManager` in a new file in `data_layer/` and implement `save`, `find` and `find_route_history`. Raise `StorageError` for every failure, never the driver's own errors.
+1. Subclass `DataManager` in a new file in `data_layer/` and implement `save`, `find` and `find_route_history`. Raise `StorageError` for every failure, never the driver's own errors, and keep its message short (log the driver's detail). Skip and log a damaged record in `find` instead of failing the whole list, and refuse a naive `since` with `ValueError`.
 2. Use `RecordSerializer` to turn records into documents and back.
 3. Add the backend to the `data` fixture in `tests/test_data_managers.py` so the whole contract suite runs against it.
 4. Choose it in `build_data()` in `main.py` with a new `DATA_BACKEND` value, and add any settings to `.env.example` with empty values.
