@@ -15,9 +15,13 @@ class ProcurementRule(BusinessRule):
     DESTRUCTION_IMPACTS = frozenset({"Cargo Destruction"})
 
     def apply(self, shipment: Shipment, assessment: AIAssessment, decision: Decision, now: datetime) -> None:
-        """Hold the shipment and alert procurement when the goods may be destroyed before they leave."""
+        """Hold the shipment and alert procurement when the goods may be destroyed before they leave.
+
+        The affected location is open text, so 'sgsin' and 'SGSIN - Singapore, SG' both match SGSIN.
+        """
         destroyed = assessment.expected_impact in self.DESTRUCTION_IMPACTS
-        at_origin = assessment.affected_location == shipment.origin.code
+        place = assessment.affected_location.split(" - ")[0].strip().upper()
+        at_origin = place == shipment.origin.code
         if destroyed and at_origin:
             decision.hold()
             decision.add_alert("procurement_team", ["email"],

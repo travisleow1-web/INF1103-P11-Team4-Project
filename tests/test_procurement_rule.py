@@ -1,3 +1,4 @@
+import pytest
 from logic_fixtures import NOW, assessment, decision, shipment
 from logic_layer.procurement_rule import ProcurementRule
 from model.flag import Flag
@@ -27,3 +28,14 @@ def test_destruction_elsewhere_changes_nothing():
 def test_other_impacts_at_the_origin_change_nothing():
     d = run(assessment(location="SGSIN", impact="Delay"))
     assert not d.hold_shipment and d.flags == ()
+
+
+@pytest.mark.parametrize("location", ["sgsin", " SGSIN", "SGSIN - Singapore, SG"])
+def test_the_origin_is_matched_loosely(location):
+    d = run(assessment(location=location, impact="Cargo Destruction"))
+    assert d.has_flag(Flag.PROCUREMENT_ALERT)
+
+
+def test_another_port_label_does_not_match():
+    d = run(assessment(location="NLRTM - Rotterdam, NL", impact="Cargo Destruction"))
+    assert not d.has_flag(Flag.PROCUREMENT_ALERT)
