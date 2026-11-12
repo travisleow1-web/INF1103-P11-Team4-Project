@@ -57,7 +57,7 @@ class AIManager:
         try:
             fetched_at = datetime.fromisoformat(entry["fetched_at"])
             return self.__parser.parse(entry["result"], AIStatus.CACHED, fetched_at)
-        except (InvalidResponseError, KeyError, TypeError, ValueError) as error:
+        except (InvalidResponseError, KeyError, TypeError, ValueError, OverflowError) as error:
             log.warning("Ignoring damaged or outdated AI cache entry: %s", error)
             return None                                       # counts as a miss
 

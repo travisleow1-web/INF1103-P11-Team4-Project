@@ -1,4 +1,5 @@
 import copy
+import json
 from datetime import datetime, timezone
 import pytest
 from ai_helpers import valid_raw
@@ -78,6 +79,21 @@ def bad(path, value):
     bad(("insights", 0, "severity"), "medium-high"),
     bad(("insights", 0, "estimated_delay_days"), "soon"),
     bad(("insights", 0, "estimated_delay_days"), -1),
+    bad(("insights", 0, "estimated_delay_days"), "3"),
+    bad(("insights", 0, "estimated_delay_days"), 2.9),
+    bad(("insights", 0, "estimated_delay_days"), 2.0),
+    bad(("insights", 0, "estimated_delay_days"), True),
+    bad(("insights", 0, "estimated_delay_days"), float("inf")),
+    bad(("insights", 0, "estimated_delay_days"), None),
+    bad(("risk_factors", 0, "type"), "none"),
+    bad(("risk_factors", 0, "location"), None),
+    bad(("risk_factors", 0, "location"), ["SGSIN"]),
+    bad(("risk_factors", 0, "detail"), {"a": 1}),
+    bad(("insights", 0, "location"), 7),
+    bad("affected_location", None),
+    bad("affected_location", ["SGSIN"]),
+    bad("confidence_score", float("inf")),
+    bad("confidence_score", float("nan")),
     bad("confidence_score", 1.5),
     bad("confidence_score", -0.1),
     bad("confidence_score", "0.8"),
@@ -113,3 +129,22 @@ def test_naive_fetch_time_is_rejected():
 
 def test_conflicting_sources_true_is_kept():
     assert parse(valid_raw(conflicting_sources=True)).conflicting_sources is True
+
+
+def test_delay_of_1e400_from_json_is_rejected():
+    raw = valid_raw()
+    raw["insights"][0]["estimated_delay_days"] = json.loads("1e400")      # inf
+    with pytest.raises(InvalidResponseError):
+        parse(raw)
+
+
+def test_insight_risk_type_may_be_none():
+    raw = valid_raw()
+    raw["insights"][0]["risk_type"] = "none"
+    assert parse(raw).insights[0].risk_type is RiskType.NONE
+
+
+def test_zero_delay_is_accepted():
+    raw = valid_raw()
+    raw["insights"][0]["estimated_delay_days"] = 0
+    assert parse(raw).insights[0].estimated_delay_days == 0

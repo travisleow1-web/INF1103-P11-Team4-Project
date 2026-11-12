@@ -128,12 +128,17 @@ def test_new_fingerprint_misses_the_old_cache(tmp_path):
     {"result": valid_raw(), "fetched_at": "2026-11-13T02:00:00"},      # no time zone
     {"result": valid_raw(expected_impact="Old Value"), "fetched_at": "2026-11-13T02:00:00+00:00"},
     {"result": "not a reply", "fetched_at": "2026-11-13T02:00:00+00:00"},
+    "INFINITY",
 ])
 def test_damaged_cache_entry_is_a_miss(tmp_path, entry):
     today = datetime.now(timezone.utc).date()
     key = ResponseCache(tmp_path / "ai_cache.json", "test").make_key(make_shipment(), today)
     if isinstance(entry, dict):
         entry = {"day": today.isoformat(), **entry}
+    if entry == "INFINITY":       # json.dumps writes inf as the bare word Infinity, as a damaged file might
+        bad_raw = valid_raw()
+        bad_raw["insights"][0]["estimated_delay_days"] = float("inf")
+        entry = {"day": today.isoformat(), "result": bad_raw, "fetched_at": "2026-11-13T02:00:00+00:00"}
     (tmp_path / "ai_cache.json").write_text(json.dumps({key: entry}), encoding="utf-8")
     client = mock_client()
     result = make_manager(tmp_path, client).assess(make_shipment())
