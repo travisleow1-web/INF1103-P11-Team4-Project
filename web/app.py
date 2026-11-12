@@ -36,20 +36,22 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
     run is the assessment flow (main.assess_shipments), passed in so the web layer never imports main.
     """
     notices = list(notices or [])
+    connected = ai is not None and logic is not None
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(WEB_DIR / "templates")), autoescape=True)
     templates = Jinja2Templates(env=env)
     app = FastAPI(title="Supply Chain Risk Assessor")
     app.mount("/static", StaticFiles(directory=str(WEB_DIR / "static")), name="static")
 
     def page(request: Request, name: str, status_code: int = 200, **context) -> HTMLResponse:
-        context = {"demo": demo, "notices": notices, "form": io.show_input_form(), **context}
+        context = {"demo": demo, "notices": notices, "connected": connected, "form": io.show_input_form(),
+                   **context}
         return templates.TemplateResponse(request, name, context, status_code=status_code)
 
     def input_page(request: Request, rows: list, status_code: int = 200, **context) -> HTMLResponse:
         return page(request, "index.html", status_code, rows=rows or [dict.fromkeys(ROW_FIELDS, "")], **context)
 
     def render(name: str, **context) -> str:
-        return env.get_template(name).render(demo=demo, notices=notices, **context)
+        return env.get_template(name).render(demo=demo, notices=notices, connected=connected, **context)
 
     @app.middleware("http")
     async def reject_large_uploads(request: Request, call_next):
@@ -118,9 +120,9 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
                               row_errors=row_errors, offset=offset)
 
         shipments = preview.valid_shipments()
-        if ai is None or logic is None:
+        if not connected:
             valid = "1 shipment is valid." if len(shipments) == 1 else f"{len(shipments)} shipments are valid."
-            return input_page(request, [], info=f"{valid} AI and Logic are not connected yet.")
+            return input_page(request, rows, info=f"{valid} AI and Logic are not connected yet.")
         return StreamingResponse(stream_results(shipments), media_type="text/html; charset=utf-8",
                                  headers={"X-Accel-Buffering": "no"})
 

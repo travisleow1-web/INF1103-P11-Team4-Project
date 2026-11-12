@@ -48,10 +48,20 @@ def test_static_files_are_served(data):
 
 # submit without AI and Logic
 
-def test_valid_rows_without_ai_say_not_connected(data):
-    page = client_for(data).post("/submit", data=good_rows(2))
+def test_valid_rows_without_ai_say_not_connected_and_stay_filled(data):
+    rows = good_rows(2)
+    rows["origin_port"][1] = "SGSIN - Singapore, SG"
+    page = client_for(data).post("/submit", data=rows)
     assert page.status_code == 200
     assert "2 shipments are valid. AI and Logic are not connected yet." in page.text
+    assert page.text.count("not connected yet") == 1                   # no second notice
+    assert page.text.count('name="origin_port"') == 2
+    assert 'value="SGSIN - Singapore, SG"' in page.text
+
+
+def test_the_home_page_says_up_front_when_ai_and_logic_are_not_connected(data):
+    assert "AI and Logic are not connected yet." in client_for(data).get("/").text
+    assert "not connected" not in demo_client(data).get("/").text
 
 
 def test_blank_typed_rows_are_skipped(data):
@@ -71,7 +81,7 @@ def test_invalid_rows_show_every_error_and_keep_what_was_typed(data):
     assert "Nothing was assessed" in page.text
     assert "Row 2: Origin: unknown port &#39;XXXXX&#39;; Arrival: &#39;2026-12-20&#39; is not a valid date" in page.text
     assert 'value="XXXXX"' in page.text
-    assert "not connected" not in page.text
+    assert "shipments are valid" not in page.text
 
 
 def test_typed_rows_with_errors_are_marked_for_screen_readers(data):
@@ -185,8 +195,8 @@ def test_demo_mode_streams_one_row_per_shipment_in_order(data):
 
 def test_result_rows_show_the_route_arrow_and_readable_primary_risk(data):
     text = demo_client(data).post("/submit", data=good_rows(1)).text
-    assert '<td class="route">SGSIN → NLRTM</td>' in text
-    assert "<td>Weather (Medium)</td>" in text
+    assert '<td class="route" data-label="Route">SGSIN → NLRTM</td>' in text
+    assert '<td data-label="Primary risk">Weather (Medium)</td>' in text
     assert "<dt>AI data fetched</dt>" in text
 
 

@@ -139,3 +139,38 @@ table.inner td, table.inner th { border-bottom: 1px solid var(--line); }
 
 tr.has-errors input { border-color: var(--error-ink); background: var(--error-bg); }
 tr.row-errors td { color: var(--error-ink); font-size: 0.9rem; padding-top: 0; }
+
+/* Phones: one field per line in the input table, and result rows as cards so risk and outcome
+   are visible without scrolling sideways. */
+@media (max-width: 640px) {
+  main { padding: 0.75rem; }
+  .top nav a { margin: 0 1rem 0 0; }
+
+  .rows thead { display: none; }
+  .rows, .rows tbody, .rows tr, .rows td { display: block; width: 100%; }
+  .rows tr.entry { border: 1px solid var(--line); border-radius: 6px; padding: 0.5rem; margin-bottom: 0.5rem; }
+  .rows .sr-only { position: static; width: auto; height: auto; clip: auto; white-space: normal;
+                   display: block; font-size: 0.85rem; color: var(--muted); }
+
+  .table-wrap { overflow-x: visible; border: 0; background: none; }
+  table.results, table.results > tbody, table.results > tbody > tr,
+  table.results > tbody > tr > th, table.results > tbody > tr > td { display: block; }
+  table.results > thead { display: none; }
+  table.results tr.summary { background: var(--paper); border: 1px solid var(--line);
+                             border-radius: 6px 6px 0 0; margin-top: 0.75rem; padding: 0.5rem; }
+  table.results tr.details { background: var(--paper); border: 1px solid var(--line); border-top: 0;
+                             border-radius: 0 0 6px 6px; padding: 0 0.5rem; }
+  table.results th[scope="row"] { font-size: 1.05rem; padding: 0.25rem 0; white-space: normal; }
+  table.results td[data-label], table.inner td[data-label] {
+    display: grid; grid-template-columns: 7.5rem 1fr; gap: 0.5rem; padding: 0.15rem 0;
+  }
+  td[data-label]::before { content: attr(data-label); color: var(--muted); font-size: 0.85rem; }
+  td[data-label] > .badge { justify-self: start; }
+  table.results td.minor { display: none; }
+
+  .detail-grid { grid-template-columns: 1fr; }
+  table.inner, table.inner tbody, table.inner tr { display: block; }
+  table.inner thead { display: none; }
+  table.inner tr { border-bottom: 1px solid var(--line); padding: 0.25rem 0; }
+  table.inner td { border: 0; }
+}

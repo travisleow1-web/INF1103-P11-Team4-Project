@@ -1,4 +1,5 @@
-// "Add row": copy the last shipment row with its boxes emptied and its error marks removed.
+// "Add row": copy the last shipment row with its boxes emptied and its error marks removed,
+// then move the cursor to the new row.
 document.getElementById("add-row").addEventListener("click", function () {
   var body = document.querySelector("#rows tbody");
   var entries = body.querySelectorAll("tr.entry");
@@ -10,4 +11,5 @@ document.getElementById("add-row").addEventListener("click", function () {
     input.removeAttribute("aria-describedby");
   });
   body.appendChild(copy);
+  copy.querySelector("input").focus();
 });

@@ -3,6 +3,7 @@
 <h1>Assess shipments</h1>
 <p>Type shipments or upload a CSV file. To look at shipments already assessed, <a href="/search">search saved records</a>.</p>
 
+{% if not connected and not info %}<p class="alert alert-info" role="status">AI and Logic are not connected yet. You can check shipments here, but they will not be assessed.</p>{% endif %}
 {% if error %}<p class="alert alert-error" role="alert">{{ error }}</p>{% endif %}
 {% if info %}<p class="alert alert-info" role="status">{{ info }}</p>{% endif %}
 {% if problems %}
