@@ -1,3 +1,4 @@
+import threading
 import time
 from typing import Any, Dict, List, Optional
 import requests
@@ -19,6 +20,7 @@ class NewsProvider(ContextProvider):
         super().__init__("news", http)
         self.__min_gap = min_gap
         self.__last_call: Optional[float] = None
+        self.__lock = threading.Lock()          # web requests run in several threads
 
     def _request(self, shipment: Shipment) -> List[Dict[str, Any]]:
         self.__wait_for_gap()
@@ -30,8 +32,9 @@ class NewsProvider(ContextProvider):
         return [{"title": a["title"], "seen": a["seendate"]} for a in articles]
 
     def __wait_for_gap(self) -> None:
-        if self.__last_call is not None:
-            remaining = self.__min_gap - (time.monotonic() - self.__last_call)
-            if remaining > 0:
-                time.sleep(remaining)
-        self.__last_call = time.monotonic()
+        with self.__lock:                       # held while sleeping, so callers queue up
+            if self.__last_call is not None:
+                remaining = self.__min_gap - (time.monotonic() - self.__last_call)
+                if remaining > 0:
+                    time.sleep(remaining)
+            self.__last_call = time.monotonic()

@@ -47,7 +47,7 @@ class AIManager:
         except AIError as error:
             log.error("AI assessment failed for %s: %s", shipment.shipment_id, error)
             return AIAssessment.fallback()
-        self.__cache.set(key, raw, fetched_at.isoformat())    # only a reply that parsed is cached
+        self.__cache.set(key, raw, fetched_at.isoformat(), today)    # only a reply that parsed is cached
         return assessment
 
     def __from_cache(self, key: str) -> Optional[AIAssessment]:

@@ -1,3 +1,5 @@
+import threading
+import time
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 import pytest
@@ -120,3 +122,28 @@ def test_failed_call_still_counts_for_the_gap():
         assert provider.fetch(make_shipment()) is None
         provider.fetch(make_shipment())
         sleep.assert_called_once_with(4.0)
+
+
+class TimedSession(FakeSession):
+    """Records when each GET starts (real clock), thread-safe enough for list appends."""
+
+    def __init__(self, count):
+        super().__init__(*[gdelt() for _ in range(count)])
+        self.starts = []
+
+    def get(self, url, **kwargs):
+        self.starts.append(time.monotonic())
+        return super().get(url, **kwargs)
+
+
+def test_concurrent_news_calls_keep_the_gap():
+    session = TimedSession(4)
+    provider = NewsProvider(session, min_gap=0.05)
+    threads = [threading.Thread(target=provider.fetch, args=(make_shipment(),)) for _ in range(4)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    starts = sorted(session.starts)
+    assert len(starts) == 4
+    assert all(later - earlier >= 0.045 for earlier, later in zip(starts, starts[1:]))

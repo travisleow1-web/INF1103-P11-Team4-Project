@@ -126,9 +126,13 @@ def test_new_fingerprint_misses_the_old_cache(tmp_path):
     {"result": valid_raw(), "fetched_at": "yesterday"},
     {"result": valid_raw(), "fetched_at": "2026-11-13T02:00:00"},      # no time zone
     {"result": valid_raw(expected_impact="Old Value"), "fetched_at": "2026-11-13T02:00:00+00:00"},
+    {"result": "not a reply", "fetched_at": "2026-11-13T02:00:00+00:00"},
 ])
 def test_damaged_cache_entry_is_a_miss(tmp_path, entry):
-    key = ResponseCache(tmp_path / "ai_cache.json", "test").make_key(make_shipment())
+    today = datetime.now(timezone.utc).date()
+    key = ResponseCache(tmp_path / "ai_cache.json", "test").make_key(make_shipment(), today)
+    if isinstance(entry, dict):
+        entry = {"day": today.isoformat(), **entry}
     (tmp_path / "ai_cache.json").write_text(json.dumps({key: entry}), encoding="utf-8")
     client = mock_client()
     result = make_manager(tmp_path, client).assess(make_shipment())
