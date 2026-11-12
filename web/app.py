@@ -1,7 +1,7 @@
 """The web layer: thin FastAPI routes that pass raw form fields to IOManager and render what it returns."""
 import logging
 from pathlib import Path
-from typing import Iterator, List, Optional
+from typing import Callable, Iterable, Iterator, List, Optional, Tuple
 import jinja2
 from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, StreamingResponse
@@ -11,8 +11,8 @@ from io_layer.csv_source import CsvSource
 from io_layer.form_source import FormSource
 from io_layer.io_manager import IOManager
 from io_layer.source_error import SourceError
+from model.shipment_record import ShipmentRecord
 from model.storage_error import StorageError
-from main import assess_shipments
 
 WEB_DIR = Path(__file__).resolve().parent
 MAX_UPLOAD_BYTES = 1024 * 1024
@@ -24,12 +24,16 @@ SEARCH_FIELDS = ("shipment_id", "origin", "destination", "departure_from", "depa
 
 logger = logging.getLogger(__name__)
 
+# main.assess_shipments: (shipments, ai, logic, data) -> (record, save_error) pairs, one per shipment
+Runner = Callable[..., Iterable[Tuple[ShipmentRecord, Optional[str]]]]
+
 
 def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
-                   notices: Optional[List[str]] = None) -> FastAPI:
+                   notices: Optional[List[str]] = None, *, run: Runner) -> FastAPI:
     """Build the FastAPI app. ai and logic may be None while those layers are not connected.
 
     notices are problems found at startup, such as an unreachable database; every page shows them in red.
+    run is the assessment flow (main.assess_shipments), passed in so the web layer never imports main.
     """
     notices = list(notices or [])
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(WEB_DIR / "templates")), autoescape=True)
@@ -64,7 +68,7 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
         done = 0
         yield render("results_start.html", total=total)
         try:
-            for record, save_error in assess_shipments(shipments, ai, logic, data):
+            for record, save_error in run(shipments, ai, logic, data):
                 done += 1
                 yield render("result_row.html", row=io.show_summary([record])[0], result=io.show_result(record),
                              number=done, total=total, save_error=save_error)

@@ -18,6 +18,7 @@ from model.port_registry import PortRegistry
 from model.shipment import Shipment
 from model.shipment_record import ShipmentRecord
 from model.storage_error import StorageError
+from web.app import create_web_app
 
 logger = logging.getLogger(__name__)
 
@@ -83,8 +84,6 @@ def create_app() -> FastAPI:
     DEMO_MODE=1 uses the fake AI and Logic from tests/fakes.py and keeps its records in DEMO_DATA_FILE
     (default demo_records.json), never in MongoDB or DATA_FILE. Every page then shows a demo banner.
     """
-    from web.app import create_web_app        # here, not at the top: web.app imports assess_shipments
-
     load_dotenv()
     ports = PortRegistry.from_json()
     demo = os.getenv("DEMO_MODE", "").strip() == "1"
@@ -97,7 +96,7 @@ def create_app() -> FastAPI:
         ai, logic = build_ai(), build_logic(data, ports)
     io = IOManager(ShipmentValidator(ports), data, ports)
     notices = [data.message] if isinstance(data, UnavailableDataManager) else []
-    return create_web_app(io, ai, logic, data, demo, notices)
+    return create_web_app(io, ai, logic, data, demo, notices, run=assess_shipments)
 
 
 if __name__ == "__main__":

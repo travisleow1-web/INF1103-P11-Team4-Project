@@ -24,7 +24,7 @@ def data(tmp_path):
 
 
 def client_for(data, ai=None, logic=None, demo=False, notices=None):
-    return TestClient(create_web_app(make_io(data), ai, logic, data, demo, notices))
+    return TestClient(create_web_app(make_io(data), ai, logic, data, demo, notices, run=main.assess_shipments))
 
 
 # input page
@@ -440,3 +440,24 @@ def test_a_failed_mongo_save_shows_the_short_message_on_the_row(caplog):
     assert SHORT in text
     assert "connection reset" not in text
     assert "connection reset by peer" in caplog.text
+
+
+def test_the_web_layer_does_not_import_main():
+    import ast
+    from pathlib import Path
+    for path in (Path(__file__).resolve().parent.parent / "web").rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        names = [a.name for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names]
+        names += [n.module for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module]
+        assert "main" not in names, path
+
+
+def test_the_runner_passed_in_is_the_one_used(data):
+    calls = []
+
+    def runner(shipments, ai, logic, data_manager):
+        calls.append([s.shipment_id for s in shipments])
+        return iter(())
+    client = TestClient(create_web_app(make_io(data), FakeAI(), FakeLogic(), data, run=runner))
+    assert "Done: 0 of 2" in client.post("/submit", data=good_rows(2)).text
+    assert calls == [["SHP-001", "SHP-002"]]
