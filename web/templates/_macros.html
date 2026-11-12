@@ -1,0 +1,11 @@
+{% macro risk_badge(risk) -%}
+<span class="badge risk-{{ risk | lower }}">{{ risk }}</span>
+{%- endmacro %}
+
+{% macro outcome_badge(outcome) -%}
+<span class="badge outcome-{{ outcome | lower }}">{{ outcome }}</span>
+{%- endmacro %}
+
+{% macro yes_no(value) -%}
+{{ "Yes" if value else "No" }}
+{%- endmacro %}

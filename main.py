@@ -17,7 +17,6 @@ from model.port_registry import PortRegistry
 from model.shipment import Shipment
 from model.shipment_record import ShipmentRecord
 from model.storage_error import StorageError
-from web.app import create_web_app
 
 logger = logging.getLogger(__name__)
 
@@ -66,14 +65,23 @@ def build_data(ports: PortRegistry) -> DataManager:
 
 
 def create_app() -> FastAPI:
-    """Read .env, compose the managers and return the FastAPI app."""
+    """Read .env, compose the managers and return the FastAPI app.
+
+    DEMO_MODE=1 uses the fake AI and Logic from tests/fakes.py, and every page shows a demo banner.
+    """
+    from web.app import create_web_app        # here, not at the top: web.app imports assess_shipments
+
     load_dotenv()
     ports = PortRegistry.from_json()
     data = build_data(ports)
-    ai = build_ai()
-    logic = build_logic(data, ports)
+    demo = os.getenv("DEMO_MODE", "").strip() == "1"
+    if demo:
+        from tests.fakes import FakeAI, FakeLogic
+        ai, logic = FakeAI(), FakeLogic()
+    else:
+        ai, logic = build_ai(), build_logic(data, ports)
     io = IOManager(ShipmentValidator(ports), data, ports)
-    return create_web_app(io, ai, logic, data)
+    return create_web_app(io, ai, logic, data, demo)
 
 
 if __name__ == "__main__":

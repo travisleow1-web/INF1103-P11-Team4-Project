@@ -94,3 +94,24 @@ thead th { border-bottom: 2px solid var(--line); font-size: 0.9rem; color: var(-
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+
+.results th[scope="row"] { white-space: nowrap; }
+.results tbody tr { border-top: 1px solid var(--line); }
+.progress { color: var(--muted); white-space: nowrap; }
+
+/* Badges always carry text; the colour only repeats it. */
+.badge {
+  display: inline-block;
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.risk-low, .outcome-proceed { background: #e3f4e8; color: #1b5e2f; }
+.risk-medium, .outcome-insure, .outcome-delay { background: #fff1d6; color: #7a4b00; }
+.risk-high, .outcome-escalate { background: #fde3d6; color: #8a3200; }
+.risk-extreme, .outcome-reject { background: #fbe0e0; color: #8a1c1c; }
+.badge-warn { background: var(--demo-bg); color: #5c4700; }
+.badge-error { background: var(--error-bg); color: var(--error-ink); }

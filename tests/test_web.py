@@ -2,7 +2,10 @@
 import pytest
 from fastapi.testclient import TestClient
 from helpers import PORTS, make_io
+from fakes import FakeAI, FakeLogic
 from data_layer.json_data_manager import JsonDataManager
+from data_layer.unavailable_data_manager import UnavailableDataManager
+from model.search_criteria import SearchCriteria
 from web.app import MAX_UPLOAD_BYTES, create_web_app
 import main
 
@@ -108,6 +111,76 @@ def test_a_file_over_1_mb_is_rejected(data):
     assert "larger than 1 MB" in page.text
 
 
+# submit in demo mode: results stream one row per shipment
+
+def demo_client(data):
+    return client_for(data, FakeAI(), FakeLogic(), demo=True)
+
+
+def test_demo_mode_shows_the_banner_on_every_page(data):
+    client = demo_client(data)
+    assert "Demo mode: fake AI and rules" in client.get("/").text
+    assert "Demo mode: fake AI and rules" in client.post("/submit", data=good_rows(1)).text
+
+
+def test_demo_mode_streams_one_row_per_shipment_in_order(data):
+    page = demo_client(data).post("/submit", data=good_rows(3))
+    assert page.status_code == 200
+    assert page.headers["x-accel-buffering"] == "no"
+    assert page.headers["content-type"].startswith("text/html")
+    text = page.text
+    positions = [text.index(f">{n} of 3<") for n in (1, 2, 3)]
+    assert positions == sorted(positions)
+    assert [text.index(f"SHP-00{n}") for n in (1, 2, 3)] == sorted(text.index(f"SHP-00{n}") for n in (1, 2, 3))
+    assert text.index("<thead>") < positions[0]
+    assert "Done: 3 of 3 shipments assessed." in text
+    assert text.rstrip().endswith("</html>")
+    assert len(data.find(SearchCriteria())) == 3
+
+
+def test_result_rows_show_risk_and_outcome_as_text(data):
+    text = demo_client(data).post("/submit", data=good_rows(3)).text
+    assert '<span class="badge risk-high">High</span>' in text            # SHP-002 in the fakes
+    assert '<span class="badge outcome-escalate">ESCALATE</span>' in text
+    assert "AI unavailable" not in text
+    assert "Not saved" not in text
+
+
+def test_ids_continue_after_earlier_submissions(data):
+    client = demo_client(data)
+    client.post("/submit", data=good_rows(2))
+    assert "SHP-003" in client.post("/submit", data=good_rows(1)).text
+
+
+def test_a_row_whose_save_failed_says_not_saved():
+    data = UnavailableDataManager("Database is down")
+    text = demo_client(data).post("/submit", data=good_rows(2)).text
+    assert text.count('<span class="badge badge-error">Not saved</span>') == 2
+    assert "Database is down" in text
+    assert "Done: 2 of 2 shipments assessed." in text
+
+
+class BrokenAI:
+    def assess(self, shipment):
+        raise RuntimeError("boom")
+
+
+def test_an_unexpected_error_ends_the_page_with_a_message(data):
+    text = client_for(data, BrokenAI(), FakeLogic()).post("/submit", data=good_rows(2)).text
+    assert "Assessment stopped after 0 of 2 shipments" in text
+    assert "boom" not in text
+    assert text.rstrip().endswith("</html>")
+
+
+def test_invalid_rows_are_not_assessed_in_demo_mode(data):
+    rows = good_rows(2)
+    rows["destination_port"][0] = "SGSIN"
+    page = demo_client(data).post("/submit", data=rows)
+    assert page.status_code == 422
+    assert "Row 1: origin and destination are the same port" in page.text
+    assert data.find(SearchCriteria()) == []
+
+
 # main.create_app
 
 @pytest.fixture
@@ -139,3 +212,17 @@ def test_build_data_rejects_an_unknown_backend(env):
     env.setenv("DATA_BACKEND", "excel")
     with pytest.raises(ValueError):
         main.build_data(PORTS)
+
+
+def test_create_app_in_demo_mode_assesses_with_the_fakes(env):
+    env.setenv("DEMO_MODE", "1")
+    client = TestClient(main.create_app())
+    page = client.post("/submit", files={"csv_file": ("s.csv", CSV, "text/csv")})
+    assert "Demo mode: fake AI and rules" in page.text
+    assert "1 of 1" in page.text and "SHP-001" in page.text
+
+
+def test_create_app_without_demo_mode_says_not_connected(env):
+    page = TestClient(main.create_app()).post("/submit", files={"csv_file": ("s.csv", CSV, "text/csv")})
+    assert "AI and Logic are not connected yet." in page.text
+    assert "Demo mode" not in page.text

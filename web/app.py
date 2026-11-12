@@ -1,19 +1,23 @@
 """The web layer: thin FastAPI routes that pass raw form fields to IOManager and render what it returns."""
+import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import Iterator, List, Optional
 import jinja2
 from fastapi import FastAPI, File, Form, Request, UploadFile
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from io_layer.csv_source import CsvSource
 from io_layer.form_source import FormSource
 from io_layer.io_manager import IOManager
 from io_layer.source_error import SourceError
+from main import assess_shipments
 
 WEB_DIR = Path(__file__).resolve().parent
 MAX_UPLOAD_BYTES = 1024 * 1024
 ROW_FIELDS = ("origin_port", "destination_port", "departure_time", "arrival_time")
+
+logger = logging.getLogger(__name__)
 
 
 def create_web_app(io: IOManager, ai, logic, data, demo: bool = False) -> FastAPI:
@@ -29,6 +33,24 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False) -> FastAP
 
     def input_page(request: Request, rows: list, status_code: int = 200, **context) -> HTMLResponse:
         return page(request, "index.html", status_code, rows=rows or [dict.fromkeys(ROW_FIELDS, "")], **context)
+
+    def render(name: str, **context) -> str:
+        return env.get_template(name).render(demo=demo, **context)
+
+    def stream_results(shipments: list) -> Iterator[str]:
+        """The results page in pieces: the table head, then one row as each shipment finishes, then the end."""
+        total = len(shipments)
+        done = 0
+        yield render("results_start.html", total=total)
+        try:
+            for record, save_error in assess_shipments(shipments, ai, logic, data):
+                done += 1
+                yield render("result_row.html", row=io.show_summary([record])[0], result=io.show_result(record),
+                             number=done, total=total, save_error=save_error)
+        except Exception:                       # the page has already started, so say so in the table
+            logger.exception("Assessment stopped after %d of %d shipments", done, total)
+            yield render("result_stopped.html", done=done, total=total)
+        yield render("results_end.html", done=done, total=total)
 
     @app.get("/", response_class=HTMLResponse)
     def index(request: Request) -> HTMLResponse:
@@ -62,8 +84,11 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False) -> FastAP
         if preview.has_problems():
             return input_page(request, rows, 422, problems=preview.problems())
 
-        count = len(preview.valid_shipments())
-        valid = "1 shipment is valid." if count == 1 else f"{count} shipments are valid."
-        return input_page(request, [], info=f"{valid} AI and Logic are not connected yet.")
+        shipments = preview.valid_shipments()
+        if ai is None or logic is None:
+            valid = "1 shipment is valid." if len(shipments) == 1 else f"{len(shipments)} shipments are valid."
+            return input_page(request, [], info=f"{valid} AI and Logic are not connected yet.")
+        return StreamingResponse(stream_results(shipments), media_type="text/html; charset=utf-8",
+                                 headers={"X-Accel-Buffering": "no"})
 
     return app

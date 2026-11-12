@@ -1,0 +1,14 @@
+{% from "_macros.html" import risk_badge, outcome_badge, yes_no %}
+    <tr>
+      <td class="progress">{{ number }} of {{ total }}</td>
+      <th scope="row">{{ row.shipment_id }}{% if row.ai_unavailable %} <span class="badge badge-warn">AI unavailable</span>{% endif %}</th>
+      <td>{{ row.route }}</td>
+      <td>{{ result.departure }}</td>
+      <td>{{ result.arrival }}</td>
+      <td>{{ row.primary_factor }} ({{ row.primary_severity }})</td>
+      <td>{{ row.confidence_score }}</td>
+      <td>{{ risk_badge(row.overall_risk) }}</td>
+      <td>{{ outcome_badge(row.outcome) }}</td>
+      <td>{{ yes_no(row.needs_human) }}</td>
+      <td>{% if save_error %}<span class="badge badge-error">Not saved</span> <span class="hint">{{ save_error }}</span>{% else %}Saved{% endif %}</td>
+    </tr>
