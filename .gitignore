@@ -8,7 +8,6 @@ ai_cache.json
 #Environment Variables
 .env
 .env.local
-demo_records.json
 
 # Records saved by the web app (JSON backend)
 shipment_records.json

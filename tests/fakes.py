@@ -1,5 +1,5 @@
-"""Dev-only stand-ins for the AI and Logic managers, until the real classes exist.
-They never run in the product. They only let the IO and Data layers be tried end to end."""
+"""Dev-only stand-ins for the AI and Logic managers, used by the tests and by the web app's demo mode.
+They run only when DEMO_MODE=1 (see main.create_app), never in normal use."""
 from datetime import datetime, timezone
 from model.ai_assessment import AIAssessment
 from model.ai_status import AIStatus
