@@ -40,3 +40,26 @@ class FakeSession:
 def gemini_reply(raw):
     """A Gemini HTTP reply whose text part holds `raw` as JSON text."""
     return FakeResponse(200, {"candidates": [{"content": {"parts": [{"text": json.dumps(raw)}]}}]})
+
+
+def valid_raw(**changes):
+    """A model reply that fits the schema: a high weather risk at Singapore and one delay insight."""
+    raw = {
+        "risk_factors": [
+            {"type": "weather", "severity": "High", "location": "SGSIN",
+             "source": "open_meteo_weather", "detail": "wind_gust_kmh=72"},
+            {"type": "piracy_threat", "severity": "Low", "location": "Route",
+             "source": "gdelt_news", "detail": "news_articles=1"},
+        ],
+        "primary_risk_factor": "weather",
+        "affected_location": "SGSIN",
+        "expected_impact": "Delay",
+        "confidence_score": 0.8,
+        "conflicting_sources": False,
+        "insights": [
+            {"code": "POTENTIAL_DELAY", "risk_type": "weather", "severity": "High",
+             "location": "SGSIN", "estimated_delay_days": 2},
+        ],
+    }
+    raw.update(changes)
+    return raw
