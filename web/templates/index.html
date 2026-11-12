@@ -1,0 +1,57 @@
+{% set title = "New shipments" %}
+{% include "_header.html" %}
+<h1>Assess shipments</h1>
+
+{% if error %}<p class="alert alert-error" role="alert">{{ error }}</p>{% endif %}
+{% if info %}<p class="alert alert-info" role="status">{{ info }}</p>{% endif %}
+{% if problems %}
+<section class="alert alert-error" role="alert">
+  <h2>Nothing was assessed. Fix these rows and submit again.</h2>
+  <p class="hint">Rows are numbered in the order they were read: CSV rows first, then typed rows.</p>
+  <ul>
+    {% for number, errors in problems %}<li>Row {{ number }}: {{ errors | join("; ") }}</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<form method="post" action="/submit" enctype="multipart/form-data">
+  <fieldset>
+    <legend>Type shipments</legend>
+    <table class="rows" id="rows">
+      <thead>
+        <tr><th scope="col">Origin port</th><th scope="col">Destination port</th>
+            <th scope="col">Departure</th><th scope="col">Arrival</th></tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td><label><span class="sr-only">Origin port</span>
+            <input name="origin_port" list="ports" value="{{ row.origin_port }}" autocomplete="off"></label></td>
+          <td><label><span class="sr-only">Destination port</span>
+            <input name="destination_port" list="ports" value="{{ row.destination_port }}" autocomplete="off"></label></td>
+          <td><label><span class="sr-only">Departure date</span>
+            <input name="departure_time" placeholder="DD/MM/YYYY" value="{{ row.departure_time }}" autocomplete="off"></label></td>
+          <td><label><span class="sr-only">Arrival date</span>
+            <input name="arrival_time" placeholder="DD/MM/YYYY" value="{{ row.arrival_time }}" autocomplete="off"></label></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <button type="button" id="add-row" class="secondary">Add row</button>
+    <datalist id="ports">
+      {% for port in form.ports %}<option value="{{ port }}">
+      {% endfor %}
+    </datalist>
+  </fieldset>
+
+  <fieldset>
+    <legend>Or upload a CSV file</legend>
+    <label for="csv_file">CSV with columns origin_port, destination_port, departure_time, arrival_time (DD/MM/YYYY, up to 1 MB)</label>
+    <input type="file" id="csv_file" name="csv_file" accept=".csv,text/csv">
+  </fieldset>
+
+  <button type="submit">Assess shipments</button>
+</form>
+<script src="/static/add_row.js"></script>
+{% include "_footer.html" %}

@@ -1,10 +1,23 @@
+"""Composition root: the only module that knows every manager.
+
+Run the web app with:  uvicorn main:create_app --factory
+"""
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Iterable, Iterator, Optional, Tuple
+from dotenv import load_dotenv
+from fastapi import FastAPI
 from data_layer.data_manager import DataManager
+from data_layer.json_data_manager import JsonDataManager
+from data_layer.mongo_data_manager import MongoDataManager
+from io_layer.io_manager import IOManager
+from io_layer.shipment_validator import ShipmentValidator
+from model.port_registry import PortRegistry
 from model.shipment import Shipment
 from model.shipment_record import ShipmentRecord
 from model.storage_error import StorageError
+from web.app import create_web_app
 
 logger = logging.getLogger(__name__)
 
@@ -27,3 +40,42 @@ def assess_shipments(shipments: Iterable[Shipment], ai, logic,
             save_error = str(error)
             logger.warning("%s was not saved: %s", shipment.shipment_id, error)
         yield record, save_error
+
+
+def build_ai():
+    """The AI manager, or None while the AI layer is not connected."""
+    return None
+
+
+def build_logic(data: DataManager, ports: PortRegistry):
+    """The Logic manager, or None while the Logic layer is not connected."""
+    return None
+
+
+def build_data(ports: PortRegistry) -> DataManager:
+    """The storage backend chosen by DATA_BACKEND: 'json' (default, DATA_FILE) or 'mongo' (MONGO_URI, DB_NAME)."""
+    backend = os.getenv("DATA_BACKEND", "json").strip().lower()
+    if backend == "json":
+        return JsonDataManager(os.getenv("DATA_FILE") or "shipment_records.json", ports)
+    if backend == "mongo":
+        uri, db_name = os.getenv("MONGO_URI", "").strip(), os.getenv("DB_NAME", "").strip()
+        if not uri or not db_name:
+            raise StorageError("MONGO_URI and DB_NAME must both be set to use MongoDB")
+        return MongoDataManager.connect(uri, db_name, ports)
+    raise ValueError(f"DATA_BACKEND must be 'json' or 'mongo', not {backend!r}")
+
+
+def create_app() -> FastAPI:
+    """Read .env, compose the managers and return the FastAPI app."""
+    load_dotenv()
+    ports = PortRegistry.from_json()
+    data = build_data(ports)
+    ai = build_ai()
+    logic = build_logic(data, ports)
+    io = IOManager(ShipmentValidator(ports), data, ports)
+    return create_web_app(io, ai, logic, data)
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:create_app", factory=True, host="127.0.0.1", port=8000)
