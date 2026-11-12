@@ -284,6 +284,13 @@ def test_build_data_uses_json_by_default(env):
     assert isinstance(main.build_data(PORTS), JsonDataManager)
 
 
+def test_empty_settings_from_env_example_mean_the_defaults(env):
+    env.setenv("DATA_BACKEND", "")
+    env.setenv("DEMO_MODE", "")
+    assert isinstance(main.build_data(PORTS), JsonDataManager)
+    assert "Demo mode" not in TestClient(main.create_app()).get("/").text
+
+
 def test_build_data_rejects_an_unknown_backend(env):
     env.setenv("DATA_BACKEND", "excel")
     with pytest.raises(ValueError):

@@ -9,3 +9,6 @@ ai_cache.json
 .env
 .env.local
 demo_records.json
+
+# Records saved by the web app (JSON backend)
+shipment_records.json

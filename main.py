@@ -57,7 +57,7 @@ def build_data(ports: PortRegistry) -> DataManager:
 
     If MongoDB cannot be reached, the app still starts with an UnavailableDataManager holding the reason.
     """
-    backend = os.getenv("DATA_BACKEND", "json").strip().lower()
+    backend = (os.getenv("DATA_BACKEND") or "json").strip().lower()
     if backend == "json":
         return JsonDataManager(os.getenv("DATA_FILE") or "shipment_records.json", ports)
     if backend == "mongo":
