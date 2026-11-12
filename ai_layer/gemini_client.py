@@ -23,7 +23,7 @@ class GeminiClient:
 
     def __init__(self, api_key: Optional[str], model: str, system_prompt: str, response_schema: dict,
                  max_retries: int = 3, timeout: float = 40, http: Optional[requests.Session] = None):
-        self.__api_key = api_key
+        self.__api_key = self.__clean_key(api_key)
         self.__model = model
         self.__system_prompt = system_prompt
         self.__response_schema = copy.deepcopy(response_schema)
@@ -50,9 +50,17 @@ class GeminiClient:
         text = self.__model + self.__system_prompt + json.dumps(self.__response_schema, sort_keys=True)
         return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
+    @staticmethod
+    def __clean_key(api_key: Optional[str]) -> Optional[str]:
+        """The key without surrounding spaces, or None if it is empty or not plain printable ASCII."""
+        key = (api_key or "").strip()
+        if not key or not key.isascii() or not key.isprintable():
+            return None
+        return key
+
     def __send(self, prompt: str) -> dict:
-        if not self.__api_key:
-            raise AIServiceError("GEMINI_API_KEY is not set", retryable=False)
+        if self.__api_key is None:
+            raise AIServiceError("GEMINI_API_KEY is not set or invalid", retryable=False)
         body = {
             "systemInstruction": {"parts": [{"text": self.__system_prompt}]},
             "contents": [{"role": "user", "parts": [{"text": prompt}]}],
@@ -66,10 +74,11 @@ class GeminiClient:
             reply = self.__http.post(GEMINI_URL.format(model=self.__model),
                                      headers={"x-goog-api-key": self.__api_key},
                                      json=body, timeout=self.__timeout)
-        except (requests.Timeout, requests.ConnectionError) as error:
-            raise AIServiceError(f"network problem: {error}", retryable=True) from error
-        except requests.RequestException as error:
-            raise AIServiceError(f"request failed: {error}", retryable=False) from error
+        # Only the error's type goes in the message: some requests errors quote the header (the key).
+        except (requests.Timeout, requests.ConnectionError, requests.exceptions.ChunkedEncodingError) as error:
+            raise AIServiceError(f"network problem: {type(error).__name__}", retryable=True) from None
+        except (requests.RequestException, ValueError, UnicodeError) as error:
+            raise AIServiceError(f"request failed: {type(error).__name__}", retryable=False) from None
         if reply.status_code == 429 or reply.status_code >= 500:
             raise AIServiceError(f"HTTP {reply.status_code}", retryable=True)
         if reply.status_code >= 400:

@@ -102,3 +102,48 @@ def test_schema_is_copied():
     before = client.fingerprint()
     schema["type"] = "ARRAY"
     assert client.fingerprint() == before
+
+
+def test_key_is_stripped_before_use():
+    client, session = make_client(gemini_reply({"ok": True}), key="  AIzaSECRET123\n")
+    client.complete("p")
+    assert session.calls[0][2]["headers"] == {"x-goog-api-key": "AIzaSECRET123"}
+
+
+@pytest.mark.parametrize("key", ["   ", "\n", "AIza’SECRET", "AIza\nSECRET", "AIzaSECRETé"])
+def test_malformed_key_counts_as_missing(key, no_sleep):
+    client, session = make_client(gemini_reply({"ok": True}), key=key)
+    with pytest.raises(AIServiceError) as caught:
+        client.complete("p")
+    assert str(caught.value) == "GEMINI_API_KEY is not set or invalid"
+    assert caught.value.retryable is False
+    assert session.calls == []
+
+
+@pytest.mark.parametrize("error", [
+    requests.exceptions.InvalidHeader("Invalid leading whitespace in header value b'AIzaSECRET123'"),
+    UnicodeEncodeError("latin-1", "AIzaSECRET123", 0, 1, "ordinal not in range"),
+    ValueError("bad value AIzaSECRET123"),
+])
+def test_request_errors_never_quote_their_text_and_are_not_retried(error):
+    client, session = make_client(error, gemini_reply({"ok": True}), key="AIzaSECRET123")
+    with pytest.raises(AIServiceError) as caught:
+        client.complete("p")
+    assert "AIzaSECRET123" not in str(caught.value)
+    assert caught.value.__cause__ is None
+    assert caught.value.retryable is False
+    assert len(session.calls) == 1
+
+
+def test_network_error_text_is_not_quoted(caplog):
+    client, session = make_client(requests.ConnectionError("proxy said AIzaSECRET123"),
+                                  gemini_reply({"ok": True}), key="AIzaSECRET123")
+    assert client.complete("p") == {"ok": True}
+    assert "AIzaSECRET123" not in caplog.text
+
+
+def test_chunked_encoding_error_is_retried():
+    client, session = make_client(requests.exceptions.ChunkedEncodingError("cut off"),
+                                  gemini_reply({"ok": True}))
+    assert client.complete("p") == {"ok": True}
+    assert len(session.calls) == 2

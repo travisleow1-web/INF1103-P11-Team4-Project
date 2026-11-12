@@ -1,3 +1,4 @@
+import logging
 import json
 from datetime import datetime, timezone
 from unittest.mock import Mock, patch
@@ -188,3 +189,19 @@ def test_malformed_json_from_the_model_falls_back(tmp_path):
     client, session = real_client(reply)
     assert make_manager(tmp_path, client).assess(make_shipment()).status is AIStatus.FALLBACK
     assert len(session.calls) == 1
+
+
+@pytest.mark.parametrize("key, error", [
+    ("AIzaSECRET123 \n", requests.exceptions.InvalidHeader("bad header value b'AIzaSECRET123'")),
+    ("AIzaSECRET123’", None),
+    ("“AIzaSECRET123”", None),
+])
+def test_api_key_never_reaches_logs_or_errors(tmp_path, caplog, key, error):
+    caplog.set_level(logging.DEBUG)
+    replies = [error] if error is not None else []
+    client, session = real_client(*replies, key=key)
+    result = make_manager(tmp_path, client).assess(make_shipment())
+    assert result.status is AIStatus.FALLBACK
+    for record in caplog.records:
+        assert "SECRET" not in record.getMessage()
+        assert record.exc_info is None or "SECRET" not in str(record.exc_info[1])
