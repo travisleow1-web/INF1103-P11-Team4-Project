@@ -28,6 +28,7 @@ class LogicManager:
     """
 
     def __init__(self, data: DataManager, ports: PortRegistry, config: Optional[RuleConfig] = None):
+        """Build the rules with the given thresholds, or the defaults when config is None."""
         self.__data = data      # association: used for route history, not owned
         self.__ports = ports
         self.__resolver = OutcomeResolver()
@@ -48,10 +49,12 @@ class LogicManager:
 
     @property
     def config(self) -> RuleConfig:
+        """The thresholds the rules use now."""
         return self.__config
 
     @property
     def rules(self) -> tuple:
+        """The business rules, in the order they run."""
         return self.__rules
 
     def update_config(self, config: RuleConfig) -> None:

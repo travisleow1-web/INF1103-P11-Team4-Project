@@ -50,3 +50,15 @@ def test_from_dict_fills_missing_keys_with_defaults():
 def test_bad_settings_are_rejected(settings):
     with pytest.raises(ValueError):
         RuleConfig(**settings)
+
+
+@pytest.mark.parametrize("data", [None, "confidence_min=0.5", [("confidence_min", 0.5)], 3, {1: 2}])
+def test_from_dict_rejects_anything_but_a_mapping_of_settings(data):
+    with pytest.raises(ValueError):
+        RuleConfig.from_dict(data)
+
+
+def test_the_defaults_cannot_be_changed_from_outside():
+    assert not hasattr(RuleConfig, "DEFAULTS")
+    RuleConfig().to_dict()["history_window_days"] = 99
+    assert RuleConfig().history_window_days == 21
