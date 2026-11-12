@@ -23,5 +23,7 @@ class DataManager(ABC):
     def find_route_history(self, route_id: str, since: datetime) -> List[ShipmentRecord]:
         """Return the records on a route ('SGSIN-NLRTM') saved at or after since, newest first.
 
+        since must be timezone-aware (UTC inside the app); a naive datetime is a ValueError.
+
         Records whose assessment is a FALLBACK are skipped: the AI never looked at them.
         """

@@ -88,7 +88,10 @@ class AIAssessment:
     @classmethod
     def from_dict(cls, data: dict) -> "AIAssessment":
         """Rebuild from to_dict() output. A missing key is a KeyError, a bad value a ValueError."""
-        fetched_at = datetime.fromisoformat(data["fetched_at"])
+        text = str(data["fetched_at"])
+        if text.endswith("Z"):                     # Python 3.10 fromisoformat does not read "Z"
+            text = text[:-1] + "+00:00"
+        fetched_at = datetime.fromisoformat(text)
         if fetched_at.tzinfo is None:
             fetched_at = fetched_at.replace(tzinfo=timezone.utc)
         return cls(

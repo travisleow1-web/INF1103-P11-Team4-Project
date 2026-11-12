@@ -32,6 +32,13 @@ def test_datetimes_from_mongodb_are_accepted():
     assert record.saved_at.tzinfo is not None
 
 
+def test_saved_at_with_a_trailing_z_is_read_as_utc():
+    serializer = RecordSerializer(PORTS)
+    doc = serializer.to_document(saved_record())
+    doc["saved_at"] = "2026-11-01T09:00:00Z"
+    assert serializer.from_document(doc).saved_at == datetime(2026, 11, 1, 9, tzinfo=timezone.utc)
+
+
 @pytest.mark.parametrize("damage", [{"origin": "ZZZZZ"}, {"departure": "01/12/2026"}, {"decision": None}])
 def test_a_damaged_document_is_a_storage_error(damage):
     serializer = RecordSerializer(PORTS)

@@ -43,6 +43,8 @@ class JsonDataManager(DataManager):
 
     def find_route_history(self, route_id: str, since: datetime) -> List[ShipmentRecord]:
         """Records on the route saved at or after since, skipping FALLBACK assessments, newest first."""
+        if since.tzinfo is None:
+            raise ValueError("since must be timezone-aware")
         records = self.__serializer.from_documents(self.__load())
         matching = [r for r in records if r.shipment.route_id() == route_id
                     and r.saved_at >= since and not r.assessment.is_fallback()]

@@ -62,6 +62,8 @@ class MongoDataManager(DataManager):
 
     def find_route_history(self, route_id: str, since: datetime) -> List[ShipmentRecord]:
         """Records on the route saved at or after since, skipping FALLBACK assessments, newest first."""
+        if since.tzinfo is None:
+            raise ValueError("since must be timezone-aware")      # MongoDB would read it as UTC silently
         origin, _, destination = route_id.partition("-")
         return self.__find_newest_first({
             "origin": origin,

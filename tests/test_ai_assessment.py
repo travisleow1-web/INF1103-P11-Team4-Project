@@ -94,6 +94,12 @@ def test_from_dict_reads_a_naive_time_as_utc():
     assert AIAssessment.from_dict(data).fetched_at == FETCHED_AT
 
 
+def test_from_dict_reads_a_trailing_z_as_utc():
+    data = live_assessment().to_dict()
+    data["fetched_at"] = "2026-11-01T08:00:00Z"
+    assert AIAssessment.from_dict(data).fetched_at == FETCHED_AT
+
+
 def test_a_naive_fetch_time_is_refused():
     with pytest.raises(ValueError):
         AIAssessment([], [], RiskType.NONE, "Unknown", "None", 0.0, False, AIStatus.LIVE, datetime(2026, 11, 1))

@@ -78,5 +78,12 @@ class RecordSerializer:
         return date.fromisoformat(value)
 
     def __time(self, value):
-        moment = value if isinstance(value, datetime) else datetime.fromisoformat(value)
+        """A datetime from MongoDB (naive UTC) or ISO text, always returned timezone-aware."""
+        if isinstance(value, datetime):
+            moment = value
+        else:
+            text = str(value)
+            if text.endswith("Z"):                 # Python 3.10 fromisoformat does not read "Z"
+                text = text[:-1] + "+00:00"
+            moment = datetime.fromisoformat(text)
         return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)

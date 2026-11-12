@@ -148,6 +148,11 @@ def test_route_history_skips_fallback_assessments(data):
     assert history[0].is_flagged() and history[0].is_delayed()
 
 
+def test_route_history_needs_a_timezone_aware_time(data):
+    with pytest.raises(ValueError):
+        data.find_route_history("SGSIN-NLRTM", datetime(2026, 11, 1))
+
+
 def test_an_unknown_route_has_no_history(data):
     data.save(saved_record("SHP-001", saved_at=at(5)))
     assert data.find_route_history("SGSIN", at(1)) == []
