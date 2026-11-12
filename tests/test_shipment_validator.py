@@ -23,38 +23,53 @@ def test_values_are_trimmed():
 
 
 def test_unknown_port():
-    assert "origin: unknown port" in check(origin_port="XXXXX").errors[0]
+    assert check(origin_port="XXXXX").errors == ["Origin: unknown port 'XXXXX'"]
 
 
 def test_same_port():
-    assert "same port" in check(destination_port="SGSIN").errors[0]
+    assert check(destination_port="SGSIN").errors == ["Origin and destination are the same port"]
 
 
 def test_arrival_must_be_after_departure():
-    assert "after" in check(arrival_time="01/12/2026").errors[0]
+    assert check(arrival_time="01/12/2026").errors == ["Arrival must be after departure"]
 
 
 def test_impossible_date():
-    assert "departure" in check(departure_time="31/02/2026").errors[0]
+    assert check(departure_time="31/02/2026").errors == [
+        "Departure: '31/02/2026' is not a valid date (use DD/MM/YYYY)"]
 
 
 def test_only_dd_mm_yyyy_is_accepted():
-    assert "departure" in check(departure_time="2026-12-01").errors[0]
+    assert "Departure" in check(departure_time="2026-12-01").errors[0]
 
 
 def test_all_missing_fields_are_reported_together():
-    assert check(origin_port="", arrival_time="").errors == ["origin_port is missing",
-                                                              "arrival_time is missing"]
+    assert check(origin_port="", arrival_time="").errors == ["Origin port is missing",
+                                                              "Arrival date is missing"]
+
+
+def test_fields_that_are_present_are_still_checked_when_another_is_missing():
+    assert check(destination_port="", origin_port="XXXXX", departure_time="2026-12-01").errors == [
+        "Origin: unknown port 'XXXXX'",
+        "Destination port is missing",
+        "Departure: '2026-12-01' is not a valid date (use DD/MM/YYYY)",
+    ]
+
+
+def test_cross_field_checks_need_both_sides_valid():
+    assert check(departure_time="bad", arrival_time="01/01/2020").errors == [
+        "Departure: 'bad' is not a valid date (use DD/MM/YYYY)"]
+    assert check(origin_port="", destination_port="SGSIN").errors == ["Origin port is missing"]
 
 
 def test_a_none_value_counts_as_missing():
-    assert check(arrival_time=None).errors == ["arrival_time is missing"]
+    assert check(arrival_time=None).errors == ["Arrival date is missing"]
 
 
 def test_an_absent_column_counts_as_missing():
     incomplete = row()
     del incomplete["arrival_time"]
-    assert ShipmentValidator(PORTS).check(incomplete, "SHP-001").errors == ["arrival_time is missing"]
+    assert ShipmentValidator(PORTS).check(incomplete, "SHP-001").errors == ["Arrival date is missing"]
 
 
 def test_errors_cannot_be_changed_from_outside():

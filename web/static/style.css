@@ -135,3 +135,6 @@ dt { color: var(--muted); }
 dd { margin: 0; }
 table.inner { font-size: 0.9rem; }
 table.inner td, table.inner th { border-bottom: 1px solid var(--line); }
+
+tr.has-errors input { border-color: var(--error-ink); background: var(--error-bg); }
+tr.row-errors td { color: var(--error-ink); font-size: 0.9rem; padding-top: 0; }

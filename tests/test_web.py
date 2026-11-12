@@ -69,9 +69,22 @@ def test_invalid_rows_show_every_error_and_keep_what_was_typed(data):
     page = client_for(data).post("/submit", data=rows)
     assert page.status_code == 422
     assert "Nothing was assessed" in page.text
-    assert "Row 2: origin: unknown port &#39;XXXXX&#39;; arrival: &#39;2026-12-20&#39; is not a valid date" in page.text
+    assert "Row 2: Origin: unknown port &#39;XXXXX&#39;; Arrival: &#39;2026-12-20&#39; is not a valid date" in page.text
     assert 'value="XXXXX"' in page.text
     assert "not connected" not in page.text
+
+
+def test_typed_rows_with_errors_are_marked_for_screen_readers(data):
+    rows = good_rows(2)
+    rows["origin_port"][1] = "XXXXX"
+    rows["destination_port"][1] = ""
+    page = client_for(data).post("/submit", data=rows, files={"csv_file": ("s.csv", CSV, "text/csv")})
+    text = page.text
+    assert text.count('<tr class="entry has-errors">') == 1
+    assert text.count('aria-invalid="true" aria-describedby="row-2-errors"') == 4
+    # the CSV row is row 1, so the second typed row is row 3
+    assert ('<td colspan="4" id="row-2-errors">Row 3: Origin: unknown port &#39;XXXXX&#39;; '
+            'Destination port is missing</td>') in text
 
 
 def test_user_text_is_escaped(data):
@@ -216,7 +229,7 @@ def test_invalid_rows_are_not_assessed_in_demo_mode(data):
     rows["destination_port"][0] = "SGSIN"
     page = demo_client(data).post("/submit", data=rows)
     assert page.status_code == 422
-    assert "Row 1: origin and destination are the same port" in page.text
+    assert "Row 1: Origin and destination are the same port" in page.text
     assert data.find(SearchCriteria()) == []
 
 

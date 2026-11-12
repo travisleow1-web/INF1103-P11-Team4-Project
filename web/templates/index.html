@@ -26,16 +26,21 @@
       </thead>
       <tbody>
         {% for row in rows %}
-        <tr>
+        {% set errors = row_errors[loop.index0] if row_errors else None %}
+        {% set invalid %}{% if errors %} aria-invalid="true" aria-describedby="row-{{ loop.index }}-errors"{% endif %}{% endset %}
+        <tr class="entry{% if errors %} has-errors{% endif %}">
           <td><label><span class="sr-only">Origin port</span>
-            <input name="origin_port" list="ports" value="{{ row.origin_port }}" autocomplete="off"></label></td>
+            <input name="origin_port" list="ports" value="{{ row.origin_port }}" autocomplete="off"{{ invalid }}></label></td>
           <td><label><span class="sr-only">Destination port</span>
-            <input name="destination_port" list="ports" value="{{ row.destination_port }}" autocomplete="off"></label></td>
+            <input name="destination_port" list="ports" value="{{ row.destination_port }}" autocomplete="off"{{ invalid }}></label></td>
           <td><label><span class="sr-only">Departure date</span>
-            <input name="departure_time" placeholder="DD/MM/YYYY" value="{{ row.departure_time }}" autocomplete="off"></label></td>
+            <input name="departure_time" placeholder="DD/MM/YYYY" value="{{ row.departure_time }}" autocomplete="off"{{ invalid }}></label></td>
           <td><label><span class="sr-only">Arrival date</span>
-            <input name="arrival_time" placeholder="DD/MM/YYYY" value="{{ row.arrival_time }}" autocomplete="off"></label></td>
+            <input name="arrival_time" placeholder="DD/MM/YYYY" value="{{ row.arrival_time }}" autocomplete="off"{{ invalid }}></label></td>
         </tr>
+        {% if errors %}
+        <tr class="row-errors"><td colspan="4" id="row-{{ loop.index }}-errors">Row {{ offset + loop.index }}: {{ errors | join("; ") }}</td></tr>
+        {% endif %}
         {% endfor %}
       </tbody>
     </table>

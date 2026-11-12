@@ -105,7 +105,12 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
         except StorageError as error:
             return input_page(request, rows, 503, error=f"{error} Nothing was assessed.")
         if preview.has_problems():
-            return input_page(request, rows, 422, problems=preview.problems())
+            # Typed rows come after any CSV rows, so typed row i is preview row offset + i.
+            offset = preview.total() - len(rows)
+            by_number = dict(preview.problems())
+            row_errors = [by_number.get(offset + i) for i in range(1, len(rows) + 1)]
+            return input_page(request, rows, 422, problems=preview.problems(),
+                              row_errors=row_errors, offset=offset)
 
         shipments = preview.valid_shipments()
         if ai is None or logic is None:
