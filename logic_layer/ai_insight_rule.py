@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 class AIInsightRule(BusinessRule):
-    """Rule 1b: data-quality codes need a human; long predicted delays and High MULTIPLE_RISKS raise risk.
+    """Rule 1b: data-quality codes need a human; long delays and High or Extreme MULTIPLE_RISKS raise risk.
 
     Based on Jun Jie's AIInsightRule (Logic_ManagerPart2).
     """
@@ -40,8 +40,9 @@ class AIInsightRule(BusinessRule):
 
         for insight in insights:
             if insight.code == "MULTIPLE_RISKS" and insight.severity >= RiskLevel.HIGH:
-                decision.raise_risk(RiskLevel.HIGH)
-                decision.add_note(f"Rule 1b: {self.describe(insight)} -> risk High", Flag.COMPOUND_RISK)
+                level = max(RiskLevel.HIGH, insight.severity)
+                decision.raise_risk(level)
+                decision.add_note(f"Rule 1b: {self.describe(insight)} -> risk {level.label}", Flag.COMPOUND_RISK)
 
     @staticmethod
     def describe(insight: Insight) -> str:

@@ -53,6 +53,14 @@ def test_a_perfect_storm_is_delayed_for_a_human():
 def test_an_extreme_factor_is_rejected():
     d = manager().evaluate(shipment(), assessment([factor(RiskType.GEOPOLITICAL, RiskLevel.EXTREME)]), NOW)
     assert d.outcome is Outcome.REJECT
+    assert d.needs_human
+    assert "Do not ship: extreme risk on this route" in d.actions
+
+
+def test_an_extreme_multiple_risks_insight_is_rejected():
+    d = manager().evaluate(shipment(), assessment(insights=[insight("MULTIPLE_RISKS", RiskLevel.EXTREME)]), NOW)
+    assert d.risk_level is RiskLevel.EXTREME
+    assert d.outcome is Outcome.REJECT
 
 
 def test_piracy_is_insured():
@@ -140,3 +148,22 @@ def test_two_clean_low_shipments_in_a_row_both_proceed(tmp_path):
     second = evaluate_and_save(logic, data, "SHP-002", NOW)
     assert not second.has_flag(Flag.CAUTIONARY_OVERRIDE)
     assert second.outcome is Outcome.PROCEED
+
+
+class BrokenStormConfig(RuleConfig):
+    """A config whose storm threshold cannot be read, so PerfectStormRule fails."""
+
+    @property
+    def perfect_storm_min_mediums(self):
+        raise RuntimeError("storm setting broken")
+
+
+def test_a_failing_early_rule_still_lets_later_rules_and_the_resolver_run():
+    a = assessment([factor(RiskType.PIRACY_THREAT, RiskLevel.LOW)], [insight("POTENTIAL_DELAY", days=4)])
+    d = manager(config=BrokenStormConfig()).evaluate(shipment(), a, NOW)
+    assert d.has_flag(Flag.RULE_ERROR)
+    assert any("PerfectStormRule could not run (storm setting broken)" in r for r in d.rationale)
+    assert d.has_flag(Flag.SIGNIFICANT_DELAY)       # AIInsightRule ran
+    assert d.has_flag(Flag.PREMIUM_INCREASE)        # InsuranceRule ran
+    assert d.outcome is Outcome.INSURE              # the resolver ran
+    assert d.actions[-1] == "Route to human review queue"

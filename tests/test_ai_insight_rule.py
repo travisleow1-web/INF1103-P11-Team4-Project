@@ -52,11 +52,12 @@ def test_delay_limits_come_from_the_config():
     assert d.risk_level is RiskLevel.HIGH
 
 
-def test_high_or_extreme_multiple_risks_is_compound_risk():
+def test_high_or_extreme_multiple_risks_is_compound_risk_at_that_level():
     for severity in (RiskLevel.HIGH, RiskLevel.EXTREME):
         d = run([insight("MULTIPLE_RISKS", severity)])
-        assert d.risk_level is RiskLevel.HIGH
+        assert d.risk_level is severity
         assert d.has_flag(Flag.COMPOUND_RISK)
+        assert d.rationale[0].endswith(f"-> risk {severity.label}")
 
 
 def test_medium_multiple_risks_changes_nothing():

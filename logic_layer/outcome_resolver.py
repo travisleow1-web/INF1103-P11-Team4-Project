@@ -7,13 +7,16 @@ from model.risk_level import RiskLevel
 class OutcomeResolver:
     """Turns the accumulated flags and risk into one outcome, then applies the human-review gate.
 
-    Based on Jun Jie's OutcomeResolver (Logic_ManagerPart2), with Extreme risk leading to REJECT.
+    Based on Jun Jie's OutcomeResolver (Logic_ManagerPart2), with Extreme risk leading to REJECT
+    and a human review.
     """
 
     def resolve(self, decision: Decision) -> None:
         """Set the decision's outcome. Runs once, after every rule."""
         if decision.risk_level >= RiskLevel.EXTREME:
             decision.set_outcome(Outcome.REJECT)
+            decision.add_action("Do not ship: extreme risk on this route")
+            decision.require_human()
         elif decision.has_flag(Flag.PROCUREMENT_ALERT):
             decision.set_outcome(Outcome.DELAY)
         elif decision.has_flag(Flag.PREMIUM_INCREASE):

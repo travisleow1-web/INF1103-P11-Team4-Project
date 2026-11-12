@@ -44,10 +44,13 @@ def test_extreme_risk_is_rejected_before_any_flag():
     assert d.actions[-1] == "Route to human review queue"
 
 
-def test_extreme_risk_alone_is_rejected():
+def test_extreme_risk_alone_is_rejected_for_a_human_with_a_clear_action():
     d = decision()
     d.raise_risk(RiskLevel.EXTREME)
-    assert resolve(d).outcome is Outcome.REJECT
+    resolve(d)
+    assert d.outcome is Outcome.REJECT
+    assert d.needs_human
+    assert d.actions == ("Do not ship: extreme risk on this route", "Route to human review queue")
 
 
 def test_procurement_alert_delays_before_insurance():
