@@ -300,6 +300,11 @@ def test_search_with_a_bad_filter_shows_the_error(data):
     assert "&lt;b&gt;x&lt;/b&gt;" in text and "<b>x</b>" not in text
 
 
+def test_search_with_a_risk_that_is_not_offered_is_an_error(data):
+    text = client_for(data).get("/search", params={"overall_risk": "Severe"}).text
+    assert "Overall risk: &#39;Severe&#39; is not one of Low, Medium, High, Extreme" in text
+
+
 def test_search_finds_what_demo_mode_saved(data):
     client = demo_client(data)
     client.post("/submit", data=good_rows(3))

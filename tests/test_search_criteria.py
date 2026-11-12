@@ -1,5 +1,7 @@
 from datetime import date, datetime, timezone
 from helpers import saved_record
+from model.outcome import Outcome
+from model.risk_level import RiskLevel
 from model.search_criteria import SearchCriteria
 
 
@@ -60,3 +62,12 @@ def test_query_uses_the_decision_prefix_and_real_dates():
 
 def test_query_with_no_filters_is_empty():
     assert SearchCriteria().to_query() == {}
+
+
+def test_enum_members_are_accepted_and_stored_as_text():
+    criteria = SearchCriteria(overall_risk=RiskLevel.HIGH, outcome=Outcome.ESCALATE)
+    assert criteria.to_dict() == {"overall_risk": "High", "outcome": "ESCALATE"}
+    assert criteria.matches(saved_record(risk="HIGH", outcome="ESCALATE"))
+    assert not criteria.matches(saved_record(risk="MEDIUM", outcome="ESCALATE"))
+    assert criteria.to_query()["decision.overall_risk"]["$regex"] == "^High$"
+    assert criteria.to_query()["decision.outcome"]["$regex"] == "^ESCALATE$"

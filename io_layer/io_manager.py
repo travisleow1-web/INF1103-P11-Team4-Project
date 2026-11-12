@@ -128,13 +128,18 @@ class IOManager:
         end = self.__read_date(fields.get("departure_to"), "to date", errors)
         if start and end and start > end:
             errors.append("from date is after to date")
+        overall_risk = self.__read_choice(fields.get("overall_risk"), "Overall risk", errors,
+                                          lambda text: RiskLevel.parse(text).label,
+                                          [level.label for level in RiskLevel])
+        outcome = self.__read_choice(fields.get("outcome"), "Outcome", errors,
+                                     lambda text: Outcome(text.upper()).value, [o.value for o in Outcome])
         shipment_id = self.__text(fields.get("shipment_id"))
         criteria = SearchCriteria(
             shipment_id=shipment_id.upper() if shipment_id else None,
             origin=origin.code if origin else None,
             destination=destination.code if destination else None,
-            overall_risk=self.__text(fields.get("overall_risk")),
-            outcome=self.__text(fields.get("outcome")),
+            overall_risk=overall_risk,
+            outcome=outcome,
             needs_human={"yes": True, "no": False}.get(str(fields.get("needs_human", "")).lower()),
             departure_from=start,
             departure_to=end,
@@ -149,6 +154,17 @@ class IOManager:
         if port is None:
             errors.append(f"{label}: unknown port '{value}'")
         return port
+
+    def __read_choice(self, value, label, errors, read, allowed):
+        """A dropdown value: blank means any; anything not in the list is an error, not a silent no-match."""
+        text = str(value or "").strip()
+        if not text:
+            return None
+        try:
+            return read(text)
+        except ValueError:
+            errors.append(f"{label}: '{text}' is not one of {', '.join(allowed)}")
+            return None
 
     def __read_date(self, value, label, errors):
         text = str(value or "").strip()

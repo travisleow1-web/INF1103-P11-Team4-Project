@@ -92,6 +92,22 @@ def test_bad_date_and_unknown_port_are_both_reported():
     assert "origin" in result["message"] and "from date" in result["message"]
 
 
+def test_search_risk_and_outcome_are_normalised_to_the_saved_spelling():
+    data = FakeData()
+    make_io(data).search({"overall_risk": "high", "outcome": "escalate"})
+    assert data.last_criteria.overall_risk == "High"
+    assert data.last_criteria.outcome == "ESCALATE"
+
+
+def test_search_rejects_risk_and_outcome_values_that_are_not_offered():
+    data = FakeData()
+    result = make_io(data).search({"overall_risk": "Severe", "outcome": "REROUTE"})
+    assert result["kind"] == "error"
+    assert "Overall risk: 'Severe' is not one of Low, Medium, High, Extreme" in result["message"]
+    assert "Outcome: 'REROUTE' is not one of PROCEED, DELAY, INSURE, ESCALATE, REJECT" in result["message"]
+    assert data.last_criteria is None
+
+
 def test_search_shipment_id_is_upper_cased():
     data = FakeData()
     make_io(data).search({"shipment_id": " shp-001 "})

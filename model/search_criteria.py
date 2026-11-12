@@ -1,6 +1,8 @@
 import re
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
+from .outcome import Outcome
+from .risk_level import RiskLevel
 
 
 @dataclass
@@ -13,6 +15,13 @@ class SearchCriteria:
     needs_human: bool = None
     departure_from: date = None     # inclusive
     departure_to: date = None       # inclusive
+
+    def __post_init__(self):
+        """Accept RiskLevel and Outcome members as well as text, stored as the text saved records hold."""
+        if isinstance(self.overall_risk, RiskLevel):
+            self.overall_risk = self.overall_risk.label
+        if isinstance(self.outcome, Outcome):
+            self.outcome = self.outcome.value
 
     def to_dict(self):
         """Only the filters the user filled in (False for needs_human still counts)."""
