@@ -155,3 +155,26 @@ def test_records_survive_a_new_manager_on_the_same_file(tmp_path):
     path = tmp_path / "records.json"
     JsonDataManager(path, PORTS).save(saved_record("SHP-001"))
     assert ids(JsonDataManager(path, PORTS).find(SearchCriteria())) == ["SHP-001"]
+
+
+# MongoDB connection
+
+def test_connect_uses_the_shipment_records_collection(monkeypatch):
+    mongomock = pytest.importorskip("mongomock")
+    client = mongomock.MongoClient()
+    monkeypatch.setattr("pymongo.MongoClient", lambda uri, **options: client)
+    MongoDataManager.connect("mongodb://example", "team4", PORTS).save(saved_record("SHP-001"))
+    assert client["team4"]["shipment_records"].count_documents({}) == 1
+
+
+def test_connect_can_use_another_collection(monkeypatch):
+    mongomock = pytest.importorskip("mongomock")
+    client = mongomock.MongoClient()
+    monkeypatch.setattr("pymongo.MongoClient", lambda uri, **options: client)
+    MongoDataManager.connect("mongodb://example", "team4", PORTS, collection_name="test_records")
+    assert "shipment_id_1" in client["team4"]["test_records"].index_information()
+
+
+def test_connect_with_a_bad_address_is_a_storage_error():
+    with pytest.raises(StorageError):
+        MongoDataManager.connect("http://not-a-mongo-address", "team4", PORTS)     # fails before any network call

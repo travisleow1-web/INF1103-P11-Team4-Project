@@ -18,11 +18,12 @@ from tests.fakes import FakeAI, FakeLogic
 DEMO_FILE = "demo_records.json"          # not shipments.json: the old DataManager uses another format there
 
 
-def show(row):
+def show(row, save_error=None):
     badge = "  [AI unavailable]" if row.get("ai_unavailable") else ""
+    unsaved = f"  [not saved: {save_error}]" if save_error else ""
     print(f"{row['shipment_id']}  {row['origin']} -> {row['destination']}  "
           f"{row['departure']} to {row['arrival']}  risk={row['decision']['overall_risk']}  "
-          f"outcome={row['decision']['outcome']}  human={row['decision']['needs_human']}{badge}")
+          f"outcome={row['decision']['outcome']}  human={row['decision']['needs_human']}{badge}{unsaved}")
 
 
 def main():
@@ -48,8 +49,8 @@ def main():
             for number, errors in preview.problems():
                 print(f"row {number}: " + "; ".join(errors))
             sys.exit("Nothing was assessed. Fix the rows above and try again.")
-        for record in assess_shipments(preview.valid_shipments(), FakeAI(), FakeLogic(), data):
-            show(io.show_result(record))
+        for record, save_error in assess_shipments(preview.valid_shipments(), FakeAI(), FakeLogic(), data):
+            show(io.show_result(record), save_error)
     else:
         result = io.search({"shipment_id": args.id, "origin": args.origin, "destination": args.destination,
                             "departure_from": getattr(args, "from"), "departure_to": args.to,

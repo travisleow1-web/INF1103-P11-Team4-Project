@@ -18,11 +18,17 @@ class MongoDataManager(DataManager):
             raise StorageError(f"Cannot reach the database: {error}") from error
 
     @classmethod
-    def connect(cls, uri, db_name, ports):
-        """Open a collection from a connection string. Nothing is read from the environment here."""
+    def connect(cls, uri: str, db_name: str, ports, collection_name: str = "shipment_records") -> "MongoDataManager":
+        """Open a collection from a connection string. Nothing is read from the environment here.
+
+        Raises StorageError if the address is invalid or the server cannot be reached.
+        """
         from pymongo import MongoClient
-        client = MongoClient(uri, serverSelectionTimeoutMS=3000)
-        return cls(client[db_name]["records"], ports)
+        try:
+            client = MongoClient(uri, serverSelectionTimeoutMS=3000)
+        except PyMongoError as error:
+            raise StorageError(f"Cannot reach the database: {error}") from error
+        return cls(client[db_name][collection_name], ports)
 
     def save(self, record):
         document = self.__with_real_dates(self.__serializer.to_document(record))
