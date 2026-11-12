@@ -1,9 +1,13 @@
 import re
+from datetime import timedelta, timezone
 from .preview import Preview
 from model.outcome import Outcome
 from model.risk_level import RiskLevel
 from model.search_criteria import SearchCriteria
 from model.storage_error import StorageError
+
+
+SGT = timezone(timedelta(hours=8), "SGT")
 
 
 class IOManager:
@@ -57,6 +61,7 @@ class IOManager:
             "departure": s.departure.strftime("%d/%m/%Y"),
             "arrival": s.arrival.strftime("%d/%m/%Y"),
             "ai_unavailable": record.assessment.is_fallback(),
+            "assessed_at": record.assessment.fetched_at.astimezone(SGT).strftime("%d/%m/%Y %H:%M SGT"),
             "assessment": record.assessment.to_dict(),
             "decision": record.decision.to_dict(),
         }

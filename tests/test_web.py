@@ -1,7 +1,7 @@
 """Web pages through FastAPI's TestClient, with a temp-file JSON data manager. No network."""
 import pytest
 from fastapi.testclient import TestClient
-from helpers import PORTS, make_io
+from helpers import PORTS, make_io, saved_record
 from fakes import FakeAI, FakeLogic
 from data_layer.json_data_manager import JsonDataManager
 from data_layer.unavailable_data_manager import UnavailableDataManager
@@ -179,6 +179,63 @@ def test_invalid_rows_are_not_assessed_in_demo_mode(data):
     assert page.status_code == 422
     assert "Row 1: origin and destination are the same port" in page.text
     assert data.find(SearchCriteria()) == []
+
+
+def test_streamed_rows_have_expandable_details(data):
+    text = demo_client(data).post("/submit", data=good_rows(1)).text
+    assert "<summary>Details for SHP-001</summary>" in text
+    assert "Fake medium weather" in text
+    assert "Fake rule: weather risk is Medium" in text
+
+
+# search
+
+def test_search_page_has_every_filter_with_a_label_and_the_dropdowns(data):
+    text = client_for(data).get("/search").text
+    for name in ("shipment_id", "origin", "destination", "departure_from", "departure_to",
+                 "overall_risk", "outcome", "needs_human"):
+        assert f'name="{name}"' in text
+    assert '<option value="Extreme">Extreme</option>' in text
+    assert '<option value="REJECT">REJECT</option>' in text
+    assert text.count("<label>") == 8
+
+
+def test_search_with_nothing_saved_offers_the_submit_page(data):
+    text = client_for(data).get("/search").text
+    assert "No records match." in text
+    assert '<a href="/">Assess new shipments</a>' in text
+
+
+def test_search_filters_and_shows_details(data):
+    data.save(saved_record("SHP-001", risk="LOW"))
+    data.save(saved_record("SHP-002", risk="HIGH", outcome="ESCALATE", needs_human=True))
+    text = client_for(data).get("/search", params={"overall_risk": "High", "needs_human": "yes"}).text
+    assert "1 record, newest first." in text
+    assert '<th scope="row">SHP-002' in text and '<th scope="row">SHP-001' not in text
+    assert "<summary>Details for SHP-002</summary>" in text
+    assert "Heavy rain" in text                                   # a risk factor detail
+    assert '<option value="High" selected>' in text              # the filter stays chosen
+
+
+def test_search_without_filters_lists_everything(data):
+    data.save(saved_record("SHP-001"))
+    data.save(saved_record("SHP-002", fallback=True))
+    text = client_for(data).get("/search").text
+    assert "2 records, newest first." in text
+    assert text.count('<span class="badge badge-warn">AI unavailable</span>') == 2   # row and details
+
+
+def test_search_with_a_bad_filter_shows_the_error(data):
+    text = client_for(data).get("/search", params={"departure_from": "2026-12-01", "origin": "<b>x</b>"}).text
+    assert "is not a valid date" in text
+    assert "&lt;b&gt;x&lt;/b&gt;" in text and "<b>x</b>" not in text
+
+
+def test_search_finds_what_demo_mode_saved(data):
+    client = demo_client(data)
+    client.post("/submit", data=good_rows(3))
+    text = client.get("/search", params={"outcome": "ESCALATE"}).text
+    assert '<th scope="row">SHP-002' in text and '<th scope="row">SHP-001' not in text
 
 
 # main.create_app

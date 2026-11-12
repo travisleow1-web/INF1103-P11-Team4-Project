@@ -16,6 +16,8 @@ from main import assess_shipments
 WEB_DIR = Path(__file__).resolve().parent
 MAX_UPLOAD_BYTES = 1024 * 1024
 ROW_FIELDS = ("origin_port", "destination_port", "departure_time", "arrival_time")
+SEARCH_FIELDS = ("shipment_id", "origin", "destination", "departure_from", "departure_to",
+                 "overall_risk", "outcome", "needs_human")
 
 logger = logging.getLogger(__name__)
 
@@ -90,5 +92,11 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False) -> FastAP
             return input_page(request, [], info=f"{valid} AI and Logic are not connected yet.")
         return StreamingResponse(stream_results(shipments), media_type="text/html; charset=utf-8",
                                  headers={"X-Accel-Buffering": "no"})
+
+    @app.get("/search", response_class=HTMLResponse)
+    def search(request: Request) -> HTMLResponse:
+        """The search form and the saved records that match it (all records when no filter is set)."""
+        fields = {name: request.query_params.get(name, "") for name in SEARCH_FIELDS}
+        return page(request, "search.html", fields=fields, result=io.search(fields))
 
     return app

@@ -121,6 +121,10 @@ def test_show_result_uses_dd_mm_yyyy_and_the_port_label():
     assert shown["decision"]["outcome"] == "PROCEED"
 
 
+def test_show_result_gives_the_assessment_time_in_singapore_time():
+    assert make_io().show_result(record())["assessed_at"] == "01/11/2026 16:00 SGT"     # 08:00 UTC
+
+
 def test_show_summary_has_the_columns_the_old_cli_showed():
     row_ = make_io().show_summary([record()])[0]
     assert row_["route"] == "SGSIN -> NLRTM"

@@ -1,6 +1,7 @@
 {% set title = "New shipments" %}
 {% include "_header.html" %}
 <h1>Assess shipments</h1>
+<p>Type shipments or upload a CSV file. To look at shipments already assessed, <a href="/search">search saved records</a>.</p>
 
 {% if error %}<p class="alert alert-error" role="alert">{{ error }}</p>{% endif %}
 {% if info %}<p class="alert alert-info" role="status">{{ info }}</p>{% endif %}
