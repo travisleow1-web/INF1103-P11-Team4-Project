@@ -11,6 +11,7 @@ from io_layer.csv_source import CsvSource
 from io_layer.form_source import FormSource
 from io_layer.io_manager import IOManager
 from io_layer.source_error import SourceError
+from model.storage_error import StorageError
 from main import assess_shipments
 
 WEB_DIR = Path(__file__).resolve().parent
@@ -88,6 +89,8 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
             preview = io.preview(*sources)
         except SourceError as error:
             return input_page(request, rows, 400, error=str(error))
+        except StorageError as error:
+            return input_page(request, rows, 503, error=f"{error} Nothing was assessed.")
         if preview.has_problems():
             return input_page(request, rows, 422, problems=preview.problems())
 

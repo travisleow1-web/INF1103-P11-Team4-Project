@@ -84,6 +84,43 @@ def test_saving_the_same_shipment_id_twice_is_an_error(data):
     assert len(data.find(SearchCriteria())) == 1
 
 
+# Damaged records
+
+def store_with_a_damaged_record(kind, tmp_path):
+    """A manager whose store holds SHP-001 (fine), a damaged SHP-002 and a non-object."""
+    from data_layer.record_serializer import RecordSerializer
+    good = RecordSerializer(PORTS).to_document(saved_record("SHP-001"))
+    damaged = {**RecordSerializer(PORTS).to_document(saved_record("SHP-002")), "origin": "ZZZZZ"}
+    if kind == "json":
+        import json
+        path = tmp_path / "records.json"
+        path.write_text(json.dumps([good, damaged, "rubbish"]), encoding="utf-8")
+        return JsonDataManager(path, PORTS)
+    mongomock = pytest.importorskip("mongomock")
+    collection = mongomock.MongoClient().db.records
+    data = MongoDataManager(collection, PORTS)
+    data.save(saved_record("SHP-001"))
+    collection.insert_one(damaged)
+    collection.insert_one({"note": "rubbish"})
+    return data
+
+
+@pytest.mark.parametrize("kind", ["json", "mongo"])
+def test_a_damaged_record_is_skipped_and_logged(kind, tmp_path, caplog):
+    data = store_with_a_damaged_record(kind, tmp_path)
+    with caplog.at_level("WARNING"):
+        assert ids(data.find(SearchCriteria())) == ["SHP-001"]
+    assert "SHP-002" in caplog.text
+    assert "position 2" in caplog.text
+
+
+@pytest.mark.parametrize("kind", ["json", "mongo"])
+def test_route_history_also_skips_damaged_records(kind, tmp_path):
+    data = store_with_a_damaged_record(kind, tmp_path)
+    since = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    assert ids(data.find_route_history("SGSIN-NLRTM", since)) == ["SHP-001"]
+
+
 # Route history (Logic Rule 3)
 
 def at(day, hour=9):

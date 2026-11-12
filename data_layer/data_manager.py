@@ -14,7 +14,10 @@ class DataManager(ABC):
 
     @abstractmethod
     def find(self, criteria: SearchCriteria) -> List[ShipmentRecord]:
-        """Return the records that match a SearchCriteria, newest first. No filters returns everything."""
+        """Return the records that match a SearchCriteria, newest first. No filters returns everything.
+
+        A damaged record is skipped (and logged); StorageError means the store itself could not be read.
+        """
 
     @abstractmethod
     def find_route_history(self, route_id: str, since: datetime) -> List[ShipmentRecord]:

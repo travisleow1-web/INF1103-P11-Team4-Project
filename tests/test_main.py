@@ -38,7 +38,7 @@ def test_the_flow_works_end_to_end_with_the_real_io_and_data_layers(tmp_path):
 
 def test_a_failed_save_is_reported_and_the_rest_still_run():
     data = UnavailableDataManager("Database is down")
-    results = list(assess_shipments(shipments(make_io(data), 3), FakeAI(), FakeLogic(), data))
+    results = list(assess_shipments(shipments(make_io(), 3), FakeAI(), FakeLogic(), data))
     assert [r.shipment.shipment_id for r, _ in results] == ["SHP-001", "SHP-002", "SHP-003"]
     assert [error for _, error in results] == ["Database is down"] * 3
 

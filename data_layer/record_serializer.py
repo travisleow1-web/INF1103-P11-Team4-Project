@@ -1,10 +1,15 @@
+import logging
 from datetime import date, datetime, timezone
+from typing import Iterable, List
 from model.port_registry import PortRegistry
 from model.ai_assessment import AIAssessment
 from model.decision import Decision
 from model.shipment import Shipment
 from model.shipment_record import ShipmentRecord
 from model.storage_error import StorageError
+
+
+logger = logging.getLogger(__name__)
 
 
 class RecordSerializer:
@@ -26,6 +31,18 @@ class RecordSerializer:
             "decision": record.decision.to_dict(),
             "saved_at": record.saved_at.isoformat(),
         }
+
+    def from_documents(self, docs: Iterable[dict]) -> List[ShipmentRecord]:
+        """Every record that can be read. A damaged document is skipped and logged, so one bad
+        record does not hide all the others."""
+        records = []
+        for index, doc in enumerate(docs):
+            try:
+                records.append(self.from_document(doc))
+            except StorageError as error:
+                name = doc.get("shipment_id") if isinstance(doc, dict) else None
+                logger.warning("Skipping saved record %s: %s", name or f"at position {index}", error)
+        return records
 
     def from_document(self, doc: dict) -> ShipmentRecord:
         """Accepts ISO strings (JSON) or datetimes (MongoDB). A damaged document raises StorageError."""

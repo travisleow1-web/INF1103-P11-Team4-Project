@@ -47,7 +47,7 @@ class MongoDataManager(DataManager):
             raise StorageError(f"Cannot save the record: {error}") from error
 
     def find(self, criteria: SearchCriteria) -> List[ShipmentRecord]:
-        """The records that match, newest first."""
+        """The records that match, newest first. Damaged records are skipped and logged."""
         return self.__find_newest_first(criteria.to_query())
 
     def find_route_history(self, route_id: str, since: datetime) -> List[ShipmentRecord]:
@@ -66,7 +66,7 @@ class MongoDataManager(DataManager):
             documents = list(cursor.sort([("saved_at", -1), ("shipment_id", -1)]))
         except PyMongoError as error:
             raise StorageError(f"Cannot search the database: {error}") from error
-        return [self.__serializer.from_document(d) for d in documents]
+        return self.__serializer.from_documents(documents)
 
     def __with_real_dates(self, document):
         """MongoDB cannot store a bare date, so days become midnight UTC datetimes."""

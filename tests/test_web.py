@@ -154,8 +154,15 @@ def test_ids_continue_after_earlier_submissions(data):
     assert "SHP-003" in client.post("/submit", data=good_rows(1)).text
 
 
-def test_a_row_whose_save_failed_says_not_saved():
-    data = UnavailableDataManager("Database is down")
+class SaveFails(JsonDataManager):
+    """Reads work, every save fails: the database went away after the IDs were given out."""
+
+    def save(self, record):
+        raise StorageError("Database is down")
+
+
+def test_a_row_whose_save_failed_says_not_saved(tmp_path):
+    data = SaveFails(tmp_path / "records.json", PORTS)
     text = demo_client(data).post("/submit", data=good_rows(2)).text
     assert text.count('<span class="badge badge-error">Not saved</span>') == 2
     assert "Database is down" in text
@@ -249,6 +256,14 @@ def test_notices_show_as_a_red_banner_on_every_page():
     assert banner in client.get("/").text
     assert banner in client.get("/search").text
     assert banner in client.post("/submit", data=good_rows(1)).text
+
+
+def test_submit_runs_nothing_when_saved_records_cannot_be_read():
+    data = UnavailableDataManager("Database unavailable")
+    page = client_for(data, FakeAI(), FakeLogic(), demo=True).post("/submit", data=good_rows(2))
+    assert page.status_code == 503
+    assert "Cannot assign shipment IDs: saved records could not be read. Nothing was assessed." in page.text
+    assert "1 of 2" not in page.text
 
 
 def test_search_without_a_database_shows_the_message():

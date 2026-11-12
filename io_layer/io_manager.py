@@ -1,3 +1,4 @@
+import logging
 import re
 from datetime import timedelta, timezone
 from typing import List
@@ -13,6 +14,7 @@ from .shipment_source import ShipmentSource
 from .shipment_validator import ShipmentValidator
 
 
+logger = logging.getLogger(__name__)
 SGT = timezone(timedelta(hours=8), "SGT")
 
 
@@ -29,7 +31,11 @@ class IOManager:
         self.__ports = ports
 
     def preview(self, *sources: ShipmentSource) -> Preview:
-        """Read every source, validate each row, and number the valid ones SHP-001, SHP-002, ..."""
+        """Read every source, validate each row, and number the valid ones SHP-001, SHP-002, ...
+
+        Numbers continue from the highest saved ID. If the saved records cannot be read, this raises
+        StorageError instead of guessing, so no ID is given out twice.
+        """
         rows = []
         for source in sources:
             rows.extend(source.read())
@@ -156,8 +162,9 @@ class IOManager:
     def __last_number(self):
         try:
             records = self.__data.find(SearchCriteria())
-        except StorageError:
-            return 0
+        except StorageError as error:
+            logger.warning("Cannot read saved records to number shipments: %s", error)
+            raise StorageError("Cannot assign shipment IDs: saved records could not be read.") from error
         numbers = [int(m.group(1)) for r in records
                    if (m := re.fullmatch(r"SHP-(\d+)", r.shipment.shipment_id))]
         return max(numbers, default=0)

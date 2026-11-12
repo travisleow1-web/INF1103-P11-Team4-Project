@@ -1,4 +1,5 @@
 from datetime import date
+import pytest
 from helpers import FakeData, make_io, record, row
 from io_layer.form_source import FormSource
 from model.search_criteria import SearchCriteria
@@ -25,9 +26,10 @@ def test_saved_ids_that_are_not_numbered_are_ignored():
     assert ids(preview) == ["SHP-005"]
 
 
-def test_ids_start_at_one_when_storage_fails():
+def test_preview_refuses_to_number_when_saved_records_cannot_be_read():
     data = FakeData(error=StorageError("db down"))
-    assert ids(make_io(data).preview(FormSource(row()))) == ["SHP-001"]
+    with pytest.raises(StorageError, match="Cannot assign shipment IDs: saved records could not be read"):
+        make_io(data).preview(FormSource(row()))
 
 
 def test_a_shipment_id_column_is_ignored():

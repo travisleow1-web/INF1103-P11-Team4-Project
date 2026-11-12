@@ -36,14 +36,14 @@ class JsonDataManager(DataManager):
             self.__write(documents)
 
     def find(self, criteria: SearchCriteria) -> List[ShipmentRecord]:
-        """The records that match, newest first."""
-        records = [self.__serializer.from_document(d) for d in self.__load()]
+        """The records that match, newest first. Damaged records are skipped and logged."""
+        records = self.__serializer.from_documents(self.__load())
         matching = [r for r in records if criteria.matches(r)]
         return self.__newest_first(matching)
 
     def find_route_history(self, route_id: str, since: datetime) -> List[ShipmentRecord]:
         """Records on the route saved at or after since, skipping FALLBACK assessments, newest first."""
-        records = [self.__serializer.from_document(d) for d in self.__load()]
+        records = self.__serializer.from_documents(self.__load())
         matching = [r for r in records if r.shipment.route_id() == route_id
                     and r.saved_at >= since and not r.assessment.is_fallback()]
         return self.__newest_first(matching)
