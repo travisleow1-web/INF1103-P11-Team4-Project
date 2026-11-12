@@ -27,12 +27,11 @@ class ResponseCache:
         self.__entries: Optional[Dict[str, Any]] = None
         self.__lock = threading.Lock()
 
-    def make_key(self, shipment: Shipment, today: Optional[date] = None) -> str:
-        """Key for this shipment's route and dates on `today` (default: the current UTC date).
+    def make_key(self, shipment: Shipment, today: date) -> str:
+        """Key for this shipment's route and dates on `today`, the current UTC date.
 
         The shipment ID is left out, so two shipments on the same route and dates share a reply.
         """
-        today = today or datetime.now(timezone.utc).date()
         details = {"origin": shipment.origin.code, "destination": shipment.destination.code,
                    "departure": shipment.departure.isoformat(), "arrival": shipment.arrival.isoformat()}
         payload = json.dumps(details, sort_keys=True) + f"|{today.isoformat()}|{self.__version}"

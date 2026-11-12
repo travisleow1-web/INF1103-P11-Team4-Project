@@ -7,6 +7,7 @@ import time
 from typing import Optional
 import requests
 from .ai_service_error import AIServiceError
+from .ai_settings import GEMINI_TIMEOUT, MAX_RETRIES
 from .invalid_response_error import InvalidResponseError
 
 log = logging.getLogger(__name__)
@@ -22,7 +23,10 @@ class GeminiClient:
     """
 
     def __init__(self, api_key: Optional[str], model: str, system_prompt: str, response_schema: dict,
-                 max_retries: int = 3, timeout: float = 40, http: Optional[requests.Session] = None):
+                 max_retries: int = MAX_RETRIES, timeout: float = GEMINI_TIMEOUT,
+                 http: Optional[requests.Session] = None):
+        if max_retries < 1:
+            raise ValueError("max_retries must be at least 1")
         self.__api_key = self.__clean_key(api_key)
         self.__model = model
         self.__system_prompt = system_prompt
@@ -32,7 +36,10 @@ class GeminiClient:
         self.__http = http or requests.Session()
 
     def complete(self, prompt: str) -> dict:
-        """Return the model's JSON reply. Raises AIServiceError or InvalidResponseError."""
+        """Return the model's JSON reply. Raises AIServiceError or InvalidResponseError.
+
+        The last attempt always returns or raises, so the loop never ends without a result.
+        """
         delay = 1.0
         for attempt in range(1, self.__max_retries + 1):
             try:
@@ -43,7 +50,6 @@ class GeminiClient:
                 log.warning("Gemini attempt %d/%d failed: %s", attempt, self.__max_retries, error)
                 time.sleep(delay + random.random())     # backoff with jitter
                 delay *= 2
-        raise AIServiceError("max_retries must be at least 1", retryable=False)
 
     def fingerprint(self) -> str:
         """Hash of the model, system prompt and schema. The cache uses it as its version."""

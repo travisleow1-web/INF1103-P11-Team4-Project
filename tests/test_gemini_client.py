@@ -3,7 +3,7 @@ import pytest
 import requests
 from ai_helpers import FakeResponse, FakeSession, gemini_reply
 from ai_layer.ai_service_error import AIServiceError
-from ai_layer.ai_settings import DEFAULT_MODEL, RESPONSE_SCHEMA, SYSTEM_PROMPT
+from ai_layer.ai_settings import DEFAULT_MODEL, GEMINI_TIMEOUT, MAX_RETRIES, RESPONSE_SCHEMA, SYSTEM_PROMPT
 from ai_layer.gemini_client import GeminiClient
 from ai_layer.invalid_response_error import InvalidResponseError
 
@@ -147,3 +147,25 @@ def test_chunked_encoding_error_is_retried():
                                   gemini_reply({"ok": True}))
     assert client.complete("p") == {"ok": True}
     assert len(session.calls) == 2
+
+
+def test_defaults_come_from_the_settings(no_sleep):
+    client, session = make_client(*[FakeResponse(503)] * (MAX_RETRIES + 1))
+    with pytest.raises(AIServiceError):
+        client.complete("p")
+    assert len(session.calls) == MAX_RETRIES
+    assert session.calls[0][2]["timeout"] == GEMINI_TIMEOUT
+
+
+@pytest.mark.parametrize("retries", [0, -1])
+def test_max_retries_must_be_at_least_one(retries):
+    with pytest.raises(ValueError):
+        GeminiClient("k", "m", "p", {}, max_retries=retries, http=FakeSession())
+
+
+def test_one_attempt_means_no_retry(no_sleep):
+    client, session = make_client(FakeResponse(429), gemini_reply({"ok": True}), max_retries=1)
+    with pytest.raises(AIServiceError):
+        client.complete("p")
+    assert len(session.calls) == 1
+    no_sleep.assert_not_called()

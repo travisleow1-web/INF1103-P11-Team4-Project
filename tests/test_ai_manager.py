@@ -1,6 +1,6 @@
 import logging
 import json
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from unittest.mock import Mock, patch
 import pytest
 import requests
@@ -230,3 +230,26 @@ def test_api_key_never_reaches_logs_or_errors(tmp_path, caplog, key, error):
     for record in caplog.records:
         assert "SECRET" not in record.getMessage()
         assert record.exc_info is None or "SECRET" not in str(record.exc_info[1])
+
+
+class LateEveningUTC(datetime):
+    """20:00 UTC on 13 Nov 2026, which is already 14 Nov in Singapore."""
+
+    @classmethod
+    def now(cls, tz=None):
+        moment = cls(2026, 11, 13, 20, 0, tzinfo=timezone.utc)
+        return moment.astimezone(tz) if tz else moment.replace(tzinfo=None)
+
+
+def test_cache_key_and_day_use_the_utc_date(tmp_path):
+    client = mock_client()
+    with patch("ai_layer.ai_manager.datetime", LateEveningUTC), \
+            patch("ai_layer.response_cache.datetime", LateEveningUTC):
+        manager = make_manager(tmp_path, client)
+        assert manager.assess(make_shipment()).status is AIStatus.LIVE
+        assert manager.assess(make_shipment()).status is AIStatus.CACHED
+    key = ResponseCache(tmp_path / "ai_cache.json", "test").make_key(make_shipment(), date(2026, 11, 13))
+    entries = json.loads((tmp_path / "ai_cache.json").read_text(encoding="utf-8"))
+    assert list(entries) == [key]
+    assert entries[key]["day"] == "2026-11-13"
+    client.complete.assert_called_once()

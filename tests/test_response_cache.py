@@ -31,9 +31,14 @@ def test_key_changes_with_route_dates_day_and_version():
     assert ResponseCache("unused.json", "v2").make_key(make_shipment(), TODAY) != base
 
 
-def test_key_defaults_to_the_utc_day():
+def test_key_is_stable_within_a_day_and_changes_across_days():
     cache = ResponseCache("unused.json", "v1")
-    assert len(cache.make_key(make_shipment())) == 64
+    shipment = make_shipment()
+    day_one = cache.make_key(shipment, date(2026, 11, 13))
+    assert len(day_one) == 64
+    assert cache.make_key(shipment, date(2026, 11, 13)) == day_one
+    assert cache.make_key(shipment, date(2026, 11, 14)) != day_one
+    assert cache.make_key(shipment, date(2027, 11, 13)) != day_one
 
 
 def test_set_then_get_survives_a_new_instance(tmp_path):
