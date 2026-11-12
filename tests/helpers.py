@@ -53,3 +53,18 @@ def record(shipment_id="SHP-001", fallback=False):
     assessment = SimpleNamespace(to_dict=lambda: dict(ASSESSMENT), is_fallback=lambda: fallback)
     decision = SimpleNamespace(to_dict=lambda: dict(DECISION))
     return SimpleNamespace(shipment=shipment, assessment=assessment, decision=decision)
+
+
+def saved_record(shipment_id="SHP-001", risk="LOW", outcome="PROCEED", needs_human=False,
+                 departure=date(2026, 12, 1), fallback=False, saved_at=None):
+    """A real ShipmentRecord (placeholder classes) of the kind the Data manager stores."""
+    from datetime import datetime, timezone
+    from io_layer.ai_assessment import AIAssessment
+    from io_layer.decision import Decision
+    from io_layer.shipment_record import ShipmentRecord
+    shipment = Shipment(shipment_id, SINGAPORE, ROTTERDAM, departure, date(2026, 12, 28))
+    assessment = AIAssessment({**ASSESSMENT, "ai_status": "FALLBACK" if fallback else "LIVE"})
+    decision = Decision({"shipment_id": shipment_id, "overall_risk": risk, "outcome": outcome,
+                         "needs_human": needs_human})
+    return ShipmentRecord(shipment, assessment, decision,
+                          saved_at or datetime(2026, 11, 1, 9, 0, tzinfo=timezone.utc))
