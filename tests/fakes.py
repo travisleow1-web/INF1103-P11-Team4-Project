@@ -1,24 +1,29 @@
 """Dev-only stand-ins for the AI and Logic managers, until the real classes exist.
 They never run in the product. They only let the IO and Data layers be tried end to end."""
+from datetime import datetime, timezone
 from model.ai_assessment import AIAssessment
+from model.ai_status import AIStatus
 from model.decision import Decision
+from model.risk_factor import RiskFactor
+from model.risk_level import RiskLevel
+from model.risk_type import RiskType
 
 LEVELS = ["LOW", "MEDIUM", "HIGH"]
 OUTCOMES = {"LOW": "PROCEED", "MEDIUM": "INSURE", "HIGH": "ESCALATE"}
 
 
 class FakeAI:
+    """Gives SHP-001 a medium weather risk, SHP-002 high, SHP-003 low, and so on."""
+
     def assess(self, shipment):
+        """Return a LIVE assessment whose severity depends only on the shipment number."""
         number = int(shipment.shipment_id.split("-")[1])
-        level = LEVELS[number % 3]
-        return AIAssessment({
-            "ai_status": "LIVE",
-            "expected_impact": "minor_delay" if level == "LOW" else "major_delay",
-            "confidence_score": 0.8,
-            "primary_risk_factor": "WEATHER",
-            "conflicting_sources": False,
-            "risk_factors": [{"type": "WEATHER", "severity": level}],
-        })
+        level = RiskLevel.parse(LEVELS[number % 3])
+        factor = RiskFactor(RiskType.WEATHER, level, shipment.origin.code, "open_meteo_weather",
+                            f"Fake {level.label.lower()} weather")
+        return AIAssessment([factor], [], RiskType.WEATHER, shipment.origin.code,
+                            "None" if level == RiskLevel.LOW else "Delay", 0.8, False,
+                            AIStatus.LIVE, datetime.now(timezone.utc))
 
 
 class FakeLogic:
