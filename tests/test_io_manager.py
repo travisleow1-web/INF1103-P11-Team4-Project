@@ -124,9 +124,9 @@ def test_show_result_uses_dd_mm_yyyy_and_the_port_label():
 def test_show_summary_has_the_columns_the_old_cli_showed():
     row_ = make_io().show_summary([record()])[0]
     assert row_["route"] == "SGSIN -> NLRTM"
-    assert row_["expected_impact"] == "minor_delay"
+    assert row_["expected_impact"] == "Delay"
     assert row_["confidence_score"] == 0.8
-    assert row_["primary_factor"] == "WEATHER"
+    assert row_["primary_factor"] == "weather"
     assert row_["primary_severity"] == "MEDIUM"
     assert row_["n_risk_factors"] == 2
     assert row_["conflicting_sources"] is False

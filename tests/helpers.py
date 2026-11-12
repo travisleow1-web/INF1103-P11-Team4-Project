@@ -1,29 +1,23 @@
 """Small stand-ins shared by the IO tests. No network, no AI, no database."""
 from datetime import date, datetime, timezone
-from types import SimpleNamespace
 from io_layer.io_manager import IOManager
+from io_layer.shipment_validator import ShipmentValidator
 from model.ai_assessment import AIAssessment
 from model.ai_status import AIStatus
+from model.decision import Decision
+from model.outcome import Outcome
+from model.port import Port
+from model.port_registry import PortRegistry
 from model.risk_factor import RiskFactor
 from model.risk_level import RiskLevel
 from model.risk_type import RiskType
-from model.port import Port
-from model.port_registry import PortRegistry
 from model.shipment import Shipment
-from io_layer.shipment_validator import ShipmentValidator
+from model.shipment_record import ShipmentRecord
 
 SINGAPORE = Port("SGSIN", "Singapore", "SG", 1.26, 103.84)
 ROTTERDAM = Port("NLRTM", "Rotterdam", "NL", 51.9, 4.5)
 PORTS = PortRegistry([SINGAPORE, ROTTERDAM])
 
-ASSESSMENT = {
-    "expected_impact": "minor_delay",
-    "confidence_score": 0.8,
-    "primary_risk_factor": "WEATHER",
-    "conflicting_sources": False,
-    "risk_factors": [{"type": "PIRACY", "severity": "LOW"}, {"type": "WEATHER", "severity": "MEDIUM"}],
-}
-DECISION = {"overall_risk": "LOW", "outcome": "PROCEED", "needs_human": False}
 FETCHED_AT = datetime(2026, 11, 1, 8, 0, tzinfo=timezone.utc)
 
 
@@ -61,20 +55,14 @@ def make_io(data=None):
 
 
 def record(shipment_id="SHP-001", fallback=False):
-    """A saved record with just the parts IOManager reads."""
-    shipment = Shipment(shipment_id, SINGAPORE, ROTTERDAM, date(2026, 12, 1), date(2026, 12, 20))
-    assessment = SimpleNamespace(to_dict=lambda: dict(ASSESSMENT), is_fallback=lambda: fallback)
-    decision = SimpleNamespace(to_dict=lambda: dict(DECISION))
-    return SimpleNamespace(shipment=shipment, assessment=assessment, decision=decision)
+    """A saved record for the IO tests: SGSIN to NLRTM, 01/12/2026 to 20/12/2026, low risk."""
+    return saved_record(shipment_id, arrival=date(2026, 12, 20), fallback=fallback)
 
 
 def saved_record(shipment_id="SHP-001", risk="LOW", outcome="PROCEED", needs_human=False,
-                 departure=date(2026, 12, 1), fallback=False, saved_at=None):
-    """A real ShipmentRecord (placeholder classes) of the kind the Data manager stores."""
-    from model.decision import Decision
-    from model.outcome import Outcome
-    from model.shipment_record import ShipmentRecord
-    shipment = Shipment(shipment_id, SINGAPORE, ROTTERDAM, departure, date(2026, 12, 28))
+                 departure=date(2026, 12, 1), arrival=date(2026, 12, 28), fallback=False, saved_at=None):
+    """A real ShipmentRecord of the kind the Data manager stores."""
+    shipment = Shipment(shipment_id, SINGAPORE, ROTTERDAM, departure, arrival)
     assessment = AIAssessment.fallback(FETCHED_AT) if fallback else live_assessment()
     decision = Decision(shipment_id)
     decision.raise_risk(RiskLevel.parse(risk))
