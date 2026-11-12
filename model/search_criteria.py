@@ -1,20 +1,27 @@
 import re
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
+from typing import Optional, Union
 from .outcome import Outcome
 from .risk_level import RiskLevel
+from .shipment_record import ShipmentRecord
 
 
 @dataclass
 class SearchCriteria:
-    shipment_id: str = None
-    origin: str = None              # port code
-    destination: str = None        # port code
-    overall_risk: str = None
-    outcome: str = None
-    needs_human: bool = None
-    departure_from: date = None     # inclusive
-    departure_to: date = None       # inclusive
+    """The search filters. Unset (None) filters match everything.
+
+    matches() filters records in Python (JSON backend); to_query() builds the same filter for MongoDB.
+    """
+
+    shipment_id: Optional[str] = None
+    origin: Optional[str] = None                                # port code
+    destination: Optional[str] = None                           # port code
+    overall_risk: Optional[Union[str, RiskLevel]] = None        # stored as the label, e.g. "High"
+    outcome: Optional[Union[str, Outcome]] = None               # stored as the value, e.g. "ESCALATE"
+    needs_human: Optional[bool] = None
+    departure_from: Optional[date] = None                       # inclusive
+    departure_to: Optional[date] = None                         # inclusive
 
     def __post_init__(self):
         """Accept RiskLevel and Outcome members as well as text, stored as the text saved records hold."""
@@ -23,16 +30,16 @@ class SearchCriteria:
         if isinstance(self.outcome, Outcome):
             self.outcome = self.outcome.value
 
-    def to_dict(self):
+    def to_dict(self) -> dict:
         """Only the filters the user filled in (False for needs_human still counts)."""
         return {k: v for k, v in vars(self).items() if v not in (None, "")}
 
-    def matches(self, record):
+    def matches(self, record: ShipmentRecord) -> bool:
         """True if a saved record passes every filter that is set. Text is compared ignoring case."""
         f = self.to_dict()
         shipment, decision = record.shipment, record.decision.to_dict()
 
-        def same(a, b):
+        def same(a: object, b: object) -> bool:
             return str(a).upper() == str(b).upper()
 
         return all([
@@ -46,7 +53,7 @@ class SearchCriteria:
             "departure_to" not in f or shipment.departure <= f["departure_to"],
         ])
 
-    def to_query(self):
+    def to_query(self) -> dict:
         """The same filters as a MongoDB query. Risk and outcome live under 'decision.'."""
         f = self.to_dict()
         query = {}
@@ -67,5 +74,5 @@ class SearchCriteria:
             query["departure"] = days
         return query
 
-    def __midnight(self, day):
+    def __midnight(self, day: date) -> datetime:
         return datetime(day.year, day.month, day.day, tzinfo=timezone.utc)
