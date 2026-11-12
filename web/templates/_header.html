@@ -15,4 +15,5 @@
   </nav>
 </header>
 {% if demo %}<div class="banner banner-demo" role="status">Demo mode: fake AI and rules</div>{% endif %}
-<main>
+{% for notice in notices %}<div class="banner banner-error" role="alert">{{ notice }}</div>
+{% endfor %}<main>

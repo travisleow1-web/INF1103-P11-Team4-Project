@@ -36,6 +36,7 @@ body {
 
 .banner { padding: 0.5rem 1rem; font-weight: 600; }
 .banner-demo { background: var(--demo-bg); color: #5c4700; }
+.banner-error { background: #b3261e; color: #fff; }
 
 main { max-width: 72rem; margin: 0 auto; padding: 1rem; }
 

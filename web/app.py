@@ -22,22 +22,27 @@ SEARCH_FIELDS = ("shipment_id", "origin", "destination", "departure_from", "depa
 logger = logging.getLogger(__name__)
 
 
-def create_web_app(io: IOManager, ai, logic, data, demo: bool = False) -> FastAPI:
-    """Build the FastAPI app. ai and logic may be None while those layers are not connected."""
+def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
+                   notices: Optional[List[str]] = None) -> FastAPI:
+    """Build the FastAPI app. ai and logic may be None while those layers are not connected.
+
+    notices are problems found at startup, such as an unreachable database; every page shows them in red.
+    """
+    notices = list(notices or [])
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(WEB_DIR / "templates")), autoescape=True)
     templates = Jinja2Templates(env=env)
     app = FastAPI(title="Supply Chain Risk Assessor")
     app.mount("/static", StaticFiles(directory=str(WEB_DIR / "static")), name="static")
 
     def page(request: Request, name: str, status_code: int = 200, **context) -> HTMLResponse:
-        context = {"demo": demo, "form": io.show_input_form(), **context}
+        context = {"demo": demo, "notices": notices, "form": io.show_input_form(), **context}
         return templates.TemplateResponse(request, name, context, status_code=status_code)
 
     def input_page(request: Request, rows: list, status_code: int = 200, **context) -> HTMLResponse:
         return page(request, "index.html", status_code, rows=rows or [dict.fromkeys(ROW_FIELDS, "")], **context)
 
     def render(name: str, **context) -> str:
-        return env.get_template(name).render(demo=demo, **context)
+        return env.get_template(name).render(demo=demo, notices=notices, **context)
 
     def stream_results(shipments: list) -> Iterator[str]:
         """The results page in pieces: the table head, then one row as each shipment finishes, then the end."""

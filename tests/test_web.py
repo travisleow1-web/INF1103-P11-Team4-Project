@@ -6,6 +6,7 @@ from fakes import FakeAI, FakeLogic
 from data_layer.json_data_manager import JsonDataManager
 from data_layer.unavailable_data_manager import UnavailableDataManager
 from model.search_criteria import SearchCriteria
+from model.storage_error import StorageError
 from web.app import MAX_UPLOAD_BYTES, create_web_app
 import main
 
@@ -22,8 +23,8 @@ def data(tmp_path):
     return JsonDataManager(tmp_path / "records.json", PORTS)
 
 
-def client_for(data, ai=None, logic=None, demo=False):
-    return TestClient(create_web_app(make_io(data), ai, logic, data, demo))
+def client_for(data, ai=None, logic=None, demo=False, notices=None):
+    return TestClient(create_web_app(make_io(data), ai, logic, data, demo, notices))
 
 
 # input page
@@ -36,6 +37,7 @@ def test_input_page_lists_the_ports_and_labels_every_box(data):
     assert page.text.count('<span class="sr-only">') == 4
     assert 'id="add-row"' in page.text
     assert "Demo mode" not in page.text
+    assert "banner-error" not in page.text
 
 
 def test_static_files_are_served(data):
@@ -238,6 +240,23 @@ def test_search_finds_what_demo_mode_saved(data):
     assert '<th scope="row">SHP-002' in text and '<th scope="row">SHP-001' not in text
 
 
+# database unavailable
+
+def test_notices_show_as_a_red_banner_on_every_page():
+    data = UnavailableDataManager("Database unavailable: timed out")
+    client = client_for(data, FakeAI(), FakeLogic(), demo=True, notices=[data.message])
+    banner = '<div class="banner banner-error" role="alert">Database unavailable: timed out</div>'
+    assert banner in client.get("/").text
+    assert banner in client.get("/search").text
+    assert banner in client.post("/submit", data=good_rows(1)).text
+
+
+def test_search_without_a_database_shows_the_message():
+    data = UnavailableDataManager("Database unavailable: timed out")
+    text = client_for(data).get("/search").text
+    assert '<p class="alert alert-error" role="alert">Database unavailable: timed out</p>' in text
+
+
 # main.create_app
 
 @pytest.fixture
@@ -283,3 +302,29 @@ def test_create_app_without_demo_mode_says_not_connected(env):
     page = TestClient(main.create_app()).post("/submit", files={"csv_file": ("s.csv", CSV, "text/csv")})
     assert "AI and Logic are not connected yet." in page.text
     assert "Demo mode" not in page.text
+
+
+def test_build_data_without_mongo_settings_is_unavailable(env):
+    env.setenv("DATA_BACKEND", "mongo")
+    data = main.build_data(PORTS)
+    assert isinstance(data, UnavailableDataManager)
+    assert "MONGO_URI and DB_NAME must both be set" in data.message
+
+
+def test_build_data_falls_back_when_mongo_cannot_be_reached(env):
+    def unreachable(*args, **kwargs):
+        raise StorageError("Cannot reach the database: timed out")
+    env.setenv("DATA_BACKEND", "mongo")
+    env.setenv("MONGO_URI", "mongodb://db.invalid")
+    env.setenv("DB_NAME", "team4")
+    env.setattr(main.MongoDataManager, "connect", unreachable)
+    data = main.build_data(PORTS)
+    assert isinstance(data, UnavailableDataManager)
+    assert "timed out" in data.message
+
+
+def test_create_app_shows_the_banner_when_the_database_is_unavailable(env):
+    env.setenv("DATA_BACKEND", "mongo")
+    page = TestClient(main.create_app()).get("/")
+    assert page.status_code == 200
+    assert "banner-error" in page.text and "Database unavailable" in page.text

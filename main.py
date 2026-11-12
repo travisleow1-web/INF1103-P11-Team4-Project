@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from data_layer.data_manager import DataManager
 from data_layer.json_data_manager import JsonDataManager
 from data_layer.mongo_data_manager import MongoDataManager
+from data_layer.unavailable_data_manager import UnavailableDataManager
 from io_layer.io_manager import IOManager
 from io_layer.shipment_validator import ShipmentValidator
 from model.port_registry import PortRegistry
@@ -52,16 +53,28 @@ def build_logic(data: DataManager, ports: PortRegistry):
 
 
 def build_data(ports: PortRegistry) -> DataManager:
-    """The storage backend chosen by DATA_BACKEND: 'json' (default, DATA_FILE) or 'mongo' (MONGO_URI, DB_NAME)."""
+    """The storage backend chosen by DATA_BACKEND: 'json' (default, DATA_FILE) or 'mongo' (MONGO_URI, DB_NAME).
+
+    If MongoDB cannot be reached, the app still starts with an UnavailableDataManager holding the reason.
+    """
     backend = os.getenv("DATA_BACKEND", "json").strip().lower()
     if backend == "json":
         return JsonDataManager(os.getenv("DATA_FILE") or "shipment_records.json", ports)
     if backend == "mongo":
-        uri, db_name = os.getenv("MONGO_URI", "").strip(), os.getenv("DB_NAME", "").strip()
-        if not uri or not db_name:
-            raise StorageError("MONGO_URI and DB_NAME must both be set to use MongoDB")
-        return MongoDataManager.connect(uri, db_name, ports)
+        try:
+            return build_mongo(ports)
+        except StorageError as error:
+            logger.error("Starting without storage: %s", error)
+            return UnavailableDataManager(f"Database unavailable: {error}. Results will not be saved.")
     raise ValueError(f"DATA_BACKEND must be 'json' or 'mongo', not {backend!r}")
+
+
+def build_mongo(ports: PortRegistry) -> MongoDataManager:
+    """Connect to the MongoDB named by MONGO_URI and DB_NAME. Raises StorageError if that fails."""
+    uri, db_name = os.getenv("MONGO_URI", "").strip(), os.getenv("DB_NAME", "").strip()
+    if not uri or not db_name:
+        raise StorageError("MONGO_URI and DB_NAME must both be set to use MongoDB")
+    return MongoDataManager.connect(uri, db_name, ports)
 
 
 def create_app() -> FastAPI:
@@ -81,7 +94,8 @@ def create_app() -> FastAPI:
     else:
         ai, logic = build_ai(), build_logic(data, ports)
     io = IOManager(ShipmentValidator(ports), data, ports)
-    return create_web_app(io, ai, logic, data, demo)
+    notices = [data.message] if isinstance(data, UnavailableDataManager) else []
+    return create_web_app(io, ai, logic, data, demo, notices)
 
 
 if __name__ == "__main__":
