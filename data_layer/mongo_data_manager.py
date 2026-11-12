@@ -1,6 +1,11 @@
 from datetime import date, datetime, timezone
+from typing import List
+from pymongo.collection import Collection
 from pymongo.errors import DuplicateKeyError, PyMongoError
 from model.ai_status import AIStatus
+from model.port_registry import PortRegistry
+from model.search_criteria import SearchCriteria
+from model.shipment_record import ShipmentRecord
 from model.storage_error import StorageError
 from .data_manager import DataManager
 from .record_serializer import RecordSerializer
@@ -9,7 +14,8 @@ from .record_serializer import RecordSerializer
 class MongoDataManager(DataManager):
     """Keeps records in a MongoDB collection. Departure, arrival and saved_at are stored as real dates."""
 
-    def __init__(self, collection, ports):
+    def __init__(self, collection: Collection, ports: PortRegistry):
+        """Use an open collection (mongomock in tests). Makes shipment_id unique."""
         self.__collection = collection
         self.__serializer = RecordSerializer(ports)
         try:
@@ -18,7 +24,7 @@ class MongoDataManager(DataManager):
             raise StorageError(f"Cannot reach the database: {error}") from error
 
     @classmethod
-    def connect(cls, uri: str, db_name: str, ports, collection_name: str = "shipment_records") -> "MongoDataManager":
+    def connect(cls, uri: str, db_name: str, ports: PortRegistry, collection_name: str = "shipment_records") -> "MongoDataManager":
         """Open a collection from a connection string. Nothing is read from the environment here.
 
         Raises StorageError if the address is invalid or the server cannot be reached.
@@ -30,7 +36,8 @@ class MongoDataManager(DataManager):
             raise StorageError(f"Cannot reach the database: {error}") from error
         return cls(client[db_name][collection_name], ports)
 
-    def save(self, record):
+    def save(self, record: ShipmentRecord) -> None:
+        """Insert the record. A shipment_id that is already saved is a StorageError."""
         document = self.__with_real_dates(self.__serializer.to_document(record))
         try:
             self.__collection.insert_one(document)
@@ -39,10 +46,11 @@ class MongoDataManager(DataManager):
         except PyMongoError as error:
             raise StorageError(f"Cannot save the record: {error}") from error
 
-    def find(self, criteria):
+    def find(self, criteria: SearchCriteria) -> List[ShipmentRecord]:
+        """The records that match, newest first."""
         return self.__find_newest_first(criteria.to_query())
 
-    def find_route_history(self, route_id: str, since: datetime) -> list:
+    def find_route_history(self, route_id: str, since: datetime) -> List[ShipmentRecord]:
         """Records on the route saved at or after since, skipping FALLBACK assessments, newest first."""
         origin, _, destination = route_id.partition("-")
         return self.__find_newest_first({

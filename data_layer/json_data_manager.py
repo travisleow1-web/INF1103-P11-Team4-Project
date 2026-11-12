@@ -2,6 +2,10 @@ import json
 import os
 from datetime import datetime
 from pathlib import Path
+from typing import List, Union
+from model.port_registry import PortRegistry
+from model.search_criteria import SearchCriteria
+from model.shipment_record import ShipmentRecord
 from model.storage_error import StorageError
 from .data_manager import DataManager
 from .record_serializer import RecordSerializer
@@ -10,11 +14,12 @@ from .record_serializer import RecordSerializer
 class JsonDataManager(DataManager):
     """Keeps records in one JSON file. Needs no database, so it is the default."""
 
-    def __init__(self, path, ports):
+    def __init__(self, path: Union[str, Path], ports: PortRegistry):
         self.__path = Path(path)
         self.__serializer = RecordSerializer(ports)
 
-    def save(self, record):
+    def save(self, record: ShipmentRecord) -> None:
+        """Add the record to the file. A shipment_id that is already saved is a StorageError."""
         documents = self.__load()
         shipment_id = record.shipment.shipment_id
         if any(d.get("shipment_id") == shipment_id for d in documents):
@@ -22,12 +27,13 @@ class JsonDataManager(DataManager):
         documents.append(self.__serializer.to_document(record))
         self.__write(documents)
 
-    def find(self, criteria):
+    def find(self, criteria: SearchCriteria) -> List[ShipmentRecord]:
+        """The records that match, newest first."""
         records = [self.__serializer.from_document(d) for d in self.__load()]
         matching = [r for r in records if criteria.matches(r)]
         return self.__newest_first(matching)
 
-    def find_route_history(self, route_id: str, since: datetime) -> list:
+    def find_route_history(self, route_id: str, since: datetime) -> List[ShipmentRecord]:
         """Records on the route saved at or after since, skipping FALLBACK assessments, newest first."""
         records = [self.__serializer.from_document(d) for d in self.__load()]
         matching = [r for r in records if r.shipment.route_id() == route_id

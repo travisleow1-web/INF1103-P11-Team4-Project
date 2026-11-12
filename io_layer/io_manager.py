@@ -1,22 +1,34 @@
 import re
 from datetime import timedelta, timezone
-from .preview import Preview
+from typing import List
+from data_layer.data_manager import DataManager
 from model.outcome import Outcome
+from model.port_registry import PortRegistry
 from model.risk_level import RiskLevel
 from model.search_criteria import SearchCriteria
+from model.shipment_record import ShipmentRecord
 from model.storage_error import StorageError
+from .preview import Preview
+from .shipment_source import ShipmentSource
+from .shipment_validator import ShipmentValidator
 
 
 SGT = timezone(timedelta(hours=8), "SGT")
 
 
 class IOManager:
-    def __init__(self, validator, data, ports):
-        self.__validator = validator
-        self.__data = data              # DataManager: IO only reads from it
-        self.__ports = ports            # PortRegistry
+    """Everything between the user and the app: input, validation, search and the data pages display.
 
-    def preview(self, *sources):
+    It takes raw strings in and returns plain dicts out. It never prints, never calls the AI or Logic,
+    and only reads saved records (through DataManager.find).
+    """
+
+    def __init__(self, validator: ShipmentValidator, data: DataManager, ports: PortRegistry):
+        self.__validator = validator
+        self.__data = data              # IO only reads from it
+        self.__ports = ports
+
+    def preview(self, *sources: ShipmentSource) -> Preview:
         """Read every source, validate each row, and number the valid ones SHP-001, SHP-002, ..."""
         rows = []
         for source in sources:
@@ -31,7 +43,7 @@ class IOManager:
             results.append((number, result))
         return Preview(results)
 
-    def search(self, fields):
+    def search(self, fields: dict) -> dict:
         """fields is the raw search form: strings in, a display dict out."""
         criteria, errors = self.__to_criteria(fields)
         if errors:
@@ -46,13 +58,14 @@ class IOManager:
                 "records": [self.show_result(r) for r in records]}
 
     # The show_* methods return the data a web template needs. They do not print.
-    def show_input_form(self):
+    def show_input_form(self) -> dict:
         """Choices for the input and search forms: port labels, risk labels and outcome values."""
         return {"ports": self.__ports.labels(),
                 "risk_levels": [level.label for level in RiskLevel],
                 "outcomes": [outcome.value for outcome in Outcome]}
 
-    def show_result(self, record):
+    def show_result(self, record: ShipmentRecord) -> dict:
+        """Everything about one record, ready to display: DD/MM/YYYY dates, port labels, full details."""
         s = record.shipment
         return {
             "shipment_id": s.shipment_id,
@@ -66,7 +79,8 @@ class IOManager:
             "decision": record.decision.to_dict(),
         }
 
-    def show_summary(self, records):
+    def show_summary(self, records: List[ShipmentRecord]) -> List[dict]:
+        """One short row per record for the results table."""
         rows = []
         for r in records:
             a = r.assessment.to_dict()
@@ -89,10 +103,12 @@ class IOManager:
             })
         return rows
 
-    def show_no_records(self):
+    def show_no_records(self) -> dict:
+        """The search result when nothing matches."""
         return {"kind": "empty", "message": "No records match."}
 
-    def show_error(self, message):
+    def show_error(self, message: str) -> dict:
+        """A search result that shows a message instead of records."""
         return {"kind": "error", "message": message}
 
     def __to_criteria(self, fields):

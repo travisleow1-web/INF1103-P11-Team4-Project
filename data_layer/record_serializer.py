@@ -1,4 +1,5 @@
 from datetime import date, datetime, timezone
+from model.port_registry import PortRegistry
 from model.ai_assessment import AIAssessment
 from model.decision import Decision
 from model.shipment import Shipment
@@ -9,10 +10,11 @@ from model.storage_error import StorageError
 class RecordSerializer:
     """Turns a ShipmentRecord into a plain document and back. Dates are ISO strings in the document."""
 
-    def __init__(self, ports):
-        self.__ports = ports            # PortRegistry: stored documents keep only the port code
+    def __init__(self, ports: PortRegistry):
+        self.__ports = ports            # stored documents keep only the port code
 
-    def to_document(self, record):
+    def to_document(self, record: ShipmentRecord) -> dict:
+        """A plain dict for storage: port codes, ISO dates, and the assessment and decision as dicts."""
         s = record.shipment
         return {
             "shipment_id": s.shipment_id,
@@ -25,7 +27,7 @@ class RecordSerializer:
             "saved_at": record.saved_at.isoformat(),
         }
 
-    def from_document(self, doc):
+    def from_document(self, doc: dict) -> ShipmentRecord:
         """Accepts ISO strings (JSON) or datetimes (MongoDB). A damaged document raises StorageError."""
         try:
             shipment = Shipment(

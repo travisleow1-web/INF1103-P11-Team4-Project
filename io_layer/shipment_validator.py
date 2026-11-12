@@ -1,16 +1,21 @@
-from datetime import datetime
+from datetime import date, datetime
+from typing import Optional
+from model.port_registry import PortRegistry
 from model.shipment import Shipment
 from .validation_result import ValidationResult
 
 
 class ShipmentValidator:
+    """Checks one raw row: required fields, known ports, DD/MM/YYYY dates, arrival after departure."""
+
     REQUIRED = ["origin_port", "destination_port", "departure_time", "arrival_time"]
     DATE_FORMAT = "%d/%m/%Y"
 
-    def __init__(self, ports):
-        self.__ports = ports            # PortRegistry
+    def __init__(self, ports: PortRegistry):
+        self.__ports = ports
 
-    def check(self, row, shipment_id):
+    def check(self, row: dict, shipment_id: str) -> ValidationResult:
+        """Collect every error in the row. A valid row becomes a Shipment with the given ID."""
         errors = []
         if not self.__check_required(row, errors):
             return ValidationResult(None, errors)      # cannot check the rest
@@ -29,7 +34,7 @@ class ShipmentValidator:
             return ValidationResult(None, errors)
         return ValidationResult(Shipment(shipment_id, origin, destination, departure, arrival), [])
 
-    def read_date(self, value):
+    def read_date(self, value: str) -> Optional[date]:
         """Return a date for a DD/MM/YYYY string, or None. Also used by IOManager for search dates."""
         try:
             return datetime.strptime(str(value).strip(), self.DATE_FORMAT).date()

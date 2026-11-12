@@ -2,7 +2,9 @@ from .shipment_source import ShipmentSource
 
 
 class FormSource(ShipmentSource):
-    def __init__(self, fields):
+    """One shipment row typed into the web form."""
+
+    def __init__(self, fields: dict):
         self.__fields = fields
 
     @classmethod
@@ -17,5 +19,6 @@ class FormSource(ShipmentSource):
                 sources.append(cls(row))
         return sources
 
-    def read(self):
+    def read(self) -> "list[dict]":
+        """Return the row as a one-item list (a copy, so callers cannot change the source)."""
         return [dict(self.__fields)]

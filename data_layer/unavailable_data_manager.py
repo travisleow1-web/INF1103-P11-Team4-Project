@@ -1,4 +1,7 @@
 from datetime import datetime
+from typing import List
+from model.search_criteria import SearchCriteria
+from model.shipment_record import ShipmentRecord
 from model.storage_error import StorageError
 from .data_manager import DataManager
 
@@ -17,14 +20,14 @@ class UnavailableDataManager(DataManager):
         """Why storage is unavailable, for the page banner."""
         return self.__message
 
-    def save(self, record) -> None:
+    def save(self, record: ShipmentRecord) -> None:
         """Always fails: there is nowhere to save."""
         raise StorageError(self.__message)
 
-    def find(self, criteria) -> list:
+    def find(self, criteria: SearchCriteria) -> List[ShipmentRecord]:
         """Always fails: there is nothing to search."""
         raise StorageError(self.__message)
 
-    def find_route_history(self, route_id: str, since: datetime) -> list:
+    def find_route_history(self, route_id: str, since: datetime) -> List[ShipmentRecord]:
         """Always fails: there is no history to read."""
         raise StorageError(self.__message)
