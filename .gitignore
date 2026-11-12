@@ -12,3 +12,5 @@ ai_cache.json
 # Records saved by the web app (JSON backend) and by demo mode
 shipment_records.json
 demo_records.json
+# Left behind if the app stops in the middle of a save
+*.json.tmp

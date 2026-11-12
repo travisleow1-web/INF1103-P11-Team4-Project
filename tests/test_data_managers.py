@@ -1,4 +1,5 @@
 """One set of tests run against every backend: they must behave the same (LSP)."""
+import threading
 from datetime import date, datetime, timezone
 import pytest
 from helpers import PORTS, ROTTERDAM, SINGAPORE, saved_record
@@ -149,6 +150,41 @@ def test_route_history_from_a_corrupt_file_is_a_storage_error(tmp_path):
     path.write_text("{not json", encoding="utf-8")
     with pytest.raises(StorageError):
         JsonDataManager(path, PORTS).find_route_history("SGSIN-NLRTM", datetime(2026, 11, 1, tzinfo=timezone.utc))
+
+
+def run_in_threads(count, work):
+    """Start count threads at once and return the errors they raised."""
+    errors = []
+    start = threading.Barrier(count)
+
+    def run(number):
+        start.wait()
+        try:
+            work(number)
+        except Exception as error:          # collected and checked by the test
+            errors.append(error)
+
+    threads = [threading.Thread(target=run, args=(n,)) for n in range(1, count + 1)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    return errors
+
+
+def test_saves_from_many_threads_are_all_kept(tmp_path):
+    data = JsonDataManager(tmp_path / "records.json", PORTS)
+    errors = run_in_threads(20, lambda n: data.save(saved_record(f"SHP-{n:03d}")))
+    assert errors == []
+    assert sorted(ids(data.find(SearchCriteria()))) == [f"SHP-{n:03d}" for n in range(1, 21)]
+    assert list(tmp_path.glob("*.tmp")) == []
+
+
+def test_the_same_id_from_many_threads_is_saved_once(tmp_path):
+    data = JsonDataManager(tmp_path / "records.json", PORTS)
+    errors = run_in_threads(10, lambda n: data.save(saved_record("SHP-001")))
+    assert len(errors) == 9 and all(isinstance(e, StorageError) for e in errors)
+    assert ids(data.find(SearchCriteria())) == ["SHP-001"]
 
 
 def test_records_survive_a_new_manager_on_the_same_file(tmp_path):

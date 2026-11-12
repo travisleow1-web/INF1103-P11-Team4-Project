@@ -1,5 +1,7 @@
 import json
 import os
+import tempfile
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import List, Union
@@ -12,20 +14,26 @@ from .record_serializer import RecordSerializer
 
 
 class JsonDataManager(DataManager):
-    """Keeps records in one JSON file. Needs no database, so it is the default."""
+    """Keeps records in one JSON file. Needs no database, so it is the default.
+
+    The web server handles requests on several threads, so saves are serialised with a lock.
+    Use one JsonDataManager per file.
+    """
 
     def __init__(self, path: Union[str, Path], ports: PortRegistry):
         self.__path = Path(path)
         self.__serializer = RecordSerializer(ports)
+        self.__lock = threading.Lock()
 
     def save(self, record: ShipmentRecord) -> None:
         """Add the record to the file. A shipment_id that is already saved is a StorageError."""
-        documents = self.__load()
         shipment_id = record.shipment.shipment_id
-        if any(d.get("shipment_id") == shipment_id for d in documents):
-            raise StorageError(f"{shipment_id} is already saved")
-        documents.append(self.__serializer.to_document(record))
-        self.__write(documents)
+        with self.__lock:                      # read, check and write as one step
+            documents = self.__load()
+            if any(d.get("shipment_id") == shipment_id for d in documents):
+                raise StorageError(f"{shipment_id} is already saved")
+            documents.append(self.__serializer.to_document(record))
+            self.__write(documents)
 
     def find(self, criteria: SearchCriteria) -> List[ShipmentRecord]:
         """The records that match, newest first."""
@@ -56,10 +64,16 @@ class JsonDataManager(DataManager):
         return documents
 
     def __write(self, documents):
-        """Write to a temporary file first so a crash cannot leave half a file."""
-        temp = self.__path.with_name(self.__path.name + ".tmp")
+        """Write to a new temporary file next to the real one, then swap it in, so a crash cannot
+        leave half a file and readers always see a whole one."""
+        temp = None
         try:
-            temp.write_text(json.dumps(documents, indent=2), encoding="utf-8")
+            handle, temp = tempfile.mkstemp(dir=self.__path.parent, prefix=self.__path.stem + ".",
+                                            suffix=".json.tmp")
+            with os.fdopen(handle, "w", encoding="utf-8") as file:
+                json.dump(documents, file, indent=2)
             os.replace(temp, self.__path)
         except OSError as error:
+            if temp and os.path.exists(temp):
+                os.remove(temp)
             raise StorageError(f"Cannot write {self.__path.name}: {error}") from error
