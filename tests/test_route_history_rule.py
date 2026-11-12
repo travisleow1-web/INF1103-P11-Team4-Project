@@ -4,15 +4,16 @@ from logic_fixtures import NOW, FakeHistory, assessment, broken_history, decisio
 from data_layer.json_data_manager import JsonDataManager
 from logic_layer.route_history_rule import RouteHistoryRule
 from logic_layer.rule_config import RuleConfig
+from model.ai_assessment import AIAssessment
 from model.flag import Flag
 from model.risk_level import RiskLevel
 
 RECENT = datetime(2026, 11, 10, 9, 0, tzinfo=timezone.utc)
 
 
-def run(data, d=None, config=None):
+def run(data, d=None, config=None, a=None):
     d = d or decision()
-    RouteHistoryRule(config or RuleConfig(), data).apply(shipment(), assessment(), d, NOW)
+    RouteHistoryRule(config or RuleConfig(), data).apply(shipment(), a or assessment(), d, NOW)
     return d
 
 
@@ -26,7 +27,7 @@ def json_data(tmp_path, *records):
 def test_clean_history_auto_approves(tmp_path):
     d = run(json_data(tmp_path, saved_record("SHP-001", saved_at=RECENT)))
     assert not d.hold_shipment and not d.needs_human
-    assert "auto-approve" in d.rationale[0]
+    assert d.rationale == ("Rule 3: no flagged or delayed shipments on this route in the last 21 days",)
 
 
 def test_a_flagged_record_on_the_route_needs_sign_off(tmp_path):
@@ -34,6 +35,25 @@ def test_a_flagged_record_on_the_route_needs_sign_off(tmp_path):
     assert d.hold_shipment and d.needs_human
     assert d.has_flag(Flag.CAUTIONARY_OVERRIDE)
     assert d.actions == ("Require human dispatcher sign-off",)
+
+
+def test_a_medium_record_within_the_window_needs_sign_off(tmp_path):
+    d = run(json_data(tmp_path, saved_record("SHP-001", risk="MEDIUM", saved_at=RECENT)))
+    assert d.has_flag(Flag.CAUTIONARY_OVERRIDE)
+
+
+def test_a_record_that_only_needed_a_human_does_not_count(tmp_path):
+    d = run(json_data(tmp_path, saved_record("SHP-001", risk="LOW", outcome="ESCALATE", needs_human=True,
+                                             saved_at=RECENT)))
+    assert not d.has_flag(Flag.CAUTIONARY_OVERRIDE)
+    assert not d.hold_shipment and not d.needs_human
+
+
+def test_a_fallback_assessment_skips_the_history_check():
+    history = FakeHistory()
+    d = run(history, a=AIAssessment.fallback(NOW))
+    assert history.calls == []
+    assert d.rationale == ()
 
 
 def test_a_delayed_record_on_the_route_needs_sign_off(tmp_path):

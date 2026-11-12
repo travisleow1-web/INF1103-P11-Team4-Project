@@ -13,6 +13,7 @@ from logic_layer.route_history_rule import RouteHistoryRule
 from logic_layer.rule_config import RuleConfig
 from logic_layer.unregistered_location_rule import UnregisteredLocationRule
 from model.ai_assessment import AIAssessment
+from model.shipment_record import ShipmentRecord
 from model.flag import Flag
 from model.outcome import Outcome
 from model.risk_level import RiskLevel
@@ -38,7 +39,7 @@ def test_a_clean_low_shipment_proceeds():
     assert d.shipment_id == "SHP-001"
     assert d.outcome is Outcome.PROCEED
     assert not d.needs_human
-    assert "auto-approve" in d.rationale[-1]
+    assert d.rationale[-1] == "Rule 3: no flagged or delayed shipments on this route in the last 21 days"
 
 
 def test_a_perfect_storm_is_delayed_for_a_human():
@@ -110,3 +111,32 @@ def test_update_config_needs_a_rule_config():
 def test_now_must_be_timezone_aware():
     with pytest.raises(ValueError):
         manager().evaluate(shipment(), assessment(), datetime(2026, 11, 13, 9, 0))
+
+
+def evaluate_and_save(logic, data, shipment_id, when):
+    """Evaluate a clean Low shipment at a given time and save it the way main.assess_shipments does."""
+    a = assessment(fetched_at=when)
+    d = logic.evaluate(shipment(shipment_id), a, when)
+    data.save(ShipmentRecord(shipment(shipment_id), a, d, when))
+    return d
+
+
+def test_a_cautionary_override_does_not_feed_itself(tmp_path):
+    data = JsonDataManager(tmp_path / "records.json", DATA_PORTS)
+    start = NOW - timedelta(days=30)
+    data.save(saved_record("SHP-001", risk="MEDIUM", saved_at=start))
+    logic = LogicManager(data, PORTS)
+    first = evaluate_and_save(logic, data, "SHP-002", start + timedelta(days=15))
+    assert first.has_flag(Flag.CAUTIONARY_OVERRIDE) and first.needs_human    # the real Medium is 15 days old
+    second = evaluate_and_save(logic, data, "SHP-003", start + timedelta(days=30))
+    assert not second.has_flag(Flag.CAUTIONARY_OVERRIDE)                     # only the override is in the window
+    assert second.outcome is Outcome.PROCEED
+
+
+def test_two_clean_low_shipments_in_a_row_both_proceed(tmp_path):
+    data = JsonDataManager(tmp_path / "records.json", DATA_PORTS)
+    logic = LogicManager(data, PORTS)
+    evaluate_and_save(logic, data, "SHP-001", NOW - timedelta(days=15))
+    second = evaluate_and_save(logic, data, "SHP-002", NOW)
+    assert not second.has_flag(Flag.CAUTIONARY_OVERRIDE)
+    assert second.outcome is Outcome.PROCEED
