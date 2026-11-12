@@ -183,6 +183,13 @@ def test_demo_mode_streams_one_row_per_shipment_in_order(data):
     assert len(data.find(SearchCriteria())) == 3
 
 
+def test_result_rows_show_the_route_arrow_and_readable_primary_risk(data):
+    text = demo_client(data).post("/submit", data=good_rows(1)).text
+    assert '<td class="route">SGSIN → NLRTM</td>' in text
+    assert "<td>Weather (Medium)</td>" in text
+    assert "<dt>AI data fetched</dt>" in text
+
+
 def test_result_rows_show_risk_and_outcome_as_text(data):
     text = demo_client(data).post("/submit", data=good_rows(3)).text
     assert '<span class="badge risk-high">High</span>' in text            # SHP-002 in the fakes

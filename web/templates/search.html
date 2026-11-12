@@ -61,9 +61,9 @@
     {% for row in result.summary %}{% set record = result.records[loop.index0] %}
     <tr>
       <th scope="row">{{ row.shipment_id }}{% if row.ai_unavailable %} <span class="badge badge-warn">AI unavailable</span>{% endif %}</th>
-      <td>{{ row.route }}</td>
+      <td class="route">{{ row.route }}</td>
       <td>{{ record.departure }}</td>
-      <td>{{ row.primary_factor }} ({{ row.primary_severity }})</td>
+      <td>{{ row.primary_risk }}</td>
       <td>{{ row.confidence_score }}</td>
       <td>{{ risk_badge(row.overall_risk) }}</td>
       <td>{{ outcome_badge(row.outcome) }}</td>

@@ -80,7 +80,8 @@ class IOManager:
             "departure": s.departure.strftime("%d/%m/%Y"),
             "arrival": s.arrival.strftime("%d/%m/%Y"),
             "ai_unavailable": record.assessment.is_fallback(),
-            "assessed_at": record.assessment.fetched_at.astimezone(SGT).strftime("%d/%m/%Y %H:%M SGT"),
+            "assessed_at": self.__local_time(record.saved_at),
+            "fetched_at": self.__local_time(record.assessment.fetched_at),
             "assessment": record.assessment.to_dict(),
             "decision": record.decision.to_dict(),
         }
@@ -93,13 +94,15 @@ class IOManager:
             d = r.decision.to_dict()
             factors = a.get("risk_factors", [])
             primary = a.get("primary_risk_factor")
+            severity = next((f["severity"] for f in factors if f["type"] == primary), "-")
             rows.append({
                 "shipment_id": r.shipment.shipment_id,
-                "route": f"{r.shipment.origin.code} -> {r.shipment.destination.code}",
+                "route": f"{r.shipment.origin.code} \u2192 {r.shipment.destination.code}",
                 "expected_impact": a.get("expected_impact"),
                 "confidence_score": a.get("confidence_score"),
                 "primary_factor": primary,
-                "primary_severity": next((f["severity"] for f in factors if f["type"] == primary), "-"),
+                "primary_severity": severity,
+                "primary_risk": self.__risk_text(primary, severity),
                 "n_risk_factors": len(factors),
                 "conflicting_sources": a.get("conflicting_sources"),
                 "overall_risk": d["overall_risk"],
@@ -155,6 +158,15 @@ class IOManager:
         if result is None:
             errors.append(f"{label}: '{value}' is not a valid date (use DD/MM/YYYY)")
         return result
+
+    def __local_time(self, moment):
+        """DD/MM/YYYY HH:MM in Singapore time, for display."""
+        return moment.astimezone(SGT).strftime("%d/%m/%Y %H:%M SGT")
+
+    def __risk_text(self, risk_type, severity):
+        """'port_congestion', 'MEDIUM' -> 'Port congestion (Medium)'; no severity -> just the name."""
+        name = str(risk_type or "none").replace("_", " ").capitalize()
+        return name if severity == "-" else f"{name} ({str(severity).capitalize()})"
 
     def __text(self, value):
         return str(value or "").strip() or None

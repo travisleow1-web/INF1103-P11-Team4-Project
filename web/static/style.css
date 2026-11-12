@@ -98,7 +98,8 @@ thead th { border-bottom: 2px solid var(--line); font-size: 0.9rem; color: var(-
 
 .results th[scope="row"] { white-space: nowrap; }
 .results tbody tr { border-top: 1px solid var(--line); }
-.progress { color: var(--muted); white-space: nowrap; }
+.progress, .route { white-space: nowrap; }
+.progress { color: var(--muted); }
 
 /* Badges always carry text; the colour only repeats it. */
 .badge {

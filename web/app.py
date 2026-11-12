@@ -92,14 +92,15 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
         """Validate every row. If all are valid, assess them; otherwise show every error and run nothing."""
         typed = {"origin_port": origin_port, "destination_port": destination_port,
                  "departure_time": departure_time, "arrival_time": arrival_time}
-        rows = [source.read()[0] for source in FormSource.many(typed)]
+        typed_sources = FormSource.many(typed)
+        rows = [source.read()[0] for source in typed_sources]            # to fill the form again
         sources = []
         if csv_file is not None and csv_file.filename:
             content = csv_file.file.read(MAX_UPLOAD_BYTES + 1)
             if len(content) > MAX_UPLOAD_BYTES:
                 return input_page(request, rows, 413, error=TOO_LARGE)     # sent without a Content-Length
             sources.append(CsvSource(content))
-        sources.extend(FormSource(row) for row in rows)
+        sources.extend(typed_sources)
         if not sources:
             return input_page(request, rows, 400, error="Add at least one shipment or choose a CSV file.")
         try:

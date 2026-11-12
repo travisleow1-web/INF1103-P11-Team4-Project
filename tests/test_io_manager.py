@@ -124,19 +124,26 @@ def test_show_result_uses_dd_mm_yyyy_and_the_port_label():
 
 
 def test_show_result_gives_the_assessment_time_in_singapore_time():
-    assert make_io().show_result(record())["assessed_at"] == "01/11/2026 16:00 SGT"     # 08:00 UTC
+    shown = make_io().show_result(record())
+    assert shown["assessed_at"] == "01/11/2026 17:00 SGT"     # saved at 09:00 UTC
+    assert shown["fetched_at"] == "01/11/2026 16:00 SGT"      # AI data fetched at 08:00 UTC
 
 
 def test_show_summary_has_the_columns_the_old_cli_showed():
     row_ = make_io().show_summary([record()])[0]
-    assert row_["route"] == "SGSIN -> NLRTM"
+    assert row_["route"] == "SGSIN \u2192 NLRTM"
     assert row_["expected_impact"] == "Delay"
     assert row_["confidence_score"] == 0.8
     assert row_["primary_factor"] == "weather"
     assert row_["primary_severity"] == "MEDIUM"
+    assert row_["primary_risk"] == "Weather (Medium)"
     assert row_["n_risk_factors"] == 2
     assert row_["conflicting_sources"] is False
     assert row_["outcome"] == "PROCEED"
+
+
+def test_summary_primary_risk_reads_like_the_details():
+    assert make_io().show_summary([record(fallback=True)])[0]["primary_risk"] == "None"
 
 
 def test_show_summary_flags_shipments_the_ai_did_not_assess():

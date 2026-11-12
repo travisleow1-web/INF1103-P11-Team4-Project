@@ -35,7 +35,8 @@
               <dl>
                 <dt>Status</dt><dd>{{ a.ai_status }}{% if result.ai_unavailable %} <span class="badge badge-warn">AI unavailable</span>{% endif %}</dd>
                 <dt>Assessed</dt><dd>{{ result.assessed_at }}</dd>
-                <dt>Primary risk</dt><dd>{{ words(a.primary_risk_factor) }}</dd>
+                <dt>AI data fetched</dt><dd>{{ result.fetched_at }}</dd>
+                <dt>Primary risk</dt><dd>{{ words(a.primary_risk_factor) | capitalize }}</dd>
                 <dt>Affected location</dt><dd>{{ a.affected_location }}</dd>
                 <dt>Expected impact</dt><dd>{{ a.expected_impact }}</dd>
                 <dt>Confidence</dt><dd>{{ a.confidence_score }}</dd>
@@ -59,7 +60,7 @@
           <table class="inner">
             <thead><tr><th scope="col">Type</th><th scope="col">Severity</th><th scope="col">Location</th><th scope="col">Source</th><th scope="col">Detail</th></tr></thead>
             <tbody>
-              {% for f in a.risk_factors %}<tr><td>{{ words(f.type) }}</td><td>{{ f.severity | capitalize }}</td><td>{{ f.location }}</td><td>{{ words(f.source) }}</td><td>{{ f.detail }}</td></tr>
+              {% for f in a.risk_factors %}<tr><td>{{ words(f.type) | capitalize }}</td><td>{{ f.severity | capitalize }}</td><td>{{ f.location }}</td><td>{{ words(f.source) }}</td><td>{{ f.detail }}</td></tr>
               {% endfor %}
             </tbody>
           </table>
@@ -70,7 +71,7 @@
           <table class="inner">
             <thead><tr><th scope="col">Code</th><th scope="col">Risk type</th><th scope="col">Severity</th><th scope="col">Location</th><th scope="col">Estimated delay (days)</th></tr></thead>
             <tbody>
-              {% for i in a.insights %}<tr><td>{{ words(i.code) }}</td><td>{{ words(i.risk_type) }}</td><td>{{ i.severity | capitalize }}</td><td>{{ i.location }}</td><td>{{ i.estimated_delay_days }}</td></tr>
+              {% for i in a.insights %}<tr><td>{{ words(i.code) }}</td><td>{{ words(i.risk_type) | capitalize }}</td><td>{{ i.severity | capitalize }}</td><td>{{ i.location }}</td><td>{{ i.estimated_delay_days }}</td></tr>
               {% endfor %}
             </tbody>
           </table>
