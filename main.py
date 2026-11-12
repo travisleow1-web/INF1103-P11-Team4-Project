@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from io_layer.shipment_record import ShipmentRecord
+from model.shipment_record import ShipmentRecord
 
 
 def assess_shipments(shipments, ai, logic, data):

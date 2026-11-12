@@ -1,5 +1,5 @@
 from datetime import datetime
-from .shipment import Shipment
+from model.shipment import Shipment
 from .validation_result import ValidationResult
 
 

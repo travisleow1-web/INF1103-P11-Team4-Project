@@ -9,7 +9,7 @@ from pathlib import Path
 from data_layer.json_data_manager import JsonDataManager
 from io_layer.csv_source import CsvSource
 from io_layer.io_manager import IOManager
-from io_layer.port_registry import PortRegistry
+from model.port_registry import PortRegistry
 from io_layer.shipment_validator import ShipmentValidator
 from io_layer.source_error import SourceError
 from main import assess_shipments

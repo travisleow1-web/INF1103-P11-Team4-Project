@@ -1,9 +1,9 @@
 from datetime import date, datetime, timezone
-from io_layer.ai_assessment import AIAssessment
-from io_layer.decision import Decision
-from io_layer.shipment import Shipment
-from io_layer.shipment_record import ShipmentRecord
-from io_layer.storage_error import StorageError
+from model.ai_assessment import AIAssessment
+from model.decision import Decision
+from model.shipment import Shipment
+from model.shipment_record import ShipmentRecord
+from model.storage_error import StorageError
 
 
 class RecordSerializer:

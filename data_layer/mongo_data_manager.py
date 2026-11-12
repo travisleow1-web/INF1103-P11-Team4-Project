@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
 from pymongo.errors import DuplicateKeyError, PyMongoError
-from io_layer.storage_error import StorageError
+from model.storage_error import StorageError
 from .data_manager import DataManager
 from .record_serializer import RecordSerializer
 

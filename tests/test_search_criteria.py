@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
 from helpers import saved_record
-from io_layer.search_criteria import SearchCriteria
+from model.search_criteria import SearchCriteria
 
 
 def test_no_filters_match_everything():

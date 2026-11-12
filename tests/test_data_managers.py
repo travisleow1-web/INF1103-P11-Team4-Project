@@ -4,8 +4,8 @@ import pytest
 from helpers import PORTS, saved_record
 from data_layer.json_data_manager import JsonDataManager
 from data_layer.mongo_data_manager import MongoDataManager
-from io_layer.search_criteria import SearchCriteria
-from io_layer.storage_error import StorageError
+from model.search_criteria import SearchCriteria
+from model.storage_error import StorageError
 
 
 @pytest.fixture(params=["json", "mongo"])

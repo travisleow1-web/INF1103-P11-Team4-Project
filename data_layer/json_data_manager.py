@@ -1,7 +1,7 @@
 import json
 import os
 from pathlib import Path
-from io_layer.storage_error import StorageError
+from model.storage_error import StorageError
 from .data_manager import DataManager
 from .record_serializer import RecordSerializer
 

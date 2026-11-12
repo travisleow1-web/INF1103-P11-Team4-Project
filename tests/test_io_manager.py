@@ -1,8 +1,8 @@
 from datetime import date
 from helpers import FakeData, make_io, record, row
 from io_layer.form_source import FormSource
-from io_layer.search_criteria import SearchCriteria
-from io_layer.storage_error import StorageError
+from model.search_criteria import SearchCriteria
+from model.storage_error import StorageError
 
 
 def ids(preview):

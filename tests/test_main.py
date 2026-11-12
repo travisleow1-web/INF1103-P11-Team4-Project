@@ -2,7 +2,7 @@ from helpers import PORTS, make_io, row
 from fakes import FakeAI, FakeLogic
 from data_layer.json_data_manager import JsonDataManager
 from io_layer.form_source import FormSource
-from io_layer.search_criteria import SearchCriteria
+from model.search_criteria import SearchCriteria
 from main import assess_shipments
 
 

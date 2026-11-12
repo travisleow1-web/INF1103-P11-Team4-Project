@@ -2,7 +2,7 @@ from datetime import date, datetime, timezone
 import pytest
 from helpers import PORTS, saved_record
 from data_layer.record_serializer import RecordSerializer
-from io_layer.storage_error import StorageError
+from model.storage_error import StorageError
 
 
 def test_a_record_survives_a_round_trip():

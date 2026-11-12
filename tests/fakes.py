@@ -1,7 +1,7 @@
 """Dev-only stand-ins for the AI and Logic managers, until the real classes exist.
 They never run in the product. They only let the IO and Data layers be tried end to end."""
-from io_layer.ai_assessment import AIAssessment
-from io_layer.decision import Decision
+from model.ai_assessment import AIAssessment
+from model.decision import Decision
 
 LEVELS = ["LOW", "MEDIUM", "HIGH"]
 OUTCOMES = {"LOW": "PROCEED", "MEDIUM": "INSURE", "HIGH": "ESCALATE"}

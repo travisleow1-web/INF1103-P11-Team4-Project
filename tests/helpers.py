@@ -2,9 +2,9 @@
 from datetime import date
 from types import SimpleNamespace
 from io_layer.io_manager import IOManager
-from io_layer.port import Port
-from io_layer.port_registry import PortRegistry
-from io_layer.shipment import Shipment
+from model.port import Port
+from model.port_registry import PortRegistry
+from model.shipment import Shipment
 from io_layer.shipment_validator import ShipmentValidator
 
 SINGAPORE = Port("SGSIN", "Singapore", "SG", 1.26, 103.84)
@@ -59,9 +59,9 @@ def saved_record(shipment_id="SHP-001", risk="LOW", outcome="PROCEED", needs_hum
                  departure=date(2026, 12, 1), fallback=False, saved_at=None):
     """A real ShipmentRecord (placeholder classes) of the kind the Data manager stores."""
     from datetime import datetime, timezone
-    from io_layer.ai_assessment import AIAssessment
-    from io_layer.decision import Decision
-    from io_layer.shipment_record import ShipmentRecord
+    from model.ai_assessment import AIAssessment
+    from model.decision import Decision
+    from model.shipment_record import ShipmentRecord
     shipment = Shipment(shipment_id, SINGAPORE, ROTTERDAM, departure, date(2026, 12, 28))
     assessment = AIAssessment({**ASSESSMENT, "ai_status": "FALLBACK" if fallback else "LIVE"})
     decision = Decision({"shipment_id": shipment_id, "overall_risk": risk, "outcome": outcome,

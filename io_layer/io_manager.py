@@ -1,7 +1,7 @@
 import re
 from .preview import Preview
-from .search_criteria import SearchCriteria
-from .storage_error import StorageError
+from model.search_criteria import SearchCriteria
+from model.storage_error import StorageError
 
 
 class IOManager:
