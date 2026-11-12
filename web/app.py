@@ -16,6 +16,8 @@ from main import assess_shipments
 
 WEB_DIR = Path(__file__).resolve().parent
 MAX_UPLOAD_BYTES = 1024 * 1024
+MAX_REQUEST_BYTES = MAX_UPLOAD_BYTES + 64 * 1024        # the file plus room for typed rows
+TOO_LARGE = "The CSV file is larger than 1 MB."
 ROW_FIELDS = ("origin_port", "destination_port", "departure_time", "arrival_time")
 SEARCH_FIELDS = ("shipment_id", "origin", "destination", "departure_from", "departure_to",
                  "overall_risk", "outcome", "needs_human")
@@ -44,6 +46,17 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
 
     def render(name: str, **context) -> str:
         return env.get_template(name).render(demo=demo, notices=notices, **context)
+
+    @app.middleware("http")
+    async def reject_large_uploads(request: Request, call_next):
+        """Refuse an oversized submission from its Content-Length, before the form is read."""
+        if request.method == "POST" and request.url.path == "/submit":
+            length = request.headers.get("content-length", "")
+            if length.isdigit() and int(length) > MAX_REQUEST_BYTES:
+                html = render("index.html", form=io.show_input_form(), error=TOO_LARGE,
+                              rows=[dict.fromkeys(ROW_FIELDS, "")])
+                return HTMLResponse(html, status_code=413)
+        return await call_next(request)
 
     def stream_results(shipments: list) -> Iterator[str]:
         """The results page in pieces: the table head, then one row as each shipment finishes, then the end."""
@@ -80,7 +93,7 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
         if csv_file is not None and csv_file.filename:
             content = csv_file.file.read(MAX_UPLOAD_BYTES + 1)
             if len(content) > MAX_UPLOAD_BYTES:
-                return input_page(request, rows, 413, error="The CSV file is larger than 1 MB.")
+                return input_page(request, rows, 413, error=TOO_LARGE)     # sent without a Content-Length
             sources.append(CsvSource(content))
         sources.extend(FormSource(row) for row in rows)
         if not sources:

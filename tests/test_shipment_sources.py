@@ -66,5 +66,23 @@ def test_an_empty_file_is_an_error():
 
 
 def test_unreadable_csv_raises_source_error():
-    with pytest.raises(SourceError, match="Could not read"):
+    with pytest.raises(SourceError, match="not a readable CSV"):
         CsvSource(b"\xff\xfe\x00").read()
+
+
+def test_missing_columns_are_named():
+    with pytest.raises(SourceError, match="^The file is missing the columns: departure_time, arrival_time.$"):
+        CsvSource(b"origin_port,destination_port\nSGSIN,NLRTM\n").read()
+
+
+def test_a_text_file_that_is_not_a_csv_is_missing_every_column():
+    with pytest.raises(SourceError, match="missing the columns: origin_port, destination_port"):
+        CsvSource(b"hello world\nthis is not a csv\n").read()
+
+
+@pytest.mark.parametrize("content", [b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\xff\xfe",
+                                     "origin_port\n".encode("utf-16")])
+def test_a_file_that_is_not_utf8_text_gets_a_plain_message(content):
+    with pytest.raises(SourceError) as caught:
+        CsvSource(content).read()
+    assert str(caught.value) == "This file is not a readable CSV (UTF-8 text)."

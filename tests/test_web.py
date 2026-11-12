@@ -106,6 +106,36 @@ def test_an_unreadable_csv_shows_the_reason(data):
     assert "The file has no shipments." in page.text
 
 
+def test_an_oversized_request_is_refused_before_the_form_is_read(data):
+    # Not valid multipart: reading it would fail, so a 413 shows the size check ran first.
+    page = client_for(data).post("/submit", content=b"x" * (2 * MAX_UPLOAD_BYTES),
+                                 headers={"content-type": "multipart/form-data; boundary=nothing"})
+    assert page.status_code == 413
+    assert "larger than 1 MB" in page.text
+
+
+def test_a_file_of_exactly_1_mb_is_accepted(data):
+    line = b"SGSIN,NLRTM,01/12/2026,20/12/2026\n"
+    header = CSV.splitlines(keepends=True)[0]
+    body = header + line * ((MAX_UPLOAD_BYTES - len(header)) // len(line))
+    body += b" " * (MAX_UPLOAD_BYTES - len(body) - 1) + b"\n"           # pad to exactly 1 MB
+    assert len(body) == MAX_UPLOAD_BYTES
+    page = client_for(data).post("/submit", files={"csv_file": ("big.csv", body, "text/csv")})
+    assert page.status_code != 413
+
+
+def test_a_csv_with_wrong_columns_says_which_are_missing(data):
+    page = client_for(data).post("/submit", files={"csv_file": ("x.csv", b"from,to\nSGSIN,NLRTM\n", "text/csv")})
+    assert page.status_code == 400
+    assert "The file is missing the columns: origin_port, destination_port, departure_time, arrival_time." in page.text
+
+
+def test_a_binary_file_gets_a_plain_message(data):
+    page = client_for(data).post("/submit", files={"csv_file": ("x.png", b"\x89PNG\r\n\x1a\n\xff\xfe", "image/png")})
+    assert "This file is not a readable CSV (UTF-8 text)." in page.text
+    assert "codec" not in page.text
+
+
 def test_a_file_over_1_mb_is_rejected(data):
     big = CSV + b"x" * MAX_UPLOAD_BYTES
     page = client_for(data).post("/submit", files={"csv_file": ("big.csv", big, "text/csv")})
