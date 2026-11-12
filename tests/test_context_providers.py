@@ -66,9 +66,32 @@ def test_shipment_departed_too_long_ago_gets_the_forecast():
     FakeResponse(200, {"no_hourly": 1}),
     requests.Timeout("slow"),
 ])
-def test_weather_failure_gives_none(reply, caplog):
-    assert WeatherProvider(FakeSession(reply)).fetch(make_shipment()) is None
-    assert "weather feed failed for SHP-001" in caplog.text
+def test_failing_origin_gives_none_for_the_origin_only(reply, caplog):
+    session = FakeSession(reply, hourly(wind_gusts_10m=[30]), hourly(wave_height=[1.0]))
+    result = WeatherProvider(session).fetch(make_shipment())
+    assert result == {"origin": None, "destination": {"wind_gusts_10m": [30], "wave_height": [1.0]}}
+    assert "weather feed failed for SHP-001 at SGSIN" in caplog.text
+
+
+def test_failing_destination_keeps_the_origin_data(caplog):
+    session = FakeSession(hourly(wind_gusts_10m=[50]), hourly(wave_height=[2.0]),
+                          hourly(wind_gusts_10m=[30]), FakeResponse(400, {"error": True}))
+    result = WeatherProvider(session).fetch(make_shipment())
+    assert result == {"origin": {"wind_gusts_10m": [50], "wave_height": [2.0]}, "destination": None}
+    assert "at NLRTM" in caplog.text
+
+
+class BrokenProvider(ContextProvider):
+    """A feed whose request always fails."""
+
+    def _request(self, shipment):
+        raise RuntimeError("feed down")
+
+
+def test_any_provider_failure_gives_none(caplog):
+    provider = BrokenProvider("broken", FakeSession())
+    assert provider.fetch(make_shipment()) is None
+    assert "broken feed failed for SHP-001: feed down" in caplog.text
 
 
 # ---- news ----
@@ -112,6 +135,16 @@ def test_first_call_does_not_wait_and_later_calls_wait_only_the_rest_of_the_gap(
         sleep.assert_called_once_with(3.0)
         provider.fetch(make_shipment())        # 15 s later: no wait
         assert sleep.call_count == 1
+
+
+def test_default_gap_leaves_headroom_over_gdelt_limit():
+    provider = NewsProvider(FakeSession(gdelt(), gdelt()))
+    with patch("ai_layer.news_provider.time.monotonic") as clock, \
+            patch("ai_layer.news_provider.time.sleep") as sleep:
+        clock.side_effect = [100.0, 101.0, 106.0]
+        provider.fetch(make_shipment())
+        provider.fetch(make_shipment())
+        sleep.assert_called_once_with(5.0)          # 6 s gap from start to start
 
 
 def test_failed_call_still_counts_for_the_gap():

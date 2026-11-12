@@ -25,6 +25,7 @@ def test_service_error_keeps_message_and_retryable_flag():
 def test_defaults():
     assert ai_settings.DEFAULT_MODEL == "gemini-3.5-flash-lite"
     assert ai_settings.HISTORY_DAYS == 90
+    assert ai_settings.NEWS_MIN_GAP == 6.0
 
 
 def test_schema_enums_come_from_the_model_enums():

@@ -11,7 +11,7 @@ HISTORY_DAYS = 90          # shipments that departed this recently get historica
 HTTP_TIMEOUT = 20          # seconds, for the weather and news feeds
 GEMINI_TIMEOUT = 40        # seconds, for one model call
 MAX_RETRIES = 3            # attempts per model call (only retryable errors are tried again)
-NEWS_MIN_GAP = 5.0         # seconds between two GDELT calls (GDELT allows one every 5 s)
+NEWS_MIN_GAP = 6.0         # seconds between the starts of two GDELT calls (GDELT allows one every 5 s)
 
 ALLOWED_IMPACT = ("Delay", "Cost Increase", "Cargo Damage", "Cargo Destruction", "None")
 ALLOWED_SOURCES = ("open_meteo_weather", "open_meteo_marine", "open_meteo_historical_forecast",
