@@ -1,4 +1,5 @@
 """Web pages through FastAPI's TestClient, with a temp-file JSON data manager. No network."""
+import threading
 import pytest
 from fastapi.testclient import TestClient
 from helpers import PORTS, make_io, saved_record
@@ -507,3 +508,38 @@ def test_create_app_reads_env_through_the_name_the_fixture_replaces(env):
     env.setattr(main, "load_dotenv", lambda *args, **kwargs: calls.append(args))
     main.create_app()
     assert calls == [()]
+
+
+class SlowFirstAI(FakeAI):
+    """FakeAI whose first two calls wait for each other, so two submissions overlap before either saves."""
+
+    def __init__(self):
+        self.__barrier = threading.Barrier(2, timeout=10)
+        self.__calls = 0
+        self.__lock = threading.Lock()
+
+    def assess(self, shipment):
+        with self.__lock:
+            self.__calls += 1
+            wait = self.__calls <= 2
+        if wait:
+            self.__barrier.wait()
+        return super().assess(shipment)
+
+
+def test_overlapping_submissions_get_distinct_ids_and_every_row_saves(data):
+    app = create_web_app(make_io(data), SlowFirstAI(), FakeLogic(), data, run=main.assess_shipments)
+    pages = []
+
+    def submit():
+        pages.append(TestClient(app).post("/submit", data=good_rows(3)).text)
+
+    threads = [threading.Thread(target=submit) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=20)
+    assert len(pages) == 2
+    assert all("Not saved" not in page for page in pages)
+    saved = sorted(r.shipment.shipment_id for r in data.find(SearchCriteria()))
+    assert saved == [f"SHP-{n:03d}" for n in range(1, 7)]

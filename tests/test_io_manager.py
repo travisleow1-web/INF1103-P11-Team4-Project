@@ -41,6 +41,28 @@ def test_invalid_rows_do_not_use_up_numbers():
     assert ids(preview) == ["SHP-001"]
 
 
+def test_two_previews_before_any_save_get_distinct_ids():
+    io = make_io(FakeData([record("SHP-002")]))
+    first = io.preview(FormSource(row()), FormSource(row()))
+    second = io.preview(FormSource(row()))
+    assert ids(first) == ["SHP-003", "SHP-004"]
+    assert ids(second) == ["SHP-005"]
+
+
+def test_a_preview_with_problems_does_not_use_up_numbers():
+    io = make_io()
+    io.preview(FormSource(row()), FormSource(row(origin_port="XXXXX")))
+    assert ids(io.preview(FormSource(row()))) == ["SHP-001"]
+
+
+def test_saved_ids_above_the_handed_out_ones_win():
+    data = FakeData()
+    io = make_io(data)
+    io.preview(FormSource(row()))
+    data.records = [record("SHP-010")]
+    assert ids(io.preview(FormSource(row()))) == ["SHP-011"]
+
+
 def test_preview_separates_valid_and_problem_rows():
     preview = make_io().preview(FormSource(row()), FormSource(row(origin_port="XXXXX")))
     assert preview.total() == 2

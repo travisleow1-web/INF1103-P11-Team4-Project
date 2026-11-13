@@ -1,5 +1,6 @@
 import logging
 import re
+import threading
 from datetime import timedelta, timezone
 from typing import List
 from data_layer.data_manager import DataManager
@@ -29,25 +30,33 @@ class IOManager:
         self.__validator = validator
         self.__data = data              # IO only reads from it
         self.__ports = ports
+        self.__last_handed_out = 0      # highest number given to a preview that can run
+        self.__numbering = threading.Lock()   # one IOManager serves every request thread
 
     def preview(self, *sources: ShipmentSource) -> Preview:
         """Read every source, validate each row, and number the valid ones SHP-001, SHP-002, ...
 
-        Numbers continue from the highest saved ID. If the saved records cannot be read, this raises
-        StorageError instead of guessing, so no ID is given out twice.
+        Numbers continue from the highest saved ID or the highest ID already handed out, whichever is
+        larger, so two submissions running at the same time never share an ID (records are saved only
+        as each shipment finishes). Only a preview without problems uses up numbers. If the saved
+        records cannot be read, this raises StorageError instead of guessing.
         """
         rows = []
         for source in sources:
             rows.extend(source.read())
 
-        next_number = self.__last_number() + 1
-        results = []
-        for number, row in enumerate(rows, start=1):
-            result = self.__validator.check(row, f"SHP-{next_number:03d}")
-            if result.is_valid():
-                next_number += 1
-            results.append((number, result))
-        return Preview(results)
+        with self.__numbering:
+            next_number = max(self.__last_number(), self.__last_handed_out) + 1
+            results = []
+            for number, row in enumerate(rows, start=1):
+                result = self.__validator.check(row, f"SHP-{next_number:03d}")
+                if result.is_valid():
+                    next_number += 1
+                results.append((number, result))
+            preview = Preview(results)
+            if not preview.has_problems():
+                self.__last_handed_out = next_number - 1
+        return preview
 
     def search(self, fields: dict) -> dict:
         """fields is the raw search form: strings in, a display dict out."""
