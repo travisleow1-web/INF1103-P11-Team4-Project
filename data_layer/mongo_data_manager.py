@@ -48,6 +48,7 @@ class MongoDataManager(DataManager):
 
     def save(self, record: ShipmentRecord) -> None:
         """Insert the record. A shipment_id that is already saved is a StorageError."""
+        print("test")
         document = self.__with_real_dates(self.__serializer.to_document(record))
         try:
             self.__collection.insert_one(document)
