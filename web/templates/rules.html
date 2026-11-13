@@ -1,0 +1,22 @@
+{% set title = "Rules" %}
+{% include "_header.html" %}
+<h1>Rule settings</h1>
+{% if error %}<p class="alert alert-error" role="alert">{{ error }}</p>{% endif %}
+{% if info %}<p class="alert alert-info" role="status">{{ info }}</p>{% endif %}
+{% if not_connected and not values %}<p class="alert alert-info" role="status">{{ not_connected }}</p>
+{% else %}
+<form method="post" action="/rules">
+  <fieldset>
+    <legend>Thresholds (leave a box empty to use the default)</legend>
+    {% for key, (label, step, min, max) in fields.items() %}
+    <label>{{ label }}
+      <input type="number" name="{{ key }}" value="{{ values[key] }}" step="{{ step }}"
+             min="{{ min }}"{% if max %} max="{{ max }}"{% endif %}>
+    </label>
+    {% endfor %}
+  </fieldset>
+  <button type="submit">Save</button>
+  <button type="submit" name="reset" value="1" formnovalidate>Reset to defaults</button>
+</form>
+{% endif %}
+{% include "_footer.html" %}

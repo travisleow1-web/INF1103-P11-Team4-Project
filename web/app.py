@@ -22,6 +22,14 @@ NO_AI = "AI is not connected: set GEMINI_API_KEY in .env (or start with DEMO_MOD
 NO_LOGIC = "Logic is not connected yet."
 NO_AI_OR_LOGIC = "AI and Logic are not connected yet."
 ROW_FIELDS = ("origin_port", "destination_port", "departure_time", "arrival_time")
+RULE_FIELDS = {
+    "confidence_min":            ("Minimum AI confidence (0 to 1)", "0.01", "0", "1"),
+    "history_window_days":       ("Route history window (days)", "1", "1", ""),
+    "perfect_storm_min_mediums": ("Medium-or-worse factors for a Perfect Storm", "1", "1", "3"),
+    "data_max_age_hours":        ("Oldest usable external data (hours)", "1", "1", ""),
+    "delay_days_limit":          ("Delay that raises risk to Medium (days)", "1", "1", ""),
+    "delay_days_high":           ("Delay that raises risk to High (days)", "1", "1", ""),
+}
 SEARCH_FIELDS = ("shipment_id", "origin", "destination", "departure_from", "departure_to",
                  "overall_risk", "outcome", "needs_human")
 
@@ -145,5 +153,29 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
         """The search form and the saved records that match it (all records when no filter is set)."""
         fields = {name: request.query_params.get(name, "") for name in SEARCH_FIELDS}
         return page(request, "search.html", fields=fields, result=io.search(fields))
+
+    def rules_page(request: Request, values: dict, status_code: int = 200, **context) -> HTMLResponse:
+        return page(request, "rules.html", status_code, fields=RULE_FIELDS, values=values, **context)
+
+    @app.get("/rules", response_class=HTMLResponse)
+    def rules(request: Request) -> HTMLResponse:
+        """The rule thresholds the next assessment will use."""
+        values = logic.config.to_dict() if logic is not None else {}
+        return rules_page(request, values)
+
+    @app.post("/rules", response_class=HTMLResponse)
+    async def save_rules(request: Request) -> HTMLResponse:
+        """Apply the typed thresholds, or show why they were refused and keep what was typed."""
+        if logic is None:
+            return rules_page(request, {}, 503, error=NO_LOGIC)
+        form = await request.form()
+        typed = {key: str(form.get(key, "")) for key in RULE_FIELDS}
+        if form.get("reset"):
+            typed = {}
+        try:
+            config = logic.configure(typed)
+        except ValueError as error:
+            return rules_page(request, typed, 422, error=str(error))
+        return rules_page(request, config.to_dict(), info="Rule settings saved. They apply to the next assessment.")
 
     return app
