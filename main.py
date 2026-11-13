@@ -5,7 +5,7 @@ Run the web app with:  uvicorn main:create_app --factory
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Iterable, Iterator, Optional, Tuple
+from typing import TYPE_CHECKING, Iterable, Iterator, Optional, Tuple
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from data_layer.data_manager import DataManager
@@ -20,10 +20,14 @@ from model.shipment_record import ShipmentRecord
 from model.storage_error import StorageError
 from web.app import create_web_app
 
+if TYPE_CHECKING:       # for type hints only; the layers are imported inside build_ai and build_logic
+    from ai_layer.ai_manager import AIManager
+    from logic_layer.logic_manager import LogicManager
+
 logger = logging.getLogger(__name__)
 
 
-def assess_shipments(shipments: Iterable[Shipment], ai, logic,
+def assess_shipments(shipments: Iterable[Shipment], ai: "AIManager", logic: "LogicManager",
                      data: DataManager) -> Iterator[Tuple[ShipmentRecord, Optional[str]]]:
     """Assess, decide and save one shipment at a time, yielding (record, save_error) as each finishes.
 
@@ -43,7 +47,7 @@ def assess_shipments(shipments: Iterable[Shipment], ai, logic,
         yield record, save_error
 
 
-def build_ai():
+def build_ai() -> Optional["AIManager"]:
     """The AI manager built from GEMINI_API_KEY, or None when no key is set.
 
     GEMINI_MODEL picks the model and AI_CACHE_FILE the cache file (default ai_cache.json).
@@ -62,7 +66,7 @@ def build_ai():
                      os.getenv("AI_CACHE_FILE") or "ai_cache.json", ALLOWED_LISTS)
 
 
-def build_logic(data: DataManager, ports: PortRegistry):
+def build_logic(data: DataManager, ports: PortRegistry) -> Optional["LogicManager"]:
     """The Logic manager with the default rule thresholds. Route history comes from data."""
     from logic_layer.logic_manager import LogicManager
 
