@@ -10,6 +10,8 @@ from ai_layer.ai_service_error import AIServiceError
 from ai_layer.ai_settings import ALLOWED_LISTS
 from ai_layer.context_provider import ContextProvider
 from ai_layer.gemini_client import GeminiClient
+from data_layer.mongo_data_manager import MongoDataManager
+from logic_layer.perfect_storm_rule import PerfectStormRule
 import main
 
 
@@ -28,6 +30,10 @@ CALM = reply()
 STORMY = reply([risk("weather", "Medium")], primary="weather", location="SGSIN", impact="Delay")
 PIRACY = reply([risk("piracy_threat", "Medium", "Route", "gdelt_news")], primary="piracy_threat",
                impact="Cost Increase")
+EXTREME = reply([risk("geopolitical", "Extreme", "Route", "gdelt_news")], primary="geopolitical",
+                impact="Cargo Damage")
+DESTRUCTION = reply([risk("weather", "Medium")], primary="weather", location="SGSIN",
+                    impact="Cargo Destruction")
 
 
 def rows(*dates):
@@ -50,14 +56,23 @@ def gemini():
     return client
 
 
-@pytest.fixture
-def app(monkeypatch, tmp_path, gemini):
-    """main.create_app with a clean environment, a temp JSON file and a real AIManager around the mock."""
+@pytest.fixture(params=["json", "mongo"])
+def app(request, monkeypatch, tmp_path, gemini):
+    """main.create_app with a clean environment and a real AIManager around the mock.
+
+    Every test runs twice: on a temp JSON file and on MongoDB through mongomock.
+    """
     monkeypatch.setattr(main, "load_dotenv", lambda *args, **kwargs: False)
     for name in ("DEMO_MODE", "DATA_BACKEND", "DATA_FILE", "DEMO_DATA_FILE", "MONGO_URI", "DB_NAME",
                  "GEMINI_API_KEY", "GEMINI_MODEL", "AI_CACHE_FILE"):
         monkeypatch.delenv(name, raising=False)
-    monkeypatch.setenv("DATA_FILE", str(tmp_path / "records.json"))
+    if request.param == "json":
+        monkeypatch.setenv("DATA_FILE", str(tmp_path / "records.json"))
+    else:
+        mongomock = pytest.importorskip("mongomock")
+        collection = mongomock.MongoClient().db.shipment_records
+        monkeypatch.setenv("DATA_BACKEND", "mongo")
+        monkeypatch.setattr(main, "build_mongo", lambda ports: MongoDataManager(collection, ports))
     providers = []
     for name in ("weather", "news"):
         provider = Mock(spec=ContextProvider)
@@ -128,3 +143,38 @@ def test_search_finds_the_saved_records(app, gemini):
 
     insured = app.get("/search", params={"outcome": "INSURE"})
     assert row_for("SHP-002") in insured.text and row_for("SHP-001") not in insured.text
+
+
+def test_extreme_risk_is_rejected_for_a_human(app, gemini):
+    gemini.complete.return_value = EXTREME
+    page = app.post("/submit", data=rows(("01/12/2026", "20/12/2026"))).text
+    assert outcome("REJECT") in page
+    assert "<li>Do not ship: extreme risk on this route</li>" in page
+    assert '<td data-label="Needs human">Yes</td>' in page
+
+
+def test_cargo_destruction_at_the_origin_is_delayed_with_a_procurement_alert(app, gemini):
+    gemini.complete.return_value = DESTRUCTION
+    page = app.post("/submit", data=rows(("01/12/2026", "20/12/2026"))).text
+    assert outcome("DELAY") in page
+    assert "Procurement Alert" in page
+    assert "procurement_team (email): Shipment SHP-001 is at risk of destruction at Singapore." in page
+    assert "Reorder goods immediately" in page
+
+
+def test_a_second_identical_submit_is_served_from_the_cache(app, gemini):
+    app.post("/submit", data=rows(("01/12/2026", "20/12/2026")))
+    page = app.post("/submit", data=rows(("01/12/2026", "20/12/2026"))).text
+    assert row_for("SHP-002") in page
+    assert "CACHED" in page
+    assert gemini.complete.call_count == 1
+
+
+def test_a_rule_that_raises_shows_a_rule_error_and_the_stream_finishes(app):
+    with patch.object(PerfectStormRule, "apply", side_effect=RuntimeError("boom")):
+        page = app.post("/submit", data=rows(("01/12/2026", "20/12/2026"))).text
+    assert "Rule error" in page
+    assert "PerfectStormRule could not run (boom), needs human" in page
+    assert outcome("ESCALATE") in page
+    assert "Done: 1 of 1 shipment assessed." in page
+    assert "Assessment stopped" not in page

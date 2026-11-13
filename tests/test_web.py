@@ -1,9 +1,12 @@
 """Web pages through FastAPI's TestClient, with a temp-file JSON data manager. No network."""
+import json
 import logging
 import threading
 from unittest.mock import patch
 import pytest
+import requests
 from fastapi.testclient import TestClient
+from ai_helpers import gemini_reply, make_shipment, valid_raw
 from helpers import PORTS, make_io, saved_record
 from fakes import FakeAI, FakeLogic
 from data_layer.json_data_manager import JsonDataManager
@@ -388,6 +391,35 @@ def test_ai_is_built_from_the_key_and_model(env, tmp_path):
     env.setenv("AI_CACHE_FILE", str(tmp_path / "cache.json"))
     from ai_layer.ai_manager import AIManager
     assert isinstance(main.build_ai(), AIManager)
+
+
+class RecordingSession:
+    """Stands in for requests.Session: Gemini posts get a valid reply, feed requests fail. Remembers the URLs."""
+
+    def __init__(self):
+        self.posted = []
+
+    def post(self, url, **kwargs):
+        self.posted.append(url)
+        return gemini_reply(valid_raw())
+
+    def get(self, url, **kwargs):
+        raise requests.ConnectionError("no network in tests")
+
+
+def test_build_ai_uses_gemini_model_and_ai_cache_file(env, tmp_path):
+    cache = tmp_path / "chosen" / "cache.json"
+    cache.parent.mkdir()
+    env.setenv("GEMINI_API_KEY", "test-key")
+    env.setenv("GEMINI_MODEL", "my-test-model")
+    env.setenv("AI_CACHE_FILE", str(cache))
+    session = RecordingSession()
+    with patch("requests.Session", return_value=session):
+        ai = main.build_ai()
+    assessment = ai.assess(make_shipment())
+    assert assessment.status.value == "LIVE"
+    assert len(session.posted) == 1 and "/models/my-test-model:generateContent" in session.posted[0]
+    assert cache.exists() and len(json.loads(cache.read_text(encoding="utf-8"))) == 1
 
 
 def test_logic_is_built_with_the_data_manager_and_ports(data):
