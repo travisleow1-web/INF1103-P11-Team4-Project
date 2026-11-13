@@ -1,5 +1,3 @@
-"""Rules that assess the AI data and raise the risk level (Rules 0, 1 and 1b)."""
-
 from datetime import datetime, timedelta
 
 from logic.businessrule import BusinessRule
@@ -7,7 +5,6 @@ from logic.decision import RiskLevel
 
 
 class DataQualityRule(BusinessRule):
-    """Rule 0: malformed items, low AI confidence, outdated data or conflicting sources -> human review."""
 
     def __init__(self, config):
         self._config = config
@@ -39,7 +36,6 @@ class DataQualityRule(BusinessRule):
 
 
 class PerfectStormRule(BusinessRule):
-    """Rule 1: any High factor -> High; enough Medium weather/congestion/labour factors -> High."""
 
     STORM_FACTORS = frozenset({"weather", "port_congestion", "labor_shortage"})
 
@@ -64,7 +60,6 @@ class PerfectStormRule(BusinessRule):
 
 
 class AIInsightRule(BusinessRule):
-    """Rule 1b: data-quality codes -> human; long predicted delays and High MULTIPLE_RISKS raise risk."""
 
     DATA_QUALITY_CODES = frozenset({"CONFLICTING_DATA", "OUTDATED_DATA", "MISSING_DATA", "NEEDS_HUMAN_REVIEW"})
 

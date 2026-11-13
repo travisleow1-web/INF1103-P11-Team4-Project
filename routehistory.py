@@ -1,10 +1,8 @@
-"""RouteHistorySource interface and its Data Manager adapter."""
 
 from abc import ABC, abstractmethod
 
 
 class RouteHistorySource(ABC):
-    """Contract: anything that can list past shipments on a route since a given time."""
 
     @abstractmethod
     def get_route_history(self, route_id, since):
@@ -12,7 +10,6 @@ class RouteHistorySource(ABC):
 
 
 class DataManagerRouteHistory(RouteHistorySource):
-    """Adapts the Data Manager's stored records to the RouteHistorySource interface."""
 
     def __init__(self, db_records):
         self._db_records = db_records

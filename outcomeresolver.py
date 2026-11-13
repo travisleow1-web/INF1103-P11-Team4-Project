@@ -1,10 +1,8 @@
-"""OutcomeResolver: turns flags and risk into one final outcome."""
 
 from logic.decision import RiskLevel
 
 
 class OutcomeResolver:
-    """Turns the accumulated flags and risk into one outcome, then applies the human-review gate."""
 
     def resolve(self, decision):
         if decision.has_flag("Procurement Alert"):

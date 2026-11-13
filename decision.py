@@ -1,27 +1,23 @@
-"""RiskLevel and Decision: risk levels and the Logic Manager's verdict on one shipment."""
+
 
 from enum import IntEnum
 
 
 class RiskLevel(IntEnum):
-    """Ordered risk levels, so they can be compared (LOW < MEDIUM < HIGH)."""
     LOW = 1
     MEDIUM = 2
     HIGH = 3
 
     @classmethod
     def from_text(cls, text):
-        """'Medium' / 'medium' / 'MEDIUM' -> RiskLevel.MEDIUM. Unknown text counts as LOW."""
         return cls.__members__.get(str(text).strip().upper(), cls.LOW)
 
     @property
     def label(self):
-        """Display form used in decisions: 'Low' / 'Medium' / 'High'."""
         return self.name.capitalize()
 
 
 class Decision:
-    """The verdict on one shipment. State is private; rules change it only through methods."""
 
     OUTCOMES = ("PROCEED", "DELAY", "INSURE", "ESCALATE", "REJECT")
 
@@ -80,7 +76,6 @@ class Decision:
         return flag in self._flags
 
     def add_note(self, why, flag=None, action=None, human=False):
-        """Record why a rule fired, plus an optional flag (no duplicates), action and human-review request."""
         if human:
             self._needs_human = True
         if flag and flag not in self._flags:
@@ -93,7 +88,6 @@ class Decision:
         self._actions.append(action)
 
     def raise_risk(self, level):
-        """Risk only ever goes up; a later rule cannot undo an earlier High."""
         if level > self._risk:
             self._risk = level
 
@@ -112,7 +106,6 @@ class Decision:
         self._outcome = outcome
 
     def to_dict(self):
-        """Plain dict for the Data Manager (saving) and IO Manager (display)."""
         return {"shipment_id": self._shipment_id, "overall_risk": self.overall_risk,
                 "outcome": self._outcome, "hold_shipment": self._hold_shipment,
                 "needs_human": self._needs_human, "flags": list(self._flags),

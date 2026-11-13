@@ -1,12 +1,3 @@
-"""
-test_logic_manager.py - automated tests for the Logic Manager.
-
-Uses hard-coded sample AI responses and a fake route-history source,
-so no live AI API, files or database are needed.
-
-Run:  python -m unittest test_logic_manager -v
-"""
-
 import unittest
 from datetime import datetime, timedelta
 
@@ -17,7 +8,6 @@ from logic.recordpreparer import RecordPreparer
 NOW = datetime(2026, 11, 9, 12, 0)
 
 class FakeHistory(RouteHistorySource):
-    """Stands in for the Data Manager."""
 
     def __init__(self, runs=None, error=None):
         self._runs = runs or []
@@ -30,7 +20,6 @@ class FakeHistory(RouteHistorySource):
 
 
 def sample_record(**changes):
-    """A clean, low-risk AI response; tests change only the fields they care about."""
     record = {
         "shipment_id": "SHP-001", "origin_port": "SGSIN", "destination_port": "NLRTM",
         "risk_factors": [{"type": "weather", "severity": "Low"}],

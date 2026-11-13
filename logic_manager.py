@@ -1,18 +1,4 @@
-"""
-logic_manager.py - Logic Manager (Phase 2, object-oriented)
 
-Applies the team's business rules to AI-enriched shipment records and returns
-one Decision per shipment. The other classes live in the logic/ folder:
-
-  logic/decision.py         RiskLevel, Decision
-  logic/ruleconfig.py       RuleConfig (configurable thresholds - new feature)
-  logic/recordpreparer.py   RecordPreparer, InvalidRecordError
-  logic/routehistory.py     RouteHistorySource interface, DataManagerRouteHistory
-  logic/businessrule.py     BusinessRule (abstract base class)
-  logic/riskrules.py        DataQualityRule, PerfectStormRule, AIInsightRule
-  logic/holdrules.py        InsuranceRule, RouteHistoryRule, ProcurementRule
-  logic/outcomeresolver.py  OutcomeResolver
-"""
 
 from datetime import datetime
 
@@ -31,7 +17,6 @@ __all__ = ["LogicManager", "Decision", "RiskLevel", "RuleConfig", "BusinessRule"
 
 
 class LogicManager:
-    """Runs every AI-enriched record through preparation, the rules and the resolver."""
 
     def __init__(self, history_source, config=None):
         self._history_source = history_source
@@ -60,13 +45,11 @@ class LogicManager:
         return tuple(self._rules)
 
     def update_config(self, config):
-        """Apply new user-chosen thresholds (new feature); rebuilds the rules with them."""
         if not isinstance(config, RuleConfig):
             raise TypeError("config must be a RuleConfig")
         self._build(config)
 
     def evaluate_shipment(self, ai_record, now=None):
-        """Run one AI row through every rule. Returns (prepared record, Decision)."""
         now = now or datetime.now()
         record = self._preparer.prepare(ai_record)
         decision = Decision(record.get("shipment_id", "UNKNOWN"))
@@ -83,9 +66,6 @@ class LogicManager:
         return record, decision
 
     def evaluate_shipments(self, assessments, now=None):
-        """Evaluate every AI assessment; returns [(record, Decision), ...].
-        Accepts the AI Manager's DataFrame or a plain list of dicts.
-        One broken row is rejected on its own instead of stopping the batch."""
         rows = assessments.to_dict("records") if hasattr(assessments, "to_dict") else list(assessments)
         results = []
         for row in rows:

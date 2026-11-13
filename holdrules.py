@@ -1,4 +1,4 @@
-"""Rules that put a shipment on hold for a specific reason (Rules 3, 4 and 5)."""
+
 
 from datetime import timedelta
 
@@ -7,7 +7,6 @@ from logic.decision import RiskLevel
 
 
 class InsuranceRule(BusinessRule):
-    """Rule 4: piracy_threat / severe_civil_unrest -> hold until extended insurance is confirmed."""
 
     TRIGGERS = frozenset({"piracy_threat", "severe_civil_unrest"})
 
@@ -23,7 +22,6 @@ class InsuranceRule(BusinessRule):
 
 
 class RouteHistoryRule(BusinessRule):
-    """Rule 3: a 'Low' route flagged or delayed recently needs dispatcher sign-off."""
 
     def __init__(self, config, history_source):
         self._config = config
@@ -50,7 +48,6 @@ class RouteHistoryRule(BusinessRule):
 
 
 class ProcurementRule(BusinessRule):
-    """Rule 5 (multi-condition): Cargo Destruction predicted AT the origin port -> reorder the goods."""
 
     DESTRUCTION_IMPACTS = frozenset({"Cargo Destruction"})
 

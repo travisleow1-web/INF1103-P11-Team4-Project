@@ -1,10 +1,9 @@
-"""RecordPreparer: cleans an AI record and refuses unusable ones (InvalidRecordError)."""
+
 
 import validator
 
 
 class InvalidRecordError(ValueError):
-    """The record is missing required fields or has an impossible confidence score."""
 
     def __init__(self, message, flag):
         super().__init__(message)
@@ -12,8 +11,6 @@ class InvalidRecordError(ValueError):
 
 
 class RecordPreparer:
-    """Copies an AI row, fills in route_id, port names, defaults and cleaned lists,
-    and refuses records that cannot be used at all."""
 
     INSIGHT_KEYS = ("code", "risk_type", "severity", "location", "estimated_delay_days")
     FACTOR_KEYS = ("type", "severity")
@@ -22,7 +19,6 @@ class RecordPreparer:
                        "confidence_score", "sources")
 
     def prepare(self, ai_record):
-        """Return a cleaned copy of the record. '_dropped_items' counts malformed list items removed."""
         record = dict(ai_record)  # never change the caller's data
         origin, destination = record.get("origin_port", ""), record.get("destination_port", "")
         record.setdefault("route_id", f"{origin}-{destination}")
@@ -41,7 +37,6 @@ class RecordPreparer:
         return record
 
     def ensure_usable(self, record):
-        """Raise InvalidRecordError when required fields are missing or confidence is not 0-1."""
         missing = [f for f in self.REQUIRED_FIELDS if record.get(f) in (None, "")]
         if missing:
             raise InvalidRecordError(f"Validation failed: missing fields {missing}", "Incomplete AI record")
@@ -56,7 +51,6 @@ class RecordPreparer:
 
     @staticmethod
     def _clean_list(value, keys):
-        """Keep dict items that have every key (copied); also return how many were dropped."""
         if not isinstance(value, list):
             return [], 0
         good = [dict(item) for item in value if isinstance(item, dict) and all(k in item for k in keys)]

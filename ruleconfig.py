@@ -1,10 +1,9 @@
-"""RuleConfig: all business-rule thresholds in one validated object (new feature)."""
+
 
 from logic.riskrules import PerfectStormRule
 
 
 class RuleConfig:
-    """Every business-rule threshold in one validated object (new feature: user-configurable rules)."""
 
     _DEFAULTS = {
         "confidence_min": 0.60,           # below this, AI output needs a human
