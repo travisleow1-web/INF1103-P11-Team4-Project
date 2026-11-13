@@ -1,0 +1,176 @@
+:root {
+  --ink: #1d2733;
+  --muted: #5b6876;
+  --line: #d5dbe2;
+  --paper: #ffffff;
+  --page: #f4f6f8;
+  --accent: #1f5f8b;
+  --error-bg: #fdecec;
+  --error-ink: #8a1c1c;
+  --info-bg: #e8f1f8;
+  --demo-bg: #fff4c2;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--ink);
+  background: var(--page);
+}
+
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: var(--accent);
+}
+.top a { color: #fff; text-decoration: none; }
+.top .brand { font-weight: 700; }
+.top nav a { margin-left: 1rem; }
+.top nav a:hover, .top nav a:focus { text-decoration: underline; }
+
+.banner { padding: 0.5rem 1rem; font-weight: 600; }
+.banner-demo { background: var(--demo-bg); color: #5c4700; }
+.banner-error { background: #b3261e; color: #fff; }
+
+main { max-width: 72rem; margin: 0 auto; padding: 1rem; }
+
+h1 { font-size: 1.5rem; }
+h2 { font-size: 1.1rem; margin: 0 0 0.5rem; }
+
+.alert { padding: 0.75rem 1rem; border-radius: 6px; }
+.alert-error { background: var(--error-bg); color: var(--error-ink); }
+.alert-info { background: var(--info-bg); }
+.hint { color: var(--muted); font-size: 0.9rem; }
+
+fieldset {
+  margin: 0 0 1rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+}
+legend { font-weight: 600; padding: 0 0.25rem; }
+
+input, select, button { font: inherit; }
+input, select {
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+input[type="file"] { border: 0; padding: 0.35rem 0; }
+
+button {
+  padding: 0.45rem 1rem;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+button.secondary { background: #fff; color: var(--accent); }
+button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible {
+  outline: 3px solid #f0a500;
+  outline-offset: 1px;
+}
+
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 0.4rem 0.5rem; text-align: left; vertical-align: top; }
+thead th { border-bottom: 2px solid var(--line); font-size: 0.9rem; color: var(--muted); }
+.rows td { padding: 0.25rem; }
+
+.table-wrap { overflow-x: auto; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.results th[scope="row"] { white-space: nowrap; }
+.results tbody tr { border-top: 1px solid var(--line); }
+.progress, .route { white-space: nowrap; }
+.progress { color: var(--muted); }
+
+/* Badges always carry text; the colour only repeats it. */
+.badge {
+  display: inline-block;
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.risk-low, .outcome-proceed { background: #e3f4e8; color: #1b5e2f; }
+.risk-medium, .outcome-insure, .outcome-delay { background: #fff1d6; color: #7a4b00; }
+.risk-high, .outcome-escalate { background: #fde3d6; color: #8a3200; }
+.risk-extreme, .outcome-reject { background: #fbe0e0; color: #8a1c1c; }
+.badge-warn { background: var(--demo-bg); color: #5c4700; }
+.badge-error { background: var(--error-bg); color: var(--error-ink); }
+
+.filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.filters label { display: block; font-size: 0.9rem; }
+
+tr.details td { padding-top: 0; }
+details summary { cursor: pointer; color: var(--accent); font-size: 0.9rem; }
+details[open] { padding-bottom: 0.75rem; }
+details h3 { font-size: 0.95rem; margin: 0.75rem 0 0.25rem; }
+.detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 0 1.5rem; }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.15rem 0.75rem; margin: 0; }
+dt { color: var(--muted); }
+dd { margin: 0; }
+table.inner { font-size: 0.9rem; }
+table.inner td, table.inner th { border-bottom: 1px solid var(--line); }
+
+tr.has-errors input { border-color: var(--error-ink); background: var(--error-bg); }
+tr.row-errors td { color: var(--error-ink); font-size: 0.9rem; padding-top: 0; }
+
+/* Phones: one field per line in the input table, and result rows as cards so risk and outcome
+   are visible without scrolling sideways. */
+@media (max-width: 640px) {
+  main { padding: 0.75rem; }
+  .top nav a { margin: 0 1rem 0 0; }
+
+  .rows thead { display: none; }
+  .rows, .rows tbody, .rows tr, .rows td { display: block; width: 100%; }
+  .rows tr.entry { border: 1px solid var(--line); border-radius: 6px; padding: 0.5rem; margin-bottom: 0.5rem; }
+  .rows .sr-only { position: static; width: auto; height: auto; clip: auto; white-space: normal;
+                   display: block; font-size: 0.85rem; color: var(--muted); }
+
+  .table-wrap { overflow-x: visible; border: 0; background: none; }
+  table.results, table.results > tbody, table.results > tbody > tr,
+  table.results > tbody > tr > th, table.results > tbody > tr > td { display: block; }
+  table.results > thead { display: none; }
+  table.results tr.summary { background: var(--paper); border: 1px solid var(--line);
+                             border-radius: 6px 6px 0 0; margin-top: 0.75rem; padding: 0.5rem; }
+  table.results tr.details { background: var(--paper); border: 1px solid var(--line); border-top: 0;
+                             border-radius: 0 0 6px 6px; padding: 0 0.5rem; }
+  table.results th[scope="row"] { font-size: 1.05rem; padding: 0.25rem 0; white-space: normal; }
+  table.results td[data-label], table.inner td[data-label] {
+    display: grid; grid-template-columns: 7.5rem 1fr; gap: 0.5rem; padding: 0.15rem 0;
+  }
+  td[data-label]::before { content: attr(data-label); color: var(--muted); font-size: 0.85rem; }
+  td[data-label] > .badge { justify-self: start; }
+  table.results td.minor { display: none; }
+
+  .detail-grid { grid-template-columns: 1fr; }
+  table.inner, table.inner tbody, table.inner tr { display: block; }
+  table.inner thead { display: none; }
+  table.inner tr { border-bottom: 1px solid var(--line); padding: 0.25rem 0; }
+  table.inner td { border: 0; }
+}

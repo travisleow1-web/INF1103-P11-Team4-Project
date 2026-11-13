@@ -1,0 +1,78 @@
+{% from "_macros.html" import risk_badge, outcome_badge, yes_no, details_row %}
+{% set title = "Search" %}
+{% include "_header.html" %}
+<h1>Search saved records</h1>
+
+<form method="get" action="/search" class="search">
+  <fieldset>
+    <legend>Filters (leave a box empty to match anything)</legend>
+    <div class="filters">
+      <label>Shipment ID <input name="shipment_id" value="{{ fields.shipment_id }}" placeholder="SHP-001" autocomplete="off"></label>
+      <label>Origin port <input name="origin" list="ports" value="{{ fields.origin }}" autocomplete="off"></label>
+      <label>Destination port <input name="destination" list="ports" value="{{ fields.destination }}" autocomplete="off"></label>
+      <label>Departure from <input name="departure_from" value="{{ fields.departure_from }}" placeholder="DD/MM/YYYY" autocomplete="off"></label>
+      <label>Departure to <input name="departure_to" value="{{ fields.departure_to }}" placeholder="DD/MM/YYYY" autocomplete="off"></label>
+      <label>Overall risk
+        <select name="overall_risk">
+          <option value="">Any</option>
+          {% for level in form.risk_levels %}<option value="{{ level }}"{% if fields.overall_risk == level %} selected{% endif %}>{{ level }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Outcome
+        <select name="outcome">
+          <option value="">Any</option>
+          {% for outcome in form.outcomes %}<option value="{{ outcome }}"{% if fields.outcome == outcome %} selected{% endif %}>{{ outcome }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Needs human
+        <select name="needs_human">
+          <option value="">Any</option>
+          <option value="yes"{% if fields.needs_human == "yes" %} selected{% endif %}>Yes</option>
+          <option value="no"{% if fields.needs_human == "no" %} selected{% endif %}>No</option>
+        </select>
+      </label>
+    </div>
+    <datalist id="ports">
+      {% for port in form.ports %}<option value="{{ port }}">
+      {% endfor %}
+    </datalist>
+    <button type="submit">Search</button> <a href="/search">Clear filters</a>
+  </fieldset>
+</form>
+
+{% if result.kind == "error" %}
+<p class="alert alert-error" role="alert">{{ result.message }}</p>
+{% elif result.kind == "empty" %}
+<p class="alert alert-info" role="status">{{ result.message }} <a href="/">Assess new shipments</a></p>
+{% else %}
+<p role="status">{{ result.summary | length }} record{{ "" if result.summary | length == 1 else "s" }}, newest first.</p>
+<div class="table-wrap">
+<table class="results">
+  <thead>
+    <tr>
+      <th scope="col">Shipment</th><th scope="col">Route</th><th scope="col">Departure</th>
+      <th scope="col">Primary risk</th><th scope="col">Confidence</th><th scope="col">Overall risk</th>
+      <th scope="col">Outcome</th><th scope="col">Needs human</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in result.summary %}{% set record = result.records[loop.index0] %}
+    <tr class="summary">
+      <th scope="row">{{ row.shipment_id }}{% if row.ai_unavailable %} <span class="badge badge-warn">AI unavailable</span>{% endif %}</th>
+      <td class="route" data-label="Route">{{ row.route }}</td>
+      <td data-label="Departure">{{ record.departure }}</td>
+      <td data-label="Primary risk">{{ row.primary_risk }}</td>
+      <td class="minor" data-label="Confidence">{{ row.confidence_score }}</td>
+      <td data-label="Overall risk">{{ risk_badge(row.overall_risk) }}</td>
+      <td data-label="Outcome">{{ outcome_badge(row.outcome) }}</td>
+      <td data-label="Needs human">{{ yes_no(row.needs_human) }}</td>
+    </tr>
+{{ details_row(record, 8) }}
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+{% include "_footer.html" %}

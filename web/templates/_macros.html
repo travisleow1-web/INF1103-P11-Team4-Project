@@ -1,0 +1,91 @@
+{% macro risk_badge(risk) -%}
+<span class="badge risk-{{ risk | lower }}">{{ risk }}</span>
+{%- endmacro %}
+
+{% macro outcome_badge(outcome) -%}
+<span class="badge outcome-{{ outcome | lower }}">{{ outcome }}</span>
+{%- endmacro %}
+
+{% macro yes_no(value) -%}
+{{ "Yes" if value else "No" }}
+{%- endmacro %}
+
+{% macro words(value) -%}
+{{ value | replace("_", " ") }}
+{%- endmacro %}
+
+{% macro details_row(result, colspan) -%}
+    <tr class="details">
+      <td colspan="{{ colspan }}">
+        <details>
+          <summary>Details for {{ result.shipment_id }}</summary>
+          {% set a = result.assessment %}{% set d = result.decision %}
+          <div class="detail-grid">
+            <section>
+              <h3>Shipment</h3>
+              <dl>
+                <dt>From</dt><dd>{{ result.origin }}</dd>
+                <dt>To</dt><dd>{{ result.destination }}</dd>
+                <dt>Departure</dt><dd>{{ result.departure }}</dd>
+                <dt>Arrival</dt><dd>{{ result.arrival }}</dd>
+              </dl>
+            </section>
+            <section>
+              <h3>AI assessment</h3>
+              <dl>
+                <dt>Status</dt><dd>{{ a.ai_status }}{% if result.ai_unavailable %} <span class="badge badge-warn">AI unavailable</span>{% endif %}</dd>
+                <dt>Assessed</dt><dd>{{ result.assessed_at }}</dd>
+                <dt>AI data fetched</dt><dd>{{ result.fetched_at }}</dd>
+                <dt>Primary risk</dt><dd>{{ words(a.primary_risk_factor) | capitalize }}</dd>
+                <dt>Affected location</dt><dd>{{ a.affected_location }}</dd>
+                <dt>Expected impact</dt><dd>{{ a.expected_impact }}</dd>
+                <dt>Confidence</dt><dd>{{ a.confidence_score }}</dd>
+                <dt>Conflicting sources</dt><dd>{{ yes_no(a.conflicting_sources) }}</dd>
+              </dl>
+            </section>
+            <section>
+              <h3>Decision</h3>
+              <dl>
+                <dt>Overall risk</dt><dd>{{ risk_badge(d.overall_risk) }}</dd>
+                <dt>Outcome</dt><dd>{{ outcome_badge(d.outcome) }}</dd>
+                <dt>Hold shipment</dt><dd>{{ yes_no(d.hold_shipment) }}</dd>
+                <dt>Needs human</dt><dd>{{ yes_no(d.needs_human) }}</dd>
+                <dt>Flags</dt><dd>{{ d.flags | join(", ") if d.flags else "None" }}</dd>
+              </dl>
+            </section>
+          </div>
+
+          <h3>Risk factors</h3>
+          {% if a.risk_factors %}
+          <table class="inner">
+            <thead><tr><th scope="col">Type</th><th scope="col">Severity</th><th scope="col">Location</th><th scope="col">Source</th><th scope="col">Detail</th></tr></thead>
+            <tbody>
+              {% for f in a.risk_factors %}<tr><td data-label="Type">{{ words(f.type) | capitalize }}</td><td data-label="Severity">{{ f.severity | capitalize }}</td><td data-label="Location">{{ f.location }}</td><td data-label="Source">{{ words(f.source) }}</td><td data-label="Detail">{{ f.detail }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}<p>None reported.</p>{% endif %}
+
+          <h3>Insights</h3>
+          {% if a.insights %}
+          <table class="inner">
+            <thead><tr><th scope="col">Code</th><th scope="col">Risk type</th><th scope="col">Severity</th><th scope="col">Location</th><th scope="col">Estimated delay (days)</th></tr></thead>
+            <tbody>
+              {% for i in a.insights %}<tr><td data-label="Code">{{ words(i.code) }}</td><td data-label="Risk type">{{ words(i.risk_type) | capitalize }}</td><td data-label="Severity">{{ i.severity | capitalize }}</td><td data-label="Location">{{ i.location }}</td><td data-label="Delay (days)">{{ i.estimated_delay_days }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}<p>None reported.</p>{% endif %}
+
+          <h3>Actions</h3>
+          {% if d.actions %}<ul>{% for action in d.actions %}<li>{{ action }}</li>{% endfor %}</ul>{% else %}<p>None.</p>{% endif %}
+
+          <h3>Alerts</h3>
+          {% if d.alerts %}<ul>{% for alert in d.alerts %}<li>{{ alert.recipient }} ({{ alert.channels | join(", ") }}): {{ alert.message }}</li>{% endfor %}</ul>{% else %}<p>None.</p>{% endif %}
+
+          <h3>Why</h3>
+          {% if d.rationale %}<ol>{% for why in d.rationale %}<li>{{ why }}</li>{% endfor %}</ol>{% else %}<p>No rule fired.</p>{% endif %}
+        </details>
+      </td>
+    </tr>
+{%- endmacro %}

@@ -1,0 +1,15 @@
+{% set title = "Results" %}
+{% include "_header.html" %}
+<h1>Results</h1>
+<p>Assessing {{ total }} shipment{{ "" if total == 1 else "s" }}. Each row appears as soon as its shipment is done.</p>
+<div class="table-wrap">
+<table class="results">
+  <thead>
+    <tr>
+      <th scope="col">Progress</th><th scope="col">Shipment</th><th scope="col">Route</th>
+      <th scope="col">Departure</th><th scope="col">Arrival</th><th scope="col">Primary risk</th>
+      <th scope="col">Confidence</th><th scope="col">Overall risk</th><th scope="col">Outcome</th>
+      <th scope="col">Needs human</th><th scope="col">Saved</th>
+    </tr>
+  </thead>
+  <tbody>
