@@ -344,7 +344,7 @@ def env(monkeypatch, tmp_path):
     """A clean environment: a developer's own .env and shell settings must not change the tests."""
     monkeypatch.setattr(main, "load_dotenv", lambda *args, **kwargs: False)
     for name in ("DEMO_MODE", "DATA_BACKEND", "DATA_FILE", "DEMO_DATA_FILE", "MONGO_URI", "DB_NAME",
-                 "GEMINI_API_KEY"):
+                 "GEMINI_API_KEY", "GEMINI_MODEL", "AI_CACHE_FILE"):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("DATA_BACKEND", "json")
     monkeypatch.setenv("DATA_FILE", str(tmp_path / "records.json"))
@@ -358,8 +358,19 @@ def test_create_app_serves_the_input_page_with_the_real_ports(env):
     assert "SGSIN - Singapore" in page.text
 
 
-def test_ai_and_logic_are_not_connected_in_the_baseline():
+def test_ai_is_not_connected_without_a_key(env):
     assert main.build_ai() is None
+
+
+def test_ai_is_built_from_the_key_and_model(env, tmp_path):
+    env.setenv("GEMINI_API_KEY", "test-key")
+    env.setenv("GEMINI_MODEL", "test-model")
+    env.setenv("AI_CACHE_FILE", str(tmp_path / "cache.json"))
+    from ai_layer.ai_manager import AIManager
+    assert isinstance(main.build_ai(), AIManager)
+
+
+def test_logic_is_not_connected_in_the_baseline():
     assert main.build_logic(None, PORTS) is None
 
 

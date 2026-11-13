@@ -37,7 +37,7 @@ The flow for one submission: the route calls `io.preview(...)`. If every row is 
 
 ## Connect your layer
 
-- **AI (PR 2):** fill in `build_ai()` in `main.py`. Put the `ai_layer` imports inside that function. Return `None` when `GEMINI_API_KEY` is not set. `assess(shipment)` must return an `AIAssessment`; on failure return `AIAssessment.fallback()`, which the pages mark "AI unavailable".
+- **AI (connected):** `build_ai()` in `main.py` builds `AIManager` (`ai_layer/`) from `GEMINI_API_KEY`, `GEMINI_MODEL` and `AI_CACHE_FILE`, and returns `None` without a key. `assess(shipment)` always returns an `AIAssessment`; when Gemini fails it returns `AIAssessment.fallback()`, which the pages mark "AI unavailable". The design is in the team notes (`ai-manager-design-notes.md`); add a news or weather source as a new `ContextProvider` subclass.
 - **Logic (PR 3):** fill in `build_logic(data, ports)` the same way. `evaluate(shipment, assessment, now)` returns a `Decision`. Route history comes from `data.find_route_history(route_id, since)`.
 
 Each PR edits only its own function in `main.py`, so the two do not conflict.

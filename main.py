@@ -44,8 +44,22 @@ def assess_shipments(shipments: Iterable[Shipment], ai, logic,
 
 
 def build_ai():
-    """The AI manager, or None while the AI layer is not connected."""
-    return None
+    """The AI manager built from GEMINI_API_KEY, or None when no key is set.
+
+    GEMINI_MODEL picks the model and AI_CACHE_FILE the cache file (default ai_cache.json).
+    """
+    from ai_layer.ai_manager import AIManager
+    from ai_layer.ai_settings import ALLOWED_LISTS, DEFAULT_MODEL, RESPONSE_SCHEMA, SYSTEM_PROMPT
+    from ai_layer.gemini_client import GeminiClient
+    from ai_layer.news_provider import NewsProvider
+    from ai_layer.weather_provider import WeatherProvider
+
+    key = os.getenv("GEMINI_API_KEY", "").strip()
+    if not key:
+        return None
+    client = GeminiClient(key, os.getenv("GEMINI_MODEL") or DEFAULT_MODEL, SYSTEM_PROMPT, RESPONSE_SCHEMA)
+    return AIManager(client, [WeatherProvider(), NewsProvider()],
+                     os.getenv("AI_CACHE_FILE") or "ai_cache.json", ALLOWED_LISTS)
 
 
 def build_logic(data: DataManager, ports: PortRegistry):
