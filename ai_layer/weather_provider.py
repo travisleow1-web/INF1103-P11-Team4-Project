@@ -4,7 +4,7 @@ from typing import Any, Dict, Optional, Tuple
 import requests
 from model.port import Port
 from model.shipment import Shipment
-from .ai_settings import HISTORY_DAYS
+from .ai_settings import FORECAST_DAYS, HISTORY_DAYS
 from .context_provider import ContextProvider
 
 log = logging.getLogger(__name__)
@@ -28,9 +28,14 @@ class WeatherProvider(ContextProvider):
         self.__history_days = history_days
 
     def _request(self, shipment: Shipment) -> Dict[str, Any]:
-        window = self.__history_window(shipment, datetime.now(timezone.utc).date())
-        return {"origin": self.__port_weather_or_none(shipment, shipment.origin, window),
-                "destination": self.__port_weather_or_none(shipment, shipment.destination, window)}
+        params = {
+            "latitude": shipment.origin.lat,
+            "longitude": shipment.origin.lon,
+            "timezone": "auto",
+            "forecast_days": FORECAST_DAYS,
+            "daily": "precipitation_sum, windgusts_10m_max, windspeed_10m_max, pressure_msl_min, pressure_msl_max, visibility_min, weathercode_max",
+        }
+        return self._get_json("https://api.open-meteo.com/v1/forecast", params)
 
     def __port_weather_or_none(self, shipment: Shipment, port: Port,
                                window: Optional[Tuple[str, str]]) -> Optional[Dict[str, Any]]:

@@ -7,7 +7,8 @@ from model.risk_level import RiskLevel
 from model.risk_type import RiskType
 
 DEFAULT_MODEL = "gemini-3.5-flash-lite"
-HISTORY_DAYS = 90          # shipments that departed this recently get historical weather
+HISTORY_DAYS = 90          # shipments that departed this recently get historical weather 
+FORECAST_DAYS = 14         # 14-day outlook for identifying clear weather windows# shipments that departed this recently get historical weather
 HTTP_TIMEOUT = 20          # seconds, for the weather and news feeds
 GEMINI_TIMEOUT = 40        # seconds, for one model call
 MAX_RETRIES = 3            # attempts per model call (only retryable errors are tried again)
@@ -38,6 +39,9 @@ Rules:
 - Compare the shipment dates with today's date given in the prompt.
 - For shipments that already departed, weather covers the departure-to-arrival dates: historical forecast data
   (hourly keys) plus "historical_weather" (reanalysis; visibility is null). Judge what the shipment experienced.
+- If weather risks affect the planned departure-to-arrival window, scan the 14-day forecast for the earliest
+  consecutive clear weather window matching the journey duration and output its start date (YYYY-MM-DD) in
+  earliest_clear_departure. Output "" if the current dates are clear or no clear window exists.
 - If data is missing, old, or contradictory, lower confidence_score and set conflicting_sources to true.
 - confidence_score is a number from 0.0 to 1.0.
 - severity is Low, Medium, High or Extreme. Use Extreme only for a direct threat to the vessel, crew or cargo.
@@ -74,6 +78,7 @@ RESPONSE_SCHEMA = {
         "expected_impact": {"type": "STRING", "enum": list(ALLOWED_IMPACT)},
         "confidence_score": {"type": "NUMBER"},
         "conflicting_sources": {"type": "BOOLEAN"},
+        "earliest_clear_departure": {"type": "STRING"},
         "insights": {
             "type": "ARRAY",
             "items": {
@@ -85,10 +90,10 @@ RESPONSE_SCHEMA = {
                     "location": {"type": "STRING"},
                     "estimated_delay_days": {"type": "INTEGER"},
                 },
-                "required": ["code", "risk_type", "severity", "location", "estimated_delay_days"],
+                "required": ["code", "risk_type", "severity", "location", "estimated_delay_days",],
             },
         },
     },
     "required": ["risk_factors", "primary_risk_factor", "affected_location", "expected_impact",
-                 "confidence_score", "conflicting_sources", "insights"],
+                 "confidence_score", "conflicting_sources",  "earliest_clear_departure", "insights"],
 }
