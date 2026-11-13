@@ -63,8 +63,10 @@ def build_ai():
 
 
 def build_logic(data: DataManager, ports: PortRegistry):
-    """The Logic manager, or None while the Logic layer is not connected."""
-    return None
+    """The Logic manager with the default rule thresholds. Route history comes from data."""
+    from logic_layer.logic_manager import LogicManager
+
+    return LogicManager(data, ports)
 
 
 def build_data(ports: PortRegistry) -> DataManager:
