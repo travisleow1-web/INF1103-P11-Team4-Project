@@ -9,15 +9,15 @@ Read `docs/io-design.md` before touching the IO layer and `docs/handoff.md` for 
 | `model/` | Shared model: `Port`, `PortRegistry`, `Shipment`, `RiskFactor`, `Insight`, `AIAssessment`, `Decision`, `ShipmentRecord`, `SearchCriteria`, `StorageError`, and the enums `RiskLevel`, `RiskType`, `Outcome`, `AIStatus`, `Flag` |
 | `io_layer/` | `IOManager`, `ShipmentSource` (ABC), `FormSource`, `CsvSource`, `SourceError`, `ShipmentValidator`, `ValidationResult`, `Preview` |
 | `data_layer/` | `DataManager` (ABC), `JsonDataManager` (default), `MongoDataManager`, `UnavailableDataManager`, `RecordSerializer` |
-| `ai_layer/` | AI manager (PR 2) |
-| `logic_layer/` | Logic manager and rules (PR 3) |
+| `ai_layer/` | `AIManager`, `GeminiClient`, `ContextProvider` with `WeatherProvider` and `NewsProvider`, `ResponseParser`, `ResponseCache`, errors, `ai_settings.py` |
+| `logic_layer/` | `LogicManager`, `RuleConfig`, `BusinessRule` (ABC) and its rules, `OutcomeResolver` |
 | `web/` | `app.py` (`create_web_app`, the FastAPI routes), `templates/`, `static/` |
 | `main.py` | Composition root: `assess_shipments`, `build_data`, `build_ai`, `build_logic`, `create_app` |
 | `tests/` | pytest tests, `helpers.py`, `fakes.py` (FakeAI and FakeLogic, used by tests and demo mode) |
 
-The old modules at the top level (`io_manager.py`, `validator.py`, `ai_manager.py`, `logic_manager.py`, `data_manager.py`, `mongodb.py`, `config.py`, `feeds.py`, `cache.py`) stay untouched until the final swap PR.
+There are no old function-based modules any more: all code lives in the packages above and `main.py`. Do not add module-level functions with global state.
 
-## Rules for the IO and web layers
+## Rules for all layers
 
 - One class per file. Keep code simple: no padding classes, no speculative abstractions.
 - Attributes are private (`self.__name`) with properties where needed. Type hints and a short docstring on public classes and methods.
@@ -26,6 +26,7 @@ The old modules at the top level (`io_manager.py`, `validator.py`, `ai_manager.p
 - Jinja autoescape stays on; never use `|safe` on data. Risk and outcome are shown as text, not colour alone.
 - Dates are `DD/MM/YYYY` only. Ports come only from `ports_reference_4.json` (50 ports). Times are timezone-aware UTC inside the app.
 - Shipment IDs are generated (`SHP-001`, `SHP-002`, ...). A `shipment_id` column in an uploaded CSV is ignored.
+- The managers never call each other; only `main.py` knows all of them. Logic rules change a `Decision` only through its methods, and read thresholds from `RuleConfig`.
 
 ## Tests
 
