@@ -16,6 +16,7 @@ from .procurement_rule import ProcurementRule
 from .route_history_rule import RouteHistoryRule
 from .rule_config import RuleConfig
 from .unregistered_location_rule import UnregisteredLocationRule
+from logic_layer.rule_config import RuleConfig
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,13 @@ class LogicManager:
         if not isinstance(config, RuleConfig):
             raise TypeError("config must be a RuleConfig")
         self.__build(config)
+
+    def configure(self, fields: Mapping[str, str]) -> RuleConfig:
+        """Apply thresholds typed by a user. Bad values raise ValueError and leave the rules unchanged."""
+        config = RuleConfig.from_text(fields)
+        self.update_config(config)
+        return config
+
 
     def evaluate(self, shipment: Shipment, assessment: AIAssessment, now: datetime) -> Decision:
         """Run every rule on the shipment, then pick the outcome. now must be timezone-aware."""

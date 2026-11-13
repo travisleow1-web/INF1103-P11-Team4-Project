@@ -8,6 +8,7 @@ from model.outcome import Outcome
 from model.risk_factor import RiskFactor
 from model.risk_level import RiskLevel
 from model.risk_type import RiskType
+from logic_layer.rule_config import RuleConfig
 
 LEVELS = [RiskLevel.LOW, RiskLevel.MEDIUM, RiskLevel.HIGH]
 OUTCOMES = {RiskLevel.LOW: Outcome.PROCEED, RiskLevel.MEDIUM: Outcome.INSURE, RiskLevel.HIGH: Outcome.ESCALATE}
@@ -40,3 +41,16 @@ class FakeLogic:
         if level == RiskLevel.HIGH:
             decision.require_human()
         return decision
+
+    def __init__(self):
+        self.__config = RuleConfig()
+
+    @property
+    def config(self):
+        """The thresholds (shown on the rules page; the fake rule ignores them)."""
+        return self.__config
+
+    def configure(self, fields):
+        """Accept typed thresholds like the real LogicManager."""
+        self.__config = RuleConfig.from_text(fields)
+        return self.__config
