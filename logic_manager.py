@@ -1,228 +1,534 @@
+from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
+from enum import IntEnum
+
 import validator
 from config import (ALLOWED_IMPACT, ALLOWED_LOCATIONS, ALLOWED_RISK_TYPES,
-                        ALLOWED_SEVERITY, INSIGHT_CODES, INSIGHT_RISK_TYPES)
+                    ALLOWED_SEVERITY, INSIGHT_CODES, INSIGHT_RISK_TYPES)
 
 # Thresholds and rule inputs (change them here, not inside the rules)
-LOW, MEDIUM, HIGH = 1, 2, 3
-LEVEL_FROM_TEXT = {"low": LOW, "medium": MEDIUM, "high": HIGH}
-CONFIDENCE_MIN, HISTORY_WINDOW_DAYS, PERFECT_STORM_MIN_MEDIUMS = 0.60, 21, 3
-DATA_MAX_AGE_HOURS, DELAY_DAYS_LIMIT, DELAY_DAYS_HIGH = 24, 3, 7
-PERFECT_STORM_FACTORS = {"weather", "port_congestion", "labor_shortage"}
-INSURANCE_TRIGGERS = {"piracy_threat", "severe_civil_unrest"}
-CARGO_DESTRUCTION_IMPACTS = {"Cargo Destruction"}
-DATA_QUALITY_INSIGHTS = {"CONFLICTING_DATA", "OUTDATED_DATA", "MISSING_DATA", "NEEDS_HUMAN_REVIEW"}
-REQUIRED_FIELDS = ["shipment_id", "origin_port", "destination_port", "risk_factors", "primary_risk_factor",
-                   "affected_location", "expected_impact", "confidence_score", "sources"]
-INSIGHT_KEYS = ("code", "risk_type", "severity", "location", "estimated_delay_days")
+class RiskLevel(IntEnum):
+    """Ordered risk levels, so they can be compared (LOW < MEDIUM < HIGH)."""
+    LOW = 1
+    MEDIUM = 2
+    HIGH = 3
 
-def new_decision(shipment_id):
-    """Fresh decision dict. outcome: PROCEED / DELAY / INSURE / ESCALATE / REJECT."""
-    return {"shipment_id": shipment_id, "overall_risk": "Low", "outcome": "PROCEED", "hold_shipment": False,
-            "needs_human": False, "flags": [], "actions": [], "alerts": [], "rationale": []}
+    @classmethod
+    def from_text(cls, text):
+        """'Medium' / 'medium' / 'MEDIUM' -> RiskLevel.MEDIUM. Unknown text counts as LOW."""
+        return cls.__members__.get(str(text).strip().upper(), cls.LOW)
 
-def _level(text):
-    return LEVEL_FROM_TEXT.get(str(text).strip().lower(), LOW)
+    @property
+    def label(self):
+        """Display form used in decisions: 'Low' / 'Medium' / 'High'."""
+        return self.name.capitalize()
 
-def _note(d, why, flag=None, action=None, human=False):
-    """Record why a rule fired, plus an optional flag (no duplicates), action and human-review request."""
-    if human:
-        d["needs_human"] = True
-    if flag and flag not in d["flags"]:
-        d["flags"].append(flag)
-    if action:
-        d["actions"].append(action)
-    d["rationale"].append(why)
 
-def _raise_risk(d, level):
-    if _level(level) > _level(d["overall_risk"]):
-        d["overall_risk"] = level
+class RuleConfig:
+    """Every business-rule threshold in one validated object (new feature: user-configurable rules)."""
 
-def _describe(i):
-    """e.g. 'POTENTIAL_DELAY weather/High @CNSHA +8d'."""
-    days = f" +{i['estimated_delay_days']}d" if i["estimated_delay_days"] else ""
-    return f"{i['code']} {i['risk_type']}/{i['severity']} @{i['location']}{days}"
+    _DEFAULTS = {
+        "confidence_min": 0.60,           # below this, AI output needs a human
+        "history_window_days": 21,        # Rule 3 look-back
+        "perfect_storm_min_mediums": 3,   # Rule 1
+        "data_max_age_hours": 24,         # external data older than this is "outdated"
+        "delay_days_limit": 3,            # Rule 1b: delay that raises risk to Medium
+        "delay_days_high": 7,             # Rule 1b: delay that raises risk to High
+    }
+    _WHOLE_NUMBER_KEYS = ("history_window_days", "perfect_storm_min_mediums",
+                          "data_max_age_hours", "delay_days_limit", "delay_days_high")
 
-def _clean_list(value, keys):
-    """Keep dict items that have every key; also return how many were dropped."""
-    good = [i for i in value if isinstance(i, dict) and all(k in i for k in keys)] if isinstance(value, list) else []
-    return good, len(value) - len(good) if isinstance(value, list) else 0
+    def __init__(self, **overrides):
+        unknown = set(overrides) - set(self._DEFAULTS)
+        if unknown:
+            raise ValueError(f"Unknown rule setting(s): {sorted(unknown)}")
+        values = {**self._DEFAULTS, **overrides}
+        self._validate(values)
+        self._values = values
 
-def prepare_record(ai_record):
-    """Copy the AI row and add route_id, port names, defaults and cleaned lists."""
-    r = dict(ai_record)
-    o, dst = r.get("origin_port", ""), r.get("destination_port", "")
-    r.setdefault("route_id", f"{o}-{dst}")
-    for key, code in (("origin", o), ("destination", dst)):
-        r.setdefault(key, validator.PORTS_BY_CODE[code]["name"] if code in validator.PORTS_BY_CODE else str(code))
-    for key, kind, default in (("sources", list, []),):
-        if not isinstance(r.get(key), kind):
-            r[key] = default
-    r["risk_factors"], bad_f = _clean_list(r.get("risk_factors"), ("type", "severity"))
-    r["insights"], bad_i = _clean_list(r.get("insights"), INSIGHT_KEYS)
-    for ins in r["insights"]:
-        try:
-            ins["estimated_delay_days"] = max(0, int(ins["estimated_delay_days"]))
-        except (TypeError, ValueError):
-            ins["estimated_delay_days"] = 0
-    r["_dropped_items"] = bad_f + bad_i
-    return r
+    @classmethod
+    def _validate(cls, values):
+        conf = values["confidence_min"]
+        if isinstance(conf, bool) or not isinstance(conf, (int, float)) or not 0.0 <= conf <= 1.0:
+            raise ValueError("confidence_min must be a number between 0 and 1")
+        for key in cls._WHOLE_NUMBER_KEYS:
+            value = values[key]
+            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                raise ValueError(f"{key} must be a whole number of at least 1")
+        if values["perfect_storm_min_mediums"] > len(PerfectStormRule.STORM_FACTORS):
+            raise ValueError("perfect_storm_min_mediums cannot exceed the number of storm factors (3)")
+        if values["delay_days_high"] < values["delay_days_limit"]:
+            raise ValueError("delay_days_high must be at least delay_days_limit")
 
-def validate_record(r, d, now):
-    """Return False (REJECT) for unusable records; flag softer problems for human review."""
-    missing = [f for f in REQUIRED_FIELDS if r.get(f) in (None, "")]
-    conf = r.get("confidence_score")
-    if missing or isinstance(conf, bool) or not isinstance(conf, (int, float)) or not 0.0 <= conf <= 1.0:
-        d["outcome"] = "REJECT"
-        if missing:
-            _note(d, f"Validation failed: missing fields {missing}", "Incomplete AI record", human=True)
-        else:
-            _note(d, "Validation failed: confidence_score not in 0-1", "Invalid confidence score", human=True)
-        return False
-    checks = [("primary_risk_factor", r.get("primary_risk_factor"), ALLOWED_RISK_TYPES),
-              ("affected_location", r.get("affected_location"), ALLOWED_LOCATIONS),
-              ("expected_impact", r.get("expected_impact"), ALLOWED_IMPACT)]
-    for f in r["risk_factors"]:
-        checks += [("risk_factors.type", f["type"], ALLOWED_RISK_TYPES),
-                   ("risk_factors.severity", f["severity"], ALLOWED_SEVERITY)]
-    for i in r["insights"]:
-        checks += [("insights.code", i["code"], INSIGHT_CODES), ("insights.risk_type", i["risk_type"],
-                   INSIGHT_RISK_TYPES), ("insights.severity", i["severity"], ALLOWED_SEVERITY)]
-    problems = [f"{n}={v!r}" for n, v, allowed in checks if v not in allowed]
-    problems += [f"{r['_dropped_items']} malformed list item(s) dropped"] if r["_dropped_items"] else []
-    try:
-        fetched = datetime.fromisoformat(str(r.get("external_data_fetched_at")))
-    except ValueError:
-        fetched = None  # missing or unreadable timestamp: skip the age check
-    for failed, flag, why in (
-            (problems, "AI output outside schema", f"Validation: unexpected AI values {problems}"),
-            (conf < CONFIDENCE_MIN, "Low AI confidence", f"Confidence {conf:.2f} is below {CONFIDENCE_MIN:.2f}"),
-            (fetched and now - fetched > timedelta(hours=DATA_MAX_AGE_HOURS), "Outdated external data",
-             f"External data is older than {DATA_MAX_AGE_HOURS}h"),
-            (r.get("conflicting_sources") is True, "Conflicting sources",
-             "AI reported conflicting or missing information")):
-        if failed:
-            _note(d, why, flag, human=True)
-    return True
+    @classmethod
+    def from_dict(cls, data):
+        """Rebuild a config from saved JSON data (keys not given keep their defaults)."""
+        return cls(**dict(data))
 
-def rule_perfect_storm(r, d):
-    """Rule 1: any High factor -> High; 3 Medium weather/congestion/labor factors -> High."""
-    levels = {}
-    for f in r["risk_factors"]:
-        levels[f["type"]] = max(levels.get(f["type"], LOW), _level(f["severity"]))
-    if HIGH in levels.values():
-        d["overall_risk"] = "High"
-        _note(d, "Rule 1: at least one risk factor is High")
-    mediums = [f for f in PERFECT_STORM_FACTORS if levels.get(f, LOW) >= MEDIUM]
-    if len(mediums) >= PERFECT_STORM_MIN_MEDIUMS:
-        d["overall_risk"] = "High"
-        _note(d, f"Rule 1 (Perfect Storm): {', '.join(sorted(mediums))} all >= Medium, upgraded to High",
-              "Perfect Storm")
-    elif MEDIUM in levels.values():
-        _raise_risk(d, "Medium")
+    def to_dict(self):
+        return dict(self._values)
 
-def rule_ai_insights(r, d):
-    """Rule 1b: data-quality codes -> human; delay >=3d Medium, >=7d High; High MULTIPLE_RISKS -> High."""
-    for i in r["insights"]:
-        if i["code"] in DATA_QUALITY_INSIGHTS:
-            _note(d, f"Rule 1b: {_describe(i)} -> human review", f"AI flagged: {i['code']}", human=True)
-    delays = [i for i in r["insights"] if i["code"] == "POTENTIAL_DELAY"]
-    worst = max(delays, key=lambda i: i["estimated_delay_days"]) if delays else None
-    if worst and worst["estimated_delay_days"] >= DELAY_DAYS_LIMIT:
-        _raise_risk(d, "High" if worst["estimated_delay_days"] >= DELAY_DAYS_HIGH else "Medium")
-        _note(d, f"Rule 1b: {_describe(worst)} -> risk {d['overall_risk']}", "Significant Delay Expected")
-    for i in r["insights"]:
-        if i["code"] == "MULTIPLE_RISKS" and _level(i["severity"]) == HIGH:
-            _raise_risk(d, "High")
-            _note(d, f"Rule 1b: {_describe(i)} -> risk High", "Compound Risk")
+    @property
+    def confidence_min(self):
+        return self._values["confidence_min"]
 
-def rule_dynamic_insurance(r, d):
-    """Rule 4: piracy_threat / severe_civil_unrest -> hold until extended insurance is confirmed."""
-    triggered = INSURANCE_TRIGGERS & ({f["type"] for f in r["risk_factors"]} | {r["primary_risk_factor"]})
-    if triggered:
-        d["hold_shipment"], d["overall_risk"] = True, "High"
-        _note(d, f"Rule 4: {', '.join(sorted(triggered))} detected, holding until insurance confirmed",
-              "Premium Increase Required", "Update financial profile: extended insurance needed", human=True)
+    @property
+    def history_window_days(self):
+        return self._values["history_window_days"]
 
-def rule_low_risk_validation(r, d, Mongo_DM, now):
-    """Rule 3: a 'Low' route flagged or delayed in the last 21 days needs dispatcher sign-off."""
-    if d["overall_risk"] != "Low":
-        return
-    try:
-        query = {
-            "route_id" : r["route_id"],
-            "saved_at" : {"lt",(now - timedelta(days=HISTORY_WINDOW_DAYS))}
+    @property
+    def perfect_storm_min_mediums(self):
+        return self._values["perfect_storm_min_mediums"]
+
+    @property
+    def data_max_age_hours(self):
+        return self._values["data_max_age_hours"]
+
+    @property
+    def delay_days_limit(self):
+        return self._values["delay_days_limit"]
+
+    @property
+    def delay_days_high(self):
+        return self._values["delay_days_high"]
+
+
+class Decision:
+    """The verdict on one shipment. State is private; rules change it only through methods."""
+
+    OUTCOMES = ("PROCEED", "DELAY", "INSURE", "ESCALATE", "REJECT")
+
+    def __init__(self, shipment_id):
+        self._shipment_id = str(shipment_id)
+        self._risk = RiskLevel.LOW
+        self._outcome = "PROCEED"
+        self._hold_shipment = False
+        self._needs_human = False
+        self._flags = []
+        self._actions = []
+        self._alerts = []
+        self._rationale = []
+
+    @property
+    def shipment_id(self):
+        return self._shipment_id
+
+    @property
+    def risk_level(self):
+        return self._risk
+
+    @property
+    def overall_risk(self):
+        return self._risk.label
+
+    @property
+    def outcome(self):
+        return self._outcome
+
+    @property
+    def hold_shipment(self):
+        return self._hold_shipment
+
+    @property
+    def needs_human(self):
+        return self._needs_human
+
+    @property
+    def flags(self):
+        return tuple(self._flags)
+
+    @property
+    def actions(self):
+        return tuple(self._actions)
+
+    @property
+    def alerts(self):
+        return tuple(dict(a) for a in self._alerts)
+
+    @property
+    def rationale(self):
+        return tuple(self._rationale)
+
+    def has_flag(self, flag):
+        return flag in self._flags
+
+    def add_note(self, why, flag=None, action=None, human=False):
+        """Record why a rule fired, plus an optional flag (no duplicates), action and human-review request."""
+        if human:
+            self._needs_human = True
+        if flag and flag not in self._flags:
+            self._flags.append(flag)
+        if action:
+            self._actions.append(action)
+        self._rationale.append(why)
+
+    def add_action(self, action):
+        self._actions.append(action)
+
+    def raise_risk(self, level):
+        """Risk only ever goes up; a later rule cannot undo an earlier High."""
+        if level > self._risk:
+            self._risk = level
+
+    def hold(self):
+        self._hold_shipment = True
+
+    def require_human(self):
+        self._needs_human = True
+
+    def add_alert(self, recipient, channels, message):
+        self._alerts.append({"recipient": recipient, "channels": list(channels), "message": message})
+
+    def set_outcome(self, outcome):
+        if outcome not in self.OUTCOMES:
+            raise ValueError(f"Unknown outcome {outcome!r}")
+        self._outcome = outcome
+
+    def to_dict(self):
+        """Plain dict for the Data Manager (saving) and IO Manager (display)."""
+        return {"shipment_id": self._shipment_id, "overall_risk": self.overall_risk,
+                "outcome": self._outcome, "hold_shipment": self._hold_shipment,
+                "needs_human": self._needs_human, "flags": list(self._flags),
+                "actions": list(self._actions), "alerts": [dict(a) for a in self._alerts],
+                "rationale": list(self._rationale)}
+
+class RouteHistorySource(ABC):
+    """Contract: anything that can list past shipments on a route since a given time."""
+
+    @abstractmethod
+    def get_route_history(self, route_id, since):
+        """Return a list of past-run dicts; a run may carry 'flagged' / 'delayed' booleans."""
+
+
+class DataManagerRouteHistory(RouteHistorySource):
+    """Adapts the Data Manager's stored records to the RouteHistorySource interface."""
+
+    def __init__(self, db_records):
+        self._db_records = db_records
+
+    def get_route_history(self, route_id, since):
+        import data_manager  # imported here so the Logic Manager can be tested without it
+        return data_manager.get_route_history(self._db_records, route_id, since)    
+
+class RecordPreparer:
+    """Copies an AI row and fills in route_id, port names, defaults and cleaned lists."""
+
+    INSIGHT_KEYS = ("code", "risk_type", "severity", "location", "estimated_delay_days")
+    FACTOR_KEYS = ("type", "severity")
+
+    def prepare(self, ai_record):
+        """Return (prepared record, number of malformed list items dropped)."""
+        record = dict(ai_record)  # never change the caller's data
+        origin, destination = record.get("origin_port", ""), record.get("destination_port", "")
+        record.setdefault("route_id", f"{origin}-{destination}")
+        for key, code in (("origin", origin), ("destination", destination)):
+            record.setdefault(key, self._port_name(code))
+        if not isinstance(record.get("sources"), list):
+            record["sources"] = []
+        record["risk_factors"], bad_factors = self._clean_list(record.get("risk_factors"), self.FACTOR_KEYS)
+        record["insights"], bad_insights = self._clean_list(record.get("insights"), self.INSIGHT_KEYS)
+        for insight in record["insights"]:
+            try:
+                insight["estimated_delay_days"] = max(0, int(insight["estimated_delay_days"]))
+            except (TypeError, ValueError):
+                insight["estimated_delay_days"] = 0
+        return record, bad_factors + bad_insights
+
+    @staticmethod
+    def _port_name(code):
+        port = validator.PORTS_BY_CODE.get(code)
+        return port["name"] if port else str(code)
+
+    @staticmethod
+    def _clean_list(value, keys):
+        """Keep dict items that have every key (copied); also return how many were dropped."""
+        if not isinstance(value, list):
+            return [], 0
+        good = [dict(item) for item in value if isinstance(item, dict) and all(k in item for k in keys)]
+        return good, len(value) - len(good)
+
+
+class RecordValidator:
+    """Rejects unusable records and flags softer problems for human review."""
+
+    REQUIRED_FIELDS = ("shipment_id", "origin_port", "destination_port", "risk_factors",
+                       "primary_risk_factor", "affected_location", "expected_impact",
+                       "confidence_score", "sources")
+
+    def __init__(self, config, allowed_values=None):
+        self._config = config
+        self._allowed = allowed_values or {
+            "risk_types": ALLOWED_RISK_TYPES, "locations": ALLOWED_LOCATIONS,
+            "impacts": ALLOWED_IMPACT, "severities": ALLOWED_SEVERITY,
+            "insight_codes": INSIGHT_CODES, "insight_risk_types": INSIGHT_RISK_TYPES,
         }
-        past = Mongo_DM.FindRecord(query)
-        #past = Data_Manager.get_route_history(search_filter, operator)
-        out = []
-        for r in past:           
-            out.append({"date": datetime.fromisoformat(r["saved_at"]), "flagged": r["flagged"], "delayed": r["delayed"]})
-        past = out
-    except (KeyError, TypeError, ValueError) as exc:
-        return _note(d, f"Rule 3: could not read route history ({exc}), needs human",
-                     "Route history unavailable", human=True)
-    problems = [p for p in past if p.get("flagged") or p.get("delayed")]
-    if not problems:
-        return _note(d, "Rule 3: Low risk and clean 21-day history, auto-approve")
-    d["hold_shipment"] = True
-    _note(d, f"Rule 3: AI says Low but {len(problems)} shipment(s) on route {r['route_id']} were flagged or "
-          f"delayed in the last {HISTORY_WINDOW_DAYS} days", "Cautionary Override",
-          "Require human dispatcher sign-off", human=True)
 
-def rule_inventory_replacement(r, d):
-    """Rule 5: Cargo Destruction predicted at the origin port -> Procurement Alert to reorder the goods."""
-    if r["expected_impact"] in CARGO_DESTRUCTION_IMPACTS and r["affected_location"] == r["origin_port"]:
-        d["hold_shipment"] = True
-        d["alerts"].append({"recipient": "procurement_team", "channels": ["email", "sms"], "message":
-                            f"Shipment {r['shipment_id']} is at risk of destruction at {r['origin']}. "
-                            "Consider reordering to avoid stock-out."})
-        _note(d, f"Rule 5: Cargo Destruction @{r['origin_port']} (origin)", "Procurement Alert",
-              "Reorder goods immediately: the goods on this shipment")
+    def validate(self, record, dropped_items, decision, now):
+        """Return False (and mark REJECT) when the record cannot be used at all."""
+        missing = [f for f in self.REQUIRED_FIELDS if record.get(f) in (None, "")]
+        conf = record.get("confidence_score")
+        if missing or isinstance(conf, bool) or not isinstance(conf, (int, float)) or not 0.0 <= conf <= 1.0:
+            decision.set_outcome("REJECT")
+            if missing:
+                decision.add_note(f"Validation failed: missing fields {missing}",
+                                  "Incomplete AI record", human=True)
+            else:
+                decision.add_note("Validation failed: confidence_score not in 0-1",
+                                  "Invalid confidence score", human=True)
+            return False
 
-def decide_outcome(d):
-    """Turn the flags into one outcome: Procurement Alert or High risk -> DELAY, insurance -> INSURE."""
-    if "Procurement Alert" in d["flags"]:
-        d["outcome"] = "DELAY"
-    elif "Premium Increase Required" in d["flags"]:
-        d["outcome"] = "INSURE"
-    elif d["overall_risk"] == "High":
-        d["outcome"] = "DELAY"
-        d["actions"].append("Delay departure until conditions clear")
-        d["needs_human"] = True
-    else:
-        d["outcome"] = "PROCEED"
-        if d["overall_risk"] == "Medium":
-            d["actions"].append("Proceed with monitoring")
-    if d["hold_shipment"] and d["outcome"] == "PROCEED":
-        d["outcome"] = "ESCALATE"
+        cfg = self._config
+        problems = self._schema_problems(record, dropped_items)
+        fetched = self._fetched_time(record)
+        checks = (
+            (problems, "AI output outside schema", f"Validation: unexpected AI values {problems}"),
+            (conf < cfg.confidence_min, "Low AI confidence",
+             f"Confidence {conf:.2f} is below {cfg.confidence_min:.2f}"),
+            (fetched and now - fetched > timedelta(hours=cfg.data_max_age_hours), "Outdated external data",
+             f"External data is older than {cfg.data_max_age_hours}h"),
+            (record.get("conflicting_sources") is True, "Conflicting sources",
+             "AI reported conflicting or missing information"),
+        )
+        for failed, flag, why in checks:
+            if failed:
+                decision.add_note(why, flag, human=True)
+        return True
 
-def evaluate_shipment(ai_record, Mongo_DM, now=None):
-    """Run one AI row through every rule. Returns (prepared record, decision dict)."""
-    now = now or datetime.now()
-    r = prepare_record(ai_record)
-    d = new_decision(str(r.get("shipment_id", "UNKNOWN")))
-    if validate_record(r, d, now):
-        for rule in (rule_perfect_storm, rule_ai_insights, rule_dynamic_insurance):
-            rule(r, d)
-        rule_low_risk_validation(r, d, Mongo_DM, now)  # after the risk-raising rules: only checks "Low"
-        rule_inventory_replacement(r, d)
-        decide_outcome(d)
-        if d["needs_human"]:  # final gate: anything needing a human is never fully automatic
-            d["outcome"] = "ESCALATE" if d["outcome"] == "PROCEED" else d["outcome"]
-            d["actions"].append("Route to human review queue")
-    r.pop("_dropped_items", None)
-    return r, d
+    def _schema_problems(self, record, dropped_items):
+        allowed = self._allowed
+        checks = [("primary_risk_factor", record.get("primary_risk_factor"), allowed["risk_types"]),
+                  ("affected_location", record.get("affected_location"), allowed["locations"]),
+                  ("expected_impact", record.get("expected_impact"), allowed["impacts"])]
+        for factor in record["risk_factors"]:
+            checks += [("risk_factors.type", factor["type"], allowed["risk_types"]),
+                       ("risk_factors.severity", factor["severity"], allowed["severities"])]
+        for insight in record["insights"]:
+            checks += [("insights.code", insight["code"], allowed["insight_codes"]),
+                       ("insights.risk_type", insight["risk_type"], allowed["insight_risk_types"]),
+                       ("insights.severity", insight["severity"], allowed["severities"])]
+        problems = [f"{name}={value!r}" for name, value, ok in checks if value not in ok]
+        if dropped_items:
+            problems.append(f"{dropped_items} malformed list item(s) dropped")
+        return problems
 
-def evaluate_shipments(assessments, Mongo_DM, now=None):
-    """Evaluate every row of ai_manager.assess_shipments(); returns [(record, decision), ...]."""
-    results = []
-    for row in assessments.to_dict("records"):
+    @staticmethod
+    def _fetched_time(record):
         try:
-            results.append(evaluate_shipment(row, Mongo_DM, now))
-        except Exception as exc:
-            d = new_decision(str(row.get("shipment_id", "UNKNOWN")))
-            d["outcome"] = "REJECT"
-            _note(d, f"Evaluation failed: {exc!r}", "Evaluation error", human=True)
-            results.append((row, d))
-    return results
+            return datetime.fromisoformat(str(record.get("external_data_fetched_at")))
+        except ValueError:
+            return None  # missing or unreadable timestamp: skip the age check
+
+class BusinessRule(ABC):
+    """Contract every business rule follows. LogicManager runs them in list order."""
+
+    @abstractmethod
+    def apply(self, record, decision, now):
+        """Inspect the prepared record and update the decision."""
+
+
+class PerfectStormRule(BusinessRule):
+    """Rule 1: any High factor -> High; enough Medium weather/congestion/labour factors -> High."""
+
+    STORM_FACTORS = frozenset({"weather", "port_congestion", "labor_shortage"})
+
+    def __init__(self, config):
+        self._config = config
+
+    def apply(self, record, decision, now):
+        levels = {}
+        for factor in record["risk_factors"]:
+            levels[factor["type"]] = max(levels.get(factor["type"], RiskLevel.LOW),
+                                         RiskLevel.from_text(factor["severity"]))
+        if RiskLevel.HIGH in levels.values():
+            decision.raise_risk(RiskLevel.HIGH)
+            decision.add_note("Rule 1: at least one risk factor is High")
+        mediums = [f for f in self.STORM_FACTORS if levels.get(f, RiskLevel.LOW) >= RiskLevel.MEDIUM]
+        if len(mediums) >= self._config.perfect_storm_min_mediums:
+            decision.raise_risk(RiskLevel.HIGH)
+            decision.add_note(f"Rule 1 (Perfect Storm): {', '.join(sorted(mediums))} all >= Medium, "
+                              "upgraded to High", "Perfect Storm")
+        elif RiskLevel.MEDIUM in levels.values():
+            decision.raise_risk(RiskLevel.MEDIUM)
+
+
+class AIInsightRule(BusinessRule):
+    """Rule 1b: data-quality codes -> human; long predicted delays and High MULTIPLE_RISKS raise risk."""
+
+    DATA_QUALITY_CODES = frozenset({"CONFLICTING_DATA", "OUTDATED_DATA", "MISSING_DATA", "NEEDS_HUMAN_REVIEW"})
+
+    def __init__(self, config):
+        self._config = config
+
+    def apply(self, record, decision, now):
+        insights = record["insights"]
+        for insight in insights:
+            if insight["code"] in self.DATA_QUALITY_CODES:
+                decision.add_note(f"Rule 1b: {self._describe(insight)} -> human review",
+                                  f"AI flagged: {insight['code']}", human=True)
+
+        delays = [i for i in insights if i["code"] == "POTENTIAL_DELAY"]
+        worst = max(delays, key=lambda i: i["estimated_delay_days"]) if delays else None
+        if worst and worst["estimated_delay_days"] >= self._config.delay_days_limit:
+            high = worst["estimated_delay_days"] >= self._config.delay_days_high
+            decision.raise_risk(RiskLevel.HIGH if high else RiskLevel.MEDIUM)
+            decision.add_note(f"Rule 1b: {self._describe(worst)} -> risk {decision.overall_risk}",
+                              "Significant Delay Expected")
+
+        for insight in insights:
+            if insight["code"] == "MULTIPLE_RISKS" and RiskLevel.from_text(insight["severity"]) == RiskLevel.HIGH:
+                decision.raise_risk(RiskLevel.HIGH)
+                decision.add_note(f"Rule 1b: {self._describe(insight)} -> risk High", "Compound Risk")
+
+    @staticmethod
+    def _describe(insight):
+        """e.g. 'POTENTIAL_DELAY weather/High @CNSHA +8d'."""
+        days = f" +{insight['estimated_delay_days']}d" if insight["estimated_delay_days"] else ""
+        return f"{insight['code']} {insight['risk_type']}/{insight['severity']} @{insight['location']}{days}"
+
+
+class InsuranceRule(BusinessRule):
+    """Rule 4: piracy_threat / severe_civil_unrest -> hold until extended insurance is confirmed."""
+
+    TRIGGERS = frozenset({"piracy_threat", "severe_civil_unrest"})
+
+    def apply(self, record, decision, now):
+        present = {f["type"] for f in record["risk_factors"]} | {record["primary_risk_factor"]}
+        triggered = self.TRIGGERS & present
+        if triggered:
+            decision.hold()
+            decision.raise_risk(RiskLevel.HIGH)
+            decision.add_note(f"Rule 4: {', '.join(sorted(triggered))} detected, holding until insurance "
+                              "confirmed", "Premium Increase Required",
+                              "Update financial profile: extended insurance needed", human=True)
+
+
+class RouteHistoryRule(BusinessRule):
+    """Rule 3: a 'Low' route flagged or delayed recently needs dispatcher sign-off."""
+
+    def __init__(self, config, history_source):
+        self._config = config
+        self._history = history_source  # association: used, not owned
+
+    def apply(self, record, decision, now):
+        if decision.risk_level != RiskLevel.LOW:
+            return  # only double-checks shipments that are still Low
+        window = self._config.history_window_days
+        try:
+            past = self._history.get_route_history(record["route_id"], now - timedelta(days=window))
+        except (KeyError, TypeError, ValueError) as exc:
+            decision.add_note(f"Rule 3: could not read route history ({exc}), needs human",
+                              "Route history unavailable", human=True)
+            return
+        problems = [p for p in past if p.get("flagged") or p.get("delayed")]
+        if not problems:
+            decision.add_note(f"Rule 3: Low risk and clean {window}-day history, auto-approve")
+            return
+        decision.hold()
+        decision.add_note(f"Rule 3: AI says Low but {len(problems)} shipment(s) on route {record['route_id']} "
+                          f"were flagged or delayed in the last {window} days", "Cautionary Override",
+                          "Require human dispatcher sign-off", human=True)
+
+
+class ProcurementRule(BusinessRule):
+    """Rule 5 (multi-condition): Cargo Destruction predicted AT the origin port -> reorder the goods."""
+
+    DESTRUCTION_IMPACTS = frozenset({"Cargo Destruction"})
+
+    def apply(self, record, decision, now):
+        destroyed = record["expected_impact"] in self.DESTRUCTION_IMPACTS
+        at_origin = record["affected_location"] == record["origin_port"]
+        if destroyed and at_origin:
+            decision.hold()
+            decision.add_alert("procurement_team", ["email"],
+                               f"Shipment {record['shipment_id']} is at risk of destruction at "
+                               f"{record['origin']}. Consider reordering to avoid stock-out.")
+            decision.add_note(f"Rule 5: Cargo Destruction @{record['origin_port']} (origin)", "Procurement Alert",
+                              "Reorder goods immediately: the goods on this shipment")
+
+class OutcomeResolver:
+    """Turns the accumulated flags and risk into one outcome, then applies the human-review gate."""
+
+    def resolve(self, decision):
+        if decision.has_flag("Procurement Alert"):
+            decision.set_outcome("DELAY")
+        elif decision.has_flag("Premium Increase Required"):
+            decision.set_outcome("INSURE")
+        elif decision.risk_level == RiskLevel.HIGH:
+            decision.set_outcome("DELAY")
+            decision.add_action("Delay departure until conditions clear")
+            decision.require_human()
+        else:
+            decision.set_outcome("PROCEED")
+            if decision.risk_level == RiskLevel.MEDIUM:
+                decision.add_action("Proceed with monitoring")
+        if decision.hold_shipment and decision.outcome == "PROCEED":
+            decision.set_outcome("ESCALATE")
+        # Final gate: anything needing a human is never fully automatic
+        if decision.needs_human:
+            if decision.outcome == "PROCEED":
+                decision.set_outcome("ESCALATE")
+            decision.add_action("Route to human review queue")
+
+
+class LogicManager:
+    """Runs every AI-enriched record through preparation, validation, the rules and the resolver."""
+
+    def __init__(self, history_source, config=None, allowed_values=None):
+        self._history_source = history_source
+        self._allowed_values = allowed_values
+        self._build(config or RuleConfig())
+
+    def _build(self, config):
+        # Composition: these parts are created here and live only inside this LogicManager.
+        self._config = config
+        self._preparer = RecordPreparer()
+        self._validator = RecordValidator(config, self._allowed_values)
+        self._rules = [
+            PerfectStormRule(config),
+            AIInsightRule(config),
+            InsuranceRule(),
+            RouteHistoryRule(config, self._history_source),  # after the risk-raising rules
+            ProcurementRule(),
+        ]
+        self._resolver = OutcomeResolver()
+
+    @property
+    def config(self):
+        return self._config
+
+    @property
+    def rules(self):
+        return tuple(self._rules)
+
+    def update_config(self, config):
+        """Apply new user-chosen thresholds (new feature); rebuilds the rules with them."""
+        if not isinstance(config, RuleConfig):
+            raise TypeError("config must be a RuleConfig")
+        self._build(config)
+
+    def evaluate_shipment(self, ai_record, now=None):
+        """Run one AI row through every rule. Returns (prepared record, Decision)."""
+        now = now or datetime.now()
+        record, dropped = self._preparer.prepare(ai_record)
+        decision = Decision(record.get("shipment_id", "UNKNOWN"))
+        if self._validator.validate(record, dropped, decision, now):
+            for rule in self._rules:  # polymorphism: same call for every rule type
+                rule.apply(record, decision, now)
+            self._resolver.resolve(decision)
+        return record, decision
+
+    def evaluate_shipments(self, assessments, now=None):
+        """Evaluate every AI assessment; returns [(record, Decision), ...].
+        Accepts the AI Manager's DataFrame or a plain list of dicts.
+        One broken row is rejected on its own instead of stopping the batch."""
+        rows = assessments.to_dict("records") if hasattr(assessments, "to_dict") else list(assessments)
+        results = []
+        for row in rows:
+            try:
+                results.append(self.evaluate_shipment(row, now))
+            except Exception as exc:  # keep the batch running; the row goes to a human
+                decision = Decision(row.get("shipment_id", "UNKNOWN") if isinstance(row, dict) else "UNKNOWN")
+                decision.set_outcome("REJECT")
+                decision.add_note(f"Evaluation failed: {exc!r}", "Evaluation error", human=True)
+                results.append((row, decision))
+        return results
