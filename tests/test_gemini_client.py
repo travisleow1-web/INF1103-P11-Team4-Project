@@ -169,3 +169,39 @@ def test_one_attempt_means_no_retry(no_sleep):
         client.complete("p")
     assert len(session.calls) == 1
     no_sleep.assert_not_called()
+
+
+def google_error(status_code, status, message):
+    return FakeResponse(status_code, {"error": {"code": status_code, "status": status, "message": message}})
+
+
+def test_an_error_reply_gives_googles_status_and_message():
+    client, _ = make_client(google_error(400, "INVALID_ARGUMENT", "API key not valid. Please pass a valid API key."))
+    with pytest.raises(AIServiceError) as caught:
+        client.complete("p")
+    assert str(caught.value) == "HTTP 400 (INVALID_ARGUMENT: API key not valid. Please pass a valid API key.)"
+    assert not caught.value.retryable
+
+
+def test_a_retried_error_reply_keeps_the_reason():
+    client, _ = make_client(*[google_error(503, "UNAVAILABLE", "The model is overloaded.")] * MAX_RETRIES)
+    with pytest.raises(AIServiceError, match=r"HTTP 503 \(UNAVAILABLE: The model is overloaded.\)"):
+        client.complete("p")
+
+
+def test_a_long_reason_is_shortened_and_the_key_is_masked():
+    client, _ = make_client(google_error(403, "PERMISSION_DENIED", "key test-key refused " + "x" * 500))
+    with pytest.raises(AIServiceError) as caught:
+        client.complete("p")
+    text = str(caught.value)
+    assert "test-key" not in text and "***" in text
+    assert len(text) < 230 and text.endswith("...)")
+
+
+@pytest.mark.parametrize("reply", [FakeResponse(400, None), FakeResponse(400, bad_json=True),
+                                   FakeResponse(400, {"error": "plain text"}), FakeResponse(400, {"error": {}})])
+def test_an_error_reply_without_a_usable_body_gives_only_the_status(reply):
+    client, _ = make_client(reply)
+    with pytest.raises(AIServiceError) as caught:
+        client.complete("p")
+    assert str(caught.value) == "HTTP 400"

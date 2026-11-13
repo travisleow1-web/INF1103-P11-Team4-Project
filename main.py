@@ -95,11 +95,13 @@ def build_mongo(ports: PortRegistry) -> MongoDataManager:
 
 
 def create_app() -> FastAPI:
-    """Read .env, compose the managers and return the FastAPI app.
+    """Set up logging if nothing has, read .env, compose the managers and return the FastAPI app.
 
     DEMO_MODE=1 uses the fake AI and Logic from tests/fakes.py and keeps its records in DEMO_DATA_FILE
     (default demo_records.json), never in MongoDB or DATA_FILE. Every page then shows a demo banner.
     """
+    if not logging.getLogger().handlers:        # leave a host's own logging setup alone
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     load_dotenv()
     ports = PortRegistry.from_json()
     demo = os.getenv("DEMO_MODE", "").strip() == "1"

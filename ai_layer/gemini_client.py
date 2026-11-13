@@ -13,6 +13,7 @@ from .invalid_response_error import InvalidResponseError
 log = logging.getLogger(__name__)
 
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+REASON_LIMIT = 200      # longest part of Google's error message kept in an AIServiceError
 
 
 class GeminiClient:
@@ -33,6 +34,8 @@ class GeminiClient:
         self.__response_schema = copy.deepcopy(response_schema)
         self.__max_retries = max_retries
         self.__timeout = timeout
+        # One Session is shared by every request thread. That is acceptable here: it only pools
+        # connections, and holds no cookies or auth state (the key is sent per request in a header).
         self.__http = http or requests.Session()
 
     def complete(self, prompt: str) -> dict:
@@ -86,10 +89,30 @@ class GeminiClient:
         except (requests.RequestException, ValueError, UnicodeError) as error:
             raise AIServiceError(f"request failed: {type(error).__name__}", retryable=False) from None
         if reply.status_code == 429 or reply.status_code >= 500:
-            raise AIServiceError(f"HTTP {reply.status_code}", retryable=True)
+            raise AIServiceError(f"HTTP {reply.status_code}{self.__reason(reply)}", retryable=True)
         if reply.status_code >= 400:
-            raise AIServiceError(f"HTTP {reply.status_code}", retryable=False)
+            raise AIServiceError(f"HTTP {reply.status_code}{self.__reason(reply)}", retryable=False)
         try:
             return json.loads(reply.json()["candidates"][0]["content"]["parts"][0]["text"])
         except (KeyError, IndexError, TypeError, ValueError) as error:
             raise InvalidResponseError(f"unreadable model reply: {error}") from error
+
+    def __reason(self, reply: requests.Response) -> str:
+        """Google's error status and message from an error reply, e.g. ' (INVALID_ARGUMENT: API key not valid)'.
+
+        Empty if the body has none. Shortened to REASON_LIMIT characters, and the key is masked just in case.
+        """
+        try:
+            error = reply.json()["error"]
+            parts = [str(error.get(name) or "").strip() for name in ("status", "message")]
+        except (KeyError, TypeError, ValueError, AttributeError):
+            return ""
+        reason = ": ".join(part for part in parts if part)
+        if not reason:
+            return ""
+        reason = " ".join(reason.split())
+        if self.__api_key:
+            reason = reason.replace(self.__api_key, "***")
+        if len(reason) > REASON_LIMIT:
+            reason = reason[:REASON_LIMIT - 3] + "..."
+        return f" ({reason})"

@@ -16,6 +16,8 @@ class ContextProvider(ABC):
 
     def __init__(self, name: str, http: Optional[requests.Session] = None, timeout: float = HTTP_TIMEOUT):
         self.__name = name
+        # One Session per feed is shared by every request thread. That is acceptable here: it only pools
+        # connections, and holds no cookies or auth state (the feeds need no login).
         self.__http = http or requests.Session()
         self.__timeout = timeout
 

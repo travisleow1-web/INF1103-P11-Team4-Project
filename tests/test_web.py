@@ -1,5 +1,7 @@
 """Web pages through FastAPI's TestClient, with a temp-file JSON data manager. No network."""
+import logging
 import threading
+from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 from helpers import PORTS, make_io, saved_record
@@ -560,3 +562,14 @@ def test_overlapping_submissions_get_distinct_ids_and_every_row_saves(data):
     assert all("Not saved" not in page for page in pages)
     saved = sorted(r.shipment.shipment_id for r in data.find(SearchCriteria()))
     assert saved == [f"SHP-{n:03d}" for n in range(1, 7)]
+
+
+def test_create_app_sets_up_logging_only_when_nothing_has(env):
+    root = logging.getLogger()
+    with patch.object(root, "handlers", []), patch("main.logging.basicConfig") as basic:
+        main.create_app()
+    basic.assert_called_once()
+    assert basic.call_args.kwargs["level"] == logging.INFO
+    with patch.object(root, "handlers", [logging.NullHandler()]), patch("main.logging.basicConfig") as basic:
+        main.create_app()
+    basic.assert_not_called()
