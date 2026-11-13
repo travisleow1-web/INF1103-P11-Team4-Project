@@ -111,7 +111,7 @@ class IOManager:
                 "confidence_score": a.get("confidence_score"),
                 "primary_factor": primary,
                 "primary_severity": severity,
-                "primary_risk": self.__risk_text(primary, severity),
+                "primary_risk": self.__risk_text(primary),
                 "n_risk_factors": len(factors),
                 "conflicting_sources": a.get("conflicting_sources"),
                 "overall_risk": d["overall_risk"],
@@ -188,10 +188,10 @@ class IOManager:
         """DD/MM/YYYY HH:MM in Singapore time, for display."""
         return moment.astimezone(SGT).strftime("%d/%m/%Y %H:%M SGT")
 
-    def __risk_text(self, risk_type, severity):
-        """'port_congestion', 'MEDIUM' -> 'Port congestion (Medium)'; no severity -> just the name."""
+    def __risk_text(self, risk_type):
+        """'port_congestion' -> 'Port congestion '; no severity -> just the name."""
         name = str(risk_type or "none").replace("_", " ").capitalize()
-        return name if severity == "-" else f"{name} ({str(severity).capitalize()})"
+        return f"{name}"
 
     def __text(self, value):
         return str(value or "").strip() or None

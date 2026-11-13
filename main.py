@@ -118,7 +118,6 @@ def create_app() -> FastAPI:
         ai, logic = build_ai(), build_logic(data, ports)
     io = IOManager(ShipmentValidator(ports), data, ports)
     notices = [data.message] if isinstance(data, UnavailableDataManager) else []
-    print(data)
     return create_web_app(io, ai, logic, data, demo, notices, run=assess_shipments)
 
 
