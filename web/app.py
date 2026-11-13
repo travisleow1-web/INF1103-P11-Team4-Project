@@ -18,6 +18,9 @@ WEB_DIR = Path(__file__).resolve().parent
 MAX_UPLOAD_BYTES = 1024 * 1024
 MAX_REQUEST_BYTES = MAX_UPLOAD_BYTES + 64 * 1024        # the file plus room for typed rows
 TOO_LARGE = "The CSV file is larger than 1 MB."
+NO_AI = "AI is not connected: set GEMINI_API_KEY in .env (or start with DEMO_MODE=1)."
+NO_LOGIC = "Logic is not connected yet."
+NO_AI_OR_LOGIC = "AI and Logic are not connected yet."
 ROW_FIELDS = ("origin_port", "destination_port", "departure_time", "arrival_time")
 SEARCH_FIELDS = ("shipment_id", "origin", "destination", "departure_from", "departure_to",
                  "overall_risk", "outcome", "needs_human")
@@ -28,6 +31,17 @@ logger = logging.getLogger(__name__)
 Runner = Callable[..., Iterable[Tuple[ShipmentRecord, Optional[str]]]]
 
 
+def not_connected_message(ai, logic) -> Optional[str]:
+    """What to tell users when the AI or Logic layer is missing, or None when both are connected."""
+    if ai is None and logic is None:
+        return NO_AI_OR_LOGIC
+    if ai is None:
+        return NO_AI
+    if logic is None:
+        return NO_LOGIC
+    return None
+
+
 def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
                    notices: Optional[List[str]] = None, *, run: Runner) -> FastAPI:
     """Build the FastAPI app. ai and logic may be None while those layers are not connected.
@@ -36,14 +50,14 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
     run is the assessment flow (main.assess_shipments), passed in so the web layer never imports main.
     """
     notices = list(notices or [])
-    connected = ai is not None and logic is not None
+    not_connected = not_connected_message(ai, logic)
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(WEB_DIR / "templates")), autoescape=True)
     templates = Jinja2Templates(env=env)
     app = FastAPI(title="Supply Chain Risk Assessor")
     app.mount("/static", StaticFiles(directory=str(WEB_DIR / "static")), name="static")
 
     def page(request: Request, name: str, status_code: int = 200, **context) -> HTMLResponse:
-        context = {"demo": demo, "notices": notices, "connected": connected, "form": io.show_input_form(),
+        context = {"demo": demo, "notices": notices, "not_connected": not_connected, "form": io.show_input_form(),
                    **context}
         return templates.TemplateResponse(request, name, context, status_code=status_code)
 
@@ -51,7 +65,7 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
         return page(request, "index.html", status_code, rows=rows or [dict.fromkeys(ROW_FIELDS, "")], **context)
 
     def render(name: str, **context) -> str:
-        return env.get_template(name).render(demo=demo, notices=notices, connected=connected, **context)
+        return env.get_template(name).render(demo=demo, notices=notices, not_connected=not_connected, **context)
 
     @app.middleware("http")
     async def reject_large_uploads(request: Request, call_next):
@@ -120,9 +134,9 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
                               row_errors=row_errors, offset=offset)
 
         shipments = preview.valid_shipments()
-        if not connected:
+        if not_connected:
             valid = "1 shipment is valid." if len(shipments) == 1 else f"{len(shipments)} shipments are valid."
-            return input_page(request, rows, info=f"{valid} AI and Logic are not connected yet.")
+            return input_page(request, rows, info=f"{valid} {not_connected}")
         return StreamingResponse(stream_results(shipments), media_type="text/html; charset=utf-8",
                                  headers={"X-Accel-Buffering": "no"})
 

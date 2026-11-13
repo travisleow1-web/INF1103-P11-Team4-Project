@@ -60,8 +60,8 @@ The shared model (`Port`, `PortRegistry`, `Shipment`, `ShipmentRecord`, `SearchC
 
 | Route | What it does |
 |---|---|
-| `GET /` | `io.show_input_form()` fills the page: row table, CSV upload, link to search. Says up front when AI and Logic are not connected |
-| `POST /submit` | Builds `CsvSource` and `FormSource.many(...)`, calls `io.preview(...)`. Problems: show them and run nothing. AI or Logic not connected: "N shipments are valid. AI and Logic are not connected yet." Otherwise streams one result row per shipment from the runner |
+| `GET /` | `io.show_input_form()` fills the page: row table, CSV upload, link to search. Says up front when the AI or Logic is not connected (without a Gemini key: "AI is not connected: set GEMINI_API_KEY in .env (or start with DEMO_MODE=1).") |
+| `POST /submit` | Builds `CsvSource` and `FormSource.many(...)`, calls `io.preview(...)`. Problems: show them and run nothing. AI or Logic not connected: "N shipments are valid." plus which one is missing Otherwise streams one result row per shipment from the runner |
 | `GET /search` | `io.search(query fields)`, rendered by `kind`: `results`, `empty` (with a link to the input page) or `error` |
 
 On phones (below 640px) typed rows stack one field per line and result rows become cards, so nothing scrolls sideways.

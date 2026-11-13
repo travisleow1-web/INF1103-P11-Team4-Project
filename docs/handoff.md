@@ -16,7 +16,7 @@ Open http://127.0.0.1:8000, upload `sample_data/shipments.csv`, then try **Searc
 
 `DEMO_MODE=1` makes `create_app()` use `FakeAI` and `FakeLogic` from `tests/fakes.py` instead of the real managers, and every page shows a yellow banner "Demo mode: fake AI and rules". Demo records go to `DEMO_DATA_FILE` (default `demo_records.json`), never to `DATA_FILE` or MongoDB, so demo runs cannot mix with real records. The fakes give each shipment a low, medium or high weather risk based on its number. They live under `tests/` and never run unless demo mode is on.
 
-Without demo mode, the AI comes from `build_ai()` and the Logic from `build_logic()` in `main.py`. `build_ai()` returns `None` when `GEMINI_API_KEY` is not set; the home page then says so up front, and the submit page validates the rows and then says "N shipments are valid. AI and Logic are not connected yet."
+Without demo mode, the AI comes from `build_ai()` and the Logic from `build_logic()` in `main.py`. `build_ai()` returns `None` when `GEMINI_API_KEY` is not set; the home page then says up front "AI is not connected: set GEMINI_API_KEY in .env (or start with DEMO_MODE=1).", and the submit page validates the rows and then says "N shipments are valid." followed by the same message.
 
 ## Folder map
 

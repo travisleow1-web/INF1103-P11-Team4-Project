@@ -65,6 +65,23 @@ def test_the_home_page_says_up_front_when_ai_and_logic_are_not_connected(data):
     assert "not connected" not in demo_client(data).get("/").text
 
 
+NO_AI = "AI is not connected: set GEMINI_API_KEY in .env (or start with DEMO_MODE=1)."
+
+
+def test_without_only_the_ai_the_pages_say_how_to_connect_it(data):
+    client = client_for(data, logic=FakeLogic())
+    home = client.get("/").text
+    assert NO_AI in home and "AI and Logic" not in home
+    page = client.post("/submit", data=good_rows(1)).text
+    assert f"1 shipment is valid. {NO_AI}" in page
+    assert page.count("not connected") == 1
+
+
+def test_without_only_the_logic_the_pages_say_so(data):
+    page = client_for(data, ai=FakeAI()).post("/submit", data=good_rows(1)).text
+    assert "1 shipment is valid. Logic is not connected yet." in page
+
+
 def test_blank_typed_rows_are_skipped(data):
     rows = good_rows(1)
     for values in rows.values():
@@ -404,9 +421,9 @@ def test_create_app_in_demo_mode_assesses_with_the_fakes(env):
     assert "1 of 1" in page.text and "SHP-001" in page.text
 
 
-def test_create_app_without_demo_mode_says_not_connected(env):
+def test_create_app_without_a_key_says_only_the_ai_is_not_connected(env):
     page = TestClient(main.create_app()).post("/submit", files={"csv_file": ("s.csv", CSV, "text/csv")})
-    assert "AI and Logic are not connected yet." in page.text
+    assert f"1 shipment is valid. {NO_AI}" in page.text
     assert "Demo mode" not in page.text
 
 
