@@ -50,6 +50,45 @@ def test_static_files_are_served(data):
     client = client_for(data)
     assert client.get("/static/style.css").status_code == 200
     assert "add-row" in client.get("/static/add_row.js").text
+    crate = client.get("/static/crate.js").text
+    assert "crate-strip" in crate
+    assert "AudioContext" in crate and "playReveal(winner.rarity)" in crate
+
+
+@pytest.mark.parametrize("path, feature", [("/search", "Search"), ("/", "Shipment Assessment")])
+def test_prank_paywall_names_the_feature_and_has_no_payment_fields(data, path, feature):
+    page = client_for(data).get(path).text
+    paywall = page[page.index('<dialog class="paywall"'):page.index("</dialog>")]
+    assert f"Unlock {feature} Pro" in paywall
+    assert "Just kidding!" in paywall
+    assert "<input" not in paywall and "<form" not in paywall
+    assert '<script src="/static/paywall.js"></script>' in page
+
+
+def test_rules_page_has_no_paywall(data):
+    assert "paywall" not in client_for(data).get("/rules").text
+
+
+@pytest.mark.parametrize("path", ["/", "/search", "/rules"])
+def test_every_page_ends_with_the_crate_reel(data, path):
+    page = client_for(data).get(path).text
+    assert 'id="crate-open"' in page
+    assert '<script src="/static/crate.js"></script>' in page
+    assert '<script src="/static/ads.js"></script>' in page
+    assert 'id="music-toggle"' in page and '<script src="/static/music.js"></script>' in page
+    assert 'preload="none"' in page and "Gymnopedie_No._1..ogg" in page   # nothing downloads until it plays
+    assert "youtube" not in page
+
+
+def test_music_script_waits_for_the_first_interaction(data):
+    music = client_for(data).get("/static/music.js").text
+    assert "pointerdown" in music and "player.play()" in music
+
+
+def test_prank_ads_are_served_and_never_link_anywhere(data):
+    ads = client_for(data).get("/static/ads.js").text
+    assert "Just kidding!" in ads
+    assert "href" not in ads and "innerHTML" not in ads and "window.open" not in ads
 
 
 # submit without AI and Logic

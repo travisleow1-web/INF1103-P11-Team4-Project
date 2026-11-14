@@ -1,0 +1,36 @@
+{# The prank paywall. The page sets `paywall` (key, feature, basic, pro, enterprise, skip, back) before including this. #}
+<dialog class="paywall" id="paywall" data-key="{{ paywall.key }}" aria-labelledby="paywall-title">
+  <div id="paywall-offer">
+    <p class="paywall-tag">Your 14-day free trial has ended</p>
+    <h2 id="paywall-title">Unlock {{ paywall.feature }} Pro</h2>
+    <p>{{ paywall.feature }} is a premium feature. Choose a plan to keep using it.</p>
+    <div class="paywall-plans">
+      <div class="paywall-plan">
+        <h3>Basic</h3>
+        <p class="paywall-price">$9.99<span>/month</span></p>
+        <p class="hint">{{ paywall.basic }}</p>
+        <button type="button" class="paywall-pick">Subscribe</button>
+      </div>
+      <div class="paywall-plan paywall-best">
+        <p class="paywall-badge">Most popular</p>
+        <h3>Pro</h3>
+        <p class="paywall-price">$49.99<span>/month</span></p>
+        <p class="hint">{{ paywall.pro }}</p>
+        <button type="button" class="paywall-pick">Subscribe</button>
+      </div>
+      <div class="paywall-plan">
+        <h3>Enterprise</h3>
+        <p class="paywall-price">$999<span>/month</span></p>
+        <p class="hint">{{ paywall.enterprise }}</p>
+        <button type="button" class="paywall-pick">Contact sales</button>
+      </div>
+    </div>
+    <button type="button" class="secondary paywall-pick">{{ paywall.skip }}</button>
+  </div>
+  <div id="paywall-joke" hidden>
+    <h2>Just kidding!</h2>
+    <p>{{ paywall.feature }} is free and always has been. Nothing was charged and nothing was sent anywhere.</p>
+    <button type="button" id="paywall-close">{{ paywall.back }}</button>
+  </div>
+</dialog>
+<script src="/static/paywall.js"></script>

@@ -61,4 +61,11 @@
   <button type="submit">Assess shipments</button>
 </form>
 <script src="/static/add_row.js"></script>
+{% set paywall = {"key": "assess", "feature": "Shipment Assessment",
+                  "basic": "Assess 1 shipment per week",
+                  "pro": "Unlimited assessments, AI included",
+                  "enterprise": "We assess the risk of you not paying",
+                  "skip": "No thanks, I'll guess the risk myself",
+                  "back": "Take me to my shipments"} %}
+{% include "_paywall.html" %}
 {% include "_footer.html" %}

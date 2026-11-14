@@ -1,3 +1,26 @@
 </main>
+<footer class="crate" aria-labelledby="crate-title">
+  <h2 id="crate-title">Cargo crate</h2>
+  <p class="hint">Just for fun: open a crate and see what cargo you get. Nothing here affects any assessment. Marcus tell me do one.</p>
+  <div class="crate-reel" aria-hidden="true">
+    <div class="crate-marker"></div>
+    <ul class="crate-strip" id="crate-strip"></ul>
+  </div>
+  <button type="button" id="crate-open">Open crate</button>
+  <button type="button" id="crate-sound" class="secondary" aria-pressed="true">Sound: on</button>
+  <p class="crate-result" id="crate-result" role="status" aria-live="polite"></p>
+</footer>
+<section class="music" aria-labelledby="music-title">
+  <h2 id="music-title">Background music</h2>
+  <p class="hint">Starts on your first click or key press.
+    Erik Satie, Gymnop&eacute;die No. 1, from
+    <a href="https://commons.wikimedia.org/wiki/File:Gymnopedie_No._1..ogg">Wikimedia Commons</a> (CC0, public domain).</p>
+  <button type="button" id="music-toggle" class="secondary" aria-pressed="true">Music: on</button>
+  <audio id="music-audio" class="music-player" controls loop preload="none"
+         src="https://commons.wikimedia.org/wiki/Special:FilePath/Gymnopedie_No._1..ogg"></audio>
+</section>
+<script src="/static/crate.js"></script>
+<script src="/static/music.js"></script>
+<script src="/static/ads.js"></script>
 </body>
 </html>
