@@ -207,3 +207,50 @@ def test_no_clear_window_gives_no_reschedule_suggestion(app, gemini):
     page = app.post("/submit", data=rows((leave.strftime("%d/%m/%Y"), arrive.strftime("%d/%m/%Y")))).text
     assert "Consider departing" not in page
 
+
+DEFAULTS = {"confidence_min": "0.6", "history_window_days": "21", "perfect_storm_min_mediums": "3",
+            "data_max_age_hours": "24", "delay_days_limit": "3", "delay_days_high": "7"}
+
+
+def saved_values(app):
+    """The numbers the rules page currently shows, by field name."""
+    import re
+    found = re.findall(r'name="(\w+)" value="([^"]*)"', app.get("/rules").text)
+    return {name: value for name, value in found if name != "reset"}
+
+
+def test_the_rules_page_starts_with_the_default_thresholds(app):
+    assert saved_values(app) == DEFAULTS
+
+
+def test_new_thresholds_apply_to_the_next_assessment(app, gemini):
+    gemini.complete.return_value = CALM                      # confidence 0.9
+    first = app.post("/submit", data=rows(("01/12/2026", "20/12/2026"))).text
+    assert outcome("PROCEED") in first
+    saved = app.post("/rules", data={**DEFAULTS, "confidence_min": "0.95"})
+    assert saved.status_code == 200 and "Rule settings saved" in saved.text
+    assert saved_values(app)["confidence_min"] == "0.95"
+    second = app.post("/submit", data=rows(("02/12/2026", "21/12/2026"))).text
+    assert outcome("ESCALATE") in second                     # 0.9 is now below the minimum
+
+
+def test_a_bad_value_is_refused_and_nothing_changes(app):
+    refused = app.post("/rules", data={**DEFAULTS, "confidence_min": "high"})
+    assert refused.status_code == 422 and "confidence_min must be a number" in refused.text
+    assert 'value="high"' in refused.text                    # what was typed is kept for correcting
+    assert saved_values(app) == DEFAULTS
+
+
+def test_settings_that_disagree_are_refused_as_a_whole(app):
+    refused = app.post("/rules", data={**DEFAULTS, "confidence_min": "0.8", "delay_days_limit": "9"})
+    assert refused.status_code == 422 and "delay_days_high must be at least delay_days_limit" in refused.text
+    assert saved_values(app) == DEFAULTS                     # the good confidence_min was not half applied
+
+
+def test_blank_boxes_use_the_defaults_and_reset_restores_them(app):
+    app.post("/rules", data={**DEFAULTS, "confidence_min": "0.8"})
+    app.post("/rules", data={key: "" for key in DEFAULTS})
+    assert saved_values(app) == DEFAULTS
+    app.post("/rules", data={**DEFAULTS, "confidence_min": "0.8"})
+    app.post("/rules", data={**DEFAULTS, "confidence_min": "0.8", "reset": "1"})
+    assert saved_values(app) == DEFAULTS
