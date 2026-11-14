@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import Optional
+from typing import Mapping, Optional
 from data_layer.data_manager import DataManager
 from model.ai_assessment import AIAssessment
 from model.decision import Decision
@@ -16,7 +16,6 @@ from .procurement_rule import ProcurementRule
 from .route_history_rule import RouteHistoryRule
 from .rule_config import RuleConfig
 from .unregistered_location_rule import UnregisteredLocationRule
-from logic_layer.rule_config import RuleConfig
 
 logger = logging.getLogger(__name__)
 
