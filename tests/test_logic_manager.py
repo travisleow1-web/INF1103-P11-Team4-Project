@@ -7,6 +7,7 @@ from logic_layer.ai_insight_rule import AIInsightRule
 from logic_layer.data_quality_rule import DataQualityRule
 from logic_layer.insurance_rule import InsuranceRule
 from logic_layer.logic_manager import LogicManager
+from logic_layer.reschedule_rule import RescheduleRule
 from logic_layer.perfect_storm_rule import PerfectStormRule
 from logic_layer.procurement_rule import ProcurementRule
 from logic_layer.route_history_rule import RouteHistoryRule
@@ -27,7 +28,7 @@ def manager(history=None, config=None):
 def test_rules_run_in_the_agreed_order():
     assert [type(r) for r in manager().rules] == [
         DataQualityRule, PerfectStormRule, AIInsightRule, InsuranceRule,
-        UnregisteredLocationRule, RouteHistoryRule, ProcurementRule]
+        UnregisteredLocationRule, RouteHistoryRule, ProcurementRule, RescheduleRule]
 
 
 def test_the_default_config_is_used_when_none_is_given():

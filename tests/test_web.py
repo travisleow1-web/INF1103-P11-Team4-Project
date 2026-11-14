@@ -426,7 +426,7 @@ def test_logic_is_built_with_the_data_manager_and_ports(data):
     from logic_layer.logic_manager import LogicManager
     logic = main.build_logic(data, PORTS)
     assert isinstance(logic, LogicManager)
-    assert len(logic.rules) == 7
+    assert len(logic.rules) == 8
 
 
 def test_build_data_uses_json_by_default(env):

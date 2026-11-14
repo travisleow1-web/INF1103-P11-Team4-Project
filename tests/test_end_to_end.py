@@ -2,6 +2,7 @@
 
 No network: the Gemini client is Mock(spec=GeminiClient) and the context providers are stubs.
 """
+from datetime import date, timedelta
 from unittest.mock import Mock, patch
 import pytest
 from fastapi.testclient import TestClient
@@ -34,6 +35,11 @@ EXTREME = reply([risk("geopolitical", "Extreme", "Route", "gdelt_news")], primar
                 impact="Cargo Damage")
 DESTRUCTION = reply([risk("weather", "Medium")], primary="weather", location="SGSIN",
                     impact="Cargo Destruction")
+
+
+def clear_window(raw, start):
+    """The same Gemini reply, with a clear departure date added."""
+    return {**raw, "earliest_clear_departure": start}
 
 
 def rows(*dates):
@@ -178,3 +184,26 @@ def test_a_rule_that_raises_shows_a_rule_error_and_the_stream_finishes(app):
     assert outcome("ESCALATE") in page
     assert "Done: 1 of 1 shipment assessed." in page
     assert "Assessment stopped" not in page
+
+
+def test_a_clear_weather_window_gives_a_reschedule_suggestion(app, gemini):
+    leave, arrive = date.today() + timedelta(days=5), date.today() + timedelta(days=20)
+    clear = leave + timedelta(days=4)
+    gemini.complete.return_value = clear_window(
+        reply([risk("weather", "High")], primary="weather", location="SGSIN", impact="Delay"), clear.isoformat())
+    page = app.post("/submit", data=rows((leave.strftime("%d/%m/%Y"), arrive.strftime("%d/%m/%Y")))).text
+    new_arrive = clear + (arrive - leave)
+    assert (f"<li>Consider departing on {clear:%d/%m/%Y} and arriving on {new_arrive:%d/%m/%Y} "
+            f"instead of {leave:%d/%m/%Y}</li>") in page
+    assert outcome("DELAY") in page
+    saved = app.get("/search").text           # the suggestion survives saving (JSON and MongoDB)
+    assert f"Consider departing on {clear:%d/%m/%Y}" in saved
+
+
+def test_no_clear_window_gives_no_reschedule_suggestion(app, gemini):
+    leave, arrive = date.today() + timedelta(days=5), date.today() + timedelta(days=20)
+    gemini.complete.return_value = clear_window(
+        reply([risk("weather", "High")], primary="weather", location="SGSIN", impact="Delay"), "")
+    page = app.post("/submit", data=rows((leave.strftime("%d/%m/%Y"), arrive.strftime("%d/%m/%Y")))).text
+    assert "Consider departing" not in page
+

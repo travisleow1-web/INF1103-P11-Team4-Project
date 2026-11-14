@@ -13,6 +13,7 @@ from .insurance_rule import InsuranceRule
 from .outcome_resolver import OutcomeResolver
 from .perfect_storm_rule import PerfectStormRule
 from .procurement_rule import ProcurementRule
+from .reschedule_rule import RescheduleRule
 from .route_history_rule import RouteHistoryRule
 from .rule_config import RuleConfig
 from .unregistered_location_rule import UnregisteredLocationRule
@@ -45,6 +46,7 @@ class LogicManager:
             UnregisteredLocationRule(self.__ports),
             RouteHistoryRule(config, self.__data),  # after the risk-raising rules
             ProcurementRule(),
+            RescheduleRule(),
         )
 
     @property
