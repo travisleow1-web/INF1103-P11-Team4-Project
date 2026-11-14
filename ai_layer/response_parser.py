@@ -1,5 +1,5 @@
-from datetime import datetime
-from typing import Any, Dict, Iterable
+from datetime import date, datetime
+from typing import Any, Dict, Iterable, Optional
 from model.ai_assessment import AIAssessment
 from model.ai_status import AIStatus
 from model.insight import Insight
@@ -36,9 +36,19 @@ class ResponseParser:
                 self.__text(raw["affected_location"], "affected_location"),
                 self.__check("impact", raw["expected_impact"]),
                 score, raw["conflicting_sources"], status, fetched_at,
+                self.__clear_date(raw.get("earliest_clear_departure")),
             )
         except (KeyError, TypeError, ValueError, AttributeError, OverflowError) as error:
             raise InvalidResponseError(f"invalid AI response: {error}") from error
+
+    @staticmethod
+    def __clear_date(value: Any) -> Optional[date]:
+        """The suggested clear departure date; missing or "" means there is none. Anything else must be YYYY-MM-DD."""
+        if value is None or value == "":
+            return None
+        if not isinstance(value, str):
+            raise ValueError("earliest_clear_departure must be text")
+        return date.fromisoformat(value.strip())
 
     def __factor(self, data: Dict[str, Any]) -> RiskFactor:
         risk_type = RiskType(data["type"])

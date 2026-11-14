@@ -1,6 +1,6 @@
 import copy
 import json
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 import pytest
 from ai_helpers import valid_raw
 from ai_layer.ai_settings import ALLOWED_LISTS
@@ -148,3 +148,22 @@ def test_zero_delay_is_accepted():
     raw = valid_raw()
     raw["insights"][0]["estimated_delay_days"] = 0
     assert parse(raw).insights[0].estimated_delay_days == 0
+
+
+def test_a_clear_departure_date_is_read():
+    assert parse(valid_raw(earliest_clear_departure="2026-11-20")).earliest_clear_departure == date(2026, 11, 20)
+
+
+@pytest.mark.parametrize("value", ["", None])
+def test_no_clear_departure_means_none(value):
+    assert parse(valid_raw(earliest_clear_departure=value)).earliest_clear_departure is None
+
+
+def test_a_reply_without_the_field_still_parses_as_none():
+    assert parse(valid_raw()).earliest_clear_departure is None
+
+
+@pytest.mark.parametrize("value", ["soon", "20/11/2026", "2026-13-40", 20261120])
+def test_a_bad_clear_departure_rejects_the_reply(value):
+    with pytest.raises(InvalidResponseError):
+        parse(valid_raw(earliest_clear_departure=value))
