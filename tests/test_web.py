@@ -585,7 +585,7 @@ def test_the_web_layer_does_not_import_main():
 def test_the_runner_passed_in_is_the_one_used(data):
     calls = []
 
-    def runner(shipments, ai, logic, data_manager):
+    def runner(shipments, ai, logic, data_manager, replace=False):
         calls.append([s.shipment_id for s in shipments])
         return iter(())
     client = TestClient(create_web_app(make_io(data), FakeAI(), FakeLogic(), data, run=runner))
@@ -604,6 +604,7 @@ class SlowFirstAI(FakeAI):
     """FakeAI whose first two calls wait for each other, so two submissions overlap before either saves."""
 
     def __init__(self):
+        super().__init__()
         self.__barrier = threading.Barrier(2, timeout=10)
         self.__calls = 0
         self.__lock = threading.Lock()

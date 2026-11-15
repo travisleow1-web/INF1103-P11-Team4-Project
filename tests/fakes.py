@@ -20,11 +20,21 @@ class FakeAI:
 
     A high risk also gets a clear departure date 4 days after the planned one, as if the forecast scan
     had found the weather clearing then. That is what lets the demo show the reschedule suggestion.
+
+    Every ninth shipment (SHP-009, SHP-018, ...) is unavailable the first time it is assessed and works
+    when assessed again, so the demo can show the re-run.
     """
+
+    def __init__(self):
+        self.__tried = set()
 
     def assess(self, shipment):
         """Return a LIVE assessment whose severity depends only on the shipment number."""
         number = int(shipment.shipment_id.split("-")[1])
+        first_try = shipment.shipment_id not in self.__tried
+        self.__tried.add(shipment.shipment_id)
+        if number % 9 == 0 and first_try:
+            return AIAssessment.fallback()
         level = LEVELS[number % 3]
         factor = RiskFactor(RiskType.WEATHER, level, shipment.origin.code, "open_meteo_weather",
                             f"Fake {level.label.lower()} weather")
@@ -42,8 +52,14 @@ class FakeLogic:
 
     def evaluate(self, shipment, assessment, now):
         """Return a Decision with the risk and outcome taken from the fake assessment."""
-        level = assessment.risk_factors[0].severity
         decision = Decision(shipment.shipment_id)
+        if assessment.is_fallback():            # no AI answer: low risk, but a person must look
+            decision.raise_risk(RiskLevel.LOW)
+            decision.set_outcome(Outcome.ESCALATE)
+            decision.add_note("Fake rule: the AI was unavailable")
+            decision.require_human()
+            return decision
+        level = assessment.risk_factors[0].severity
         decision.raise_risk(level)
         decision.set_outcome(OUTCOMES[level])
         decision.add_note(f"Fake rule: weather risk is {level.label}")

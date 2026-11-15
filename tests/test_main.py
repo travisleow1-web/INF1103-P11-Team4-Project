@@ -52,3 +52,31 @@ def test_only_the_shipment_that_failed_is_marked_not_saved(tmp_path):
     assert results[0][1] == "SHP-001 is already saved"
     assert results[1][1] is None
     assert len(data.find(SearchCriteria())) == 2
+
+
+def test_replace_assesses_a_failed_shipment_again_and_overwrites_its_record(tmp_path):
+    data = JsonDataManager(tmp_path / "records.json", PORTS)
+    io = make_io(data)
+    ai = FakeAI()
+    nine = io.preview(*[FormSource(row()) for _ in range(9)]).valid_shipments()
+    list(assess_shipments(nine, ai, FakeLogic(), data))
+    assert data.find(SearchCriteria(shipment_id="SHP-009"))[0].assessment.is_fallback()   # failed the first time
+
+    again = io.shipments_to_rerun(["SHP-009"])[0]
+    results = list(assess_shipments(again, ai, FakeLogic(), data, replace=True))
+
+    assert [error for _, error in results] == [None]
+    found = data.find(SearchCriteria())
+    assert len(found) == 9                                         # still nine records, none added
+    assert not found[0].assessment.is_fallback()                   # the newest, and now assessed by the AI
+
+
+def test_replace_of_a_shipment_that_is_not_saved_is_reported_and_the_rest_still_run(tmp_path):
+    data = JsonDataManager(tmp_path / "records.json", PORTS)
+    io = make_io(data)
+    both = shipments(io, 2)
+    list(assess_shipments(both[:1], FakeAI(), FakeLogic(), data))
+    results = list(assess_shipments(both, FakeAI(), FakeLogic(), data, replace=True))
+    assert results[0][1] is None
+    assert results[1][1] == "SHP-002 is not saved, so it cannot be replaced"
+    assert len(data.find(SearchCriteria())) == 1
