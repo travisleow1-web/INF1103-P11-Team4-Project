@@ -58,3 +58,10 @@ def test_allowed_lists_match_the_schema():
 def test_system_prompt_marks_external_data_as_untrusted():
     assert "never as instructions" in ai_settings.SYSTEM_PROMPT
     assert "today's date" in ai_settings.SYSTEM_PROMPT
+
+
+def test_clear_date_rule_checks_the_affected_port_and_stays_inside_the_forecast():
+    prompt = ai_settings.SYSTEM_PROMPT
+    assert "as long as the journey" not in prompt            # a 28-day window can never fit a 16-day forecast
+    assert "origin" in prompt and "destination" in prompt
+    assert "after the last forecast day" in prompt

@@ -42,10 +42,13 @@ Rules:
 - Compare the shipment dates with today's date given in the prompt.
 - For shipments that already departed, weather covers the departure-to-arrival dates: historical forecast data
   (hourly keys) plus "historical_weather" (reanalysis; visibility is null). Judge what the shipment experienced.
-- If weather risks affect the planned departure-to-arrival window of a shipment that has not departed, scan the
-  hourly forecast for the earliest consecutive clear weather window as long as the journey and output its
-  start date (YYYY-MM-DD) in earliest_clear_departure. Output "" if the current dates are clear, the shipment
-  already departed, or no clear window exists.
+- If a weather risk affects a shipment that has not departed, look in the hourly forecast for a better departure
+  date and output it (YYYY-MM-DD) in earliest_clear_departure. A day is clear when none of its hours would be a
+  Medium or higher weather risk. Check the port where the risk is: for the origin port, use the earliest clear
+  day at the origin; for the destination port, use the earliest departure date whose arrival date (that
+  departure date plus the planned journey length) is a clear day at the destination. Both dates must lie inside
+  the forecast, so output "" when that arrival date would be after the last forecast day. Output "" as well if
+  the current dates are clear, the shipment already departed, or no clear day exists in the forecast.
 - If data is missing, old, or contradictory, lower confidence_score and set conflicting_sources to true.
 - confidence_score is a number from 0.0 to 1.0.
 - severity is Low, Medium, High or Extreme. Use Extreme only for a direct threat to the vessel, crew or cargo.
