@@ -105,7 +105,7 @@ def test_a_calm_route_proceeds(app):
     assert page.status_code == 200
     assert "1 of 1" in page.text and row_for("SHP-001") in page.text
     assert outcome("PROCEED") in page.text
-    assert "AI unavailable" not in page.text
+    assert '<span class="badge badge-warn">AI unavailable</span>' not in page.text
     assert "not connected" not in page.text
 
 
@@ -260,36 +260,48 @@ def high_weather_with_window(clear):
     return clear_window(reply([risk("weather", "High")], primary="weather", location="SGSIN", impact="Delay"), clear)
 
 
-def test_the_panel_and_table_show_the_new_date_and_why_on_the_live_path(app, gemini):
+def test_the_report_and_hidden_line_show_the_new_date_and_why_on_the_live_path(app, gemini):
     leave, arrive = date.today() + timedelta(days=5), date.today() + timedelta(days=20)
     clear = leave + timedelta(days=4)
     gemini.complete.return_value = high_weather_with_window(clear.isoformat())
     results = app.post("/submit", data=rows((f"{leave:%d/%m/%Y}", f"{arrive:%d/%m/%Y}"))).text
-    assert "Suggested departure" not in results                 # no extra column: the panel is an option
-    assert '<details class="reschedule">' in results            # closed until the user opens it
-    assert '<details class="reschedule">' in app.get("/search").text
-    panel = results[results.index('<details class="reschedule"'):]
-    assert "Show reschedule suggestions (1)" in panel
-    assert f"Departing on {leave:%d/%m/%Y} meets High weather risk at SGSIN (test)" in panel
-    assert f"starting {clear:%d/%m/%Y}, 4 days later" in panel
+    assert "Suggested departure" not in results                 # no extra column: the dates are an option
+    report = results[results.index('class="report"'):]
+    assert "1 of 1 high-risk shipment has a new date" in report and "Show suggested dates" in report
+    line = results[results.index('class="reschedule-row"'):]      # hidden until the switch is on
+    assert f"Departing on {leave:%d/%m/%Y} meets High weather risk at SGSIN (test)" in line
+    assert f"starting {clear:%d/%m/%Y}, 4 days later" in line
+    search = app.get("/search").text
+    assert 'class="reschedule-row"' in search and "Summary of these records" in search
 
 
-def test_a_high_risk_shipment_with_no_clear_window_is_listed_without_a_date(app, gemini):
-    leave, arrive = date.today() + timedelta(days=5), date.today() + timedelta(days=20)
+def test_a_high_risk_shipment_with_no_clear_window_says_so_in_the_report(app, gemini):
+    leave, arrive = date.today() + timedelta(days=5), date.today() + timedelta(days=10)
     gemini.complete.return_value = high_weather_with_window("")
     results = app.post("/submit", data=rows((f"{leave:%d/%m/%Y}", f"{arrive:%d/%m/%Y}"))).text
-    panel = results[results.index('<details class="reschedule"'):]
-    assert "Show reschedule suggestions (1)" in panel and "No new date suggested" in panel
+    report = results[results.index('class="report"'):]
+    assert "0 of 1 high-risk shipment has a new date" in report
+    assert "1 has none because no clear day was found in the forecast." in report
+    assert "No new date suggested: no clear day was found in the forecast." in results
+
+
+def test_an_arrival_after_the_forecast_is_named_as_the_reason(app, gemini):
+    leave, arrive = date.today() + timedelta(days=5), date.today() + timedelta(days=30)
+    gemini.complete.return_value = high_weather_with_window("")
+    results = app.post("/submit", data=rows((f"{leave:%d/%m/%Y}", f"{arrive:%d/%m/%Y}"))).text
+    assert "because its arrival is after the 16-day forecast" in results
 
 
 def test_a_shipment_that_already_left_gets_no_new_date_even_if_the_ai_gives_one(app, gemini):
     leave, arrive = date.today() - timedelta(days=3), date.today() + timedelta(days=10)
     gemini.complete.return_value = high_weather_with_window((date.today() + timedelta(days=2)).isoformat())
     results = app.post("/submit", data=rows((f"{leave:%d/%m/%Y}", f"{arrive:%d/%m/%Y}"))).text
-    panel = results[results.index('<details class="reschedule"'):]
-    assert "No new date suggested" in panel and "Reschedule</span>" not in panel
+    assert "0 of 1 high-risk shipment has a new date" in results and "because it had already left" in results
+    assert "New dates for" not in results
 
 
-def test_a_calm_route_has_an_empty_panel(app):
+def test_a_calm_route_has_nothing_to_attend_to(app):
     results = app.post("/submit", data=rows(("01/12/2026", "20/12/2026"))).text
-    assert "Show reschedule suggestions (0)" in results and "so no new dates are suggested" in results
+    report = results[results.index('class="report"'):]
+    assert "Nothing needs attention." in report
+    assert 'class="reschedule-row"' not in results and "Show suggested dates" not in results

@@ -1,7 +1,10 @@
 {% set title = "Results" %}
+{% set main_class = "stream" %}
 {% include "_header.html" %}
 <h1>Results</h1>
-<p>Assessing {{ total }} shipment{{ "" if total == 1 else "s" }}. Each row appears as soon as its shipment is done.</p>
+<p class="lede">Assessing {{ total }} shipment{{ "" if total == 1 else "s" }}. Each row appears as soon as its shipment is done.</p>
+{% from "_macros.html" import dates_switch %}
+{{ dates_switch() }}
 <div class="table-wrap">
 <table class="results">
   <thead>

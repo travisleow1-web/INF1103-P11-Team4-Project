@@ -266,7 +266,7 @@ def test_result_rows_show_risk_and_outcome_as_text(data):
     text = demo_client(data).post("/submit", data=good_rows(3)).text
     assert '<span class="badge risk-high">High</span>' in text            # SHP-002 in the fakes
     assert '<span class="badge outcome-escalate">ESCALATE</span>' in text
-    assert "AI unavailable" not in text
+    assert '<span class="badge badge-warn">AI unavailable</span>' not in text
     assert "Not saved" not in text
 
 
@@ -646,21 +646,29 @@ def test_create_app_sets_up_logging_only_when_nothing_has(env):
     basic.assert_not_called()
 
 
-def test_demo_mode_lists_the_high_risk_shipments_with_their_reasoning_after_the_table(data):
+def test_demo_mode_report_leads_the_results_and_the_dates_stay_hidden_until_switched_on(data):
     from datetime import date, timedelta
     leave = date.today() + timedelta(days=5)
     rows = good_rows(3)
     rows["departure_time"] = [leave.strftime("%d/%m/%Y")] * 3
-    rows["arrival_time"] = [(leave + timedelta(days=20)).strftime("%d/%m/%Y")] * 3
+    rows["arrival_time"] = [(leave + timedelta(days=9)).strftime("%d/%m/%Y")] * 3
     text = demo_client(data).post("/submit", data=rows).text           # SHP-002 is the fake AI's high risk
-    panel = text[text.index('<details class="reschedule"'):]
-    assert "Show reschedule suggestions (1)" in panel
-    assert f"{leave + timedelta(days=4):%d/%m/%Y} to " in panel and "4 days later" in panel
-    assert "meets High weather risk" in panel
-    assert text.index("Done: 3 of 3") < text.index('<details class="reschedule"')   # shown once the rows are done
+    assert '<main class="stream">' in text                              # CSS shows the report above the table
+    assert text.index('<table class="results">') < text.index('class="report"')    # it is sent after the rows
+    report = text[text.index('class="report"'):]
+    assert "1 of 1 high-risk shipment has a new date" in report and "Show suggested dates" in report
+    assert 'for="show-dates"' in report and text.count('id="show-dates"') == 1
+    assert text.index('id="show-dates"') < text.index('<table class="results">')   # before the table, so CSS reaches the rows
+    assert text.count('class="reschedule-row"') == 1                    # one hidden line, under SHP-002 only
+    row = text[text.index('class="reschedule-row"'):]
+    assert f"{leave + timedelta(days=4):%d/%m/%Y} to " in row and "4 days later" in row
+    assert "meets High weather risk" in row
+    assert "Suggested departure" not in text
 
 
-def test_search_shows_the_reschedule_panel(data):
+def test_search_shows_the_summary_and_hidden_date_lines(data):
     client = demo_client(data)
     client.post("/submit", data=good_rows(3))
-    assert "Show reschedule suggestions (1)" in client.get("/search").text
+    page = client.get("/search").text
+    assert "Summary of these records" in page and "Show suggested dates" in page
+    assert page.count('class="reschedule-row"') == 1 and page.count('id="show-dates"') == 1

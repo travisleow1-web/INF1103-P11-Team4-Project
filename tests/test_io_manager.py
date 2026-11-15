@@ -211,7 +211,7 @@ def test_the_reschedule_overview_lists_every_high_risk_shipment_with_or_without_
     rows = make_io().show_reschedule(records)
     assert [r["shipment_id"] for r in rows] == ["SHP-003", "SHP-004"]
     none, found = rows
-    assert none["suggested"] is None and none["days_later"] is None and none["reasoning"] == IOManager.NO_RESCHEDULE
+    assert none["suggested"] is None and none["days_later"] is None and none["reasoning"] == "No new date suggested: its arrival is after the 16-day forecast."
     assert found == {"shipment_id": "SHP-004", "route": "SGSIN \u2192 NLRTM", "planned": "01/12/2026 to 28/12/2026",
                      "suggested": "05/12/2026 to 01/01/2027", "days_later": 4, "reasoning": "Clear soon"}
 

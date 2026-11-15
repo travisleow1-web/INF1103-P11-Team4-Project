@@ -57,17 +57,17 @@ def test_dates_suggested_and_none_are_counted_for_high_risk_only():
 
 def test_no_date_because_it_had_already_left():
     left = saved_record("SHP-001", risk="HIGH", departure=date(2026, 10, 20), arrival=date(2026, 10, 27))
-    assert report(left)["no_date"] == "1 has none: 1 because it had already left."
+    assert report(left)["no_date"] == "1 has none because it had already left."
 
 
 def test_no_date_because_the_arrival_is_after_the_forecast():
     far = saved_record("SHP-001", risk="HIGH")                      # arrives 28/12, saved 01/11: past a 16-day forecast
-    assert report(far)["no_date"] == "1 has none: 1 because its arrival is after the 16-day forecast."
+    assert report(far)["no_date"] == "1 has none because its arrival is after the 16-day forecast."
 
 
 def test_the_forecast_length_comes_from_the_manager_not_a_fixed_number():
     far = saved_record("SHP-001", risk="HIGH", departure=date(2026, 11, 3), arrival=date(2026, 11, 20))
-    assert report(far)["no_date"] == "1 has none: 1 because its arrival is after the 16-day forecast."
+    assert report(far)["no_date"] == "1 has none because its arrival is after the 16-day forecast."
     from helpers import PORTS
     from io_layer.io_manager import IOManager
     from io_layer.shipment_validator import ShipmentValidator
@@ -77,12 +77,12 @@ def test_the_forecast_length_comes_from_the_manager_not_a_fixed_number():
 
 def test_no_date_because_the_risk_is_not_weather():
     near = saved_record("SHP-001", risk="HIGH", departure=date(2026, 11, 3), arrival=date(2026, 11, 8))
-    assert report(near)["no_date"] == "1 has none: 1 because its risk is not a weather problem."
+    assert report(near)["no_date"] == "1 has none because its risk is not a weather problem."
 
 
 def test_no_date_because_no_clear_day_was_found():
     near = high_weather(saved_record("SHP-001", risk="HIGH", departure=date(2026, 11, 3), arrival=date(2026, 11, 8)))
-    assert report(near)["no_date"] == "1 has none: 1 because no clear day was found in the forecast."
+    assert report(near)["no_date"] == "1 has none because no clear day was found in the forecast."
 
 
 def test_several_reasons_share_one_sentence():
@@ -91,7 +91,13 @@ def test_several_reasons_share_one_sentence():
     far2 = saved_record("SHP-003", risk="EXTREME")
     text = report(left, far, far2)["no_date"]
     assert text == ("3 have none: 1 because it had already left; "
-                    "2 because its arrival is after the 16-day forecast.")
+                    "2 because their arrivals are after the 16-day forecast.")
+
+
+def test_several_shipments_with_the_same_reason_get_one_plural_sentence():
+    left = [saved_record(f"SHP-00{n}", risk="HIGH", departure=date(2026, 10, 20), arrival=date(2026, 10, 27))
+            for n in (1, 2)]
+    assert report(*left)["no_date"] == "2 have none because they had already left."
 
 
 def test_run_facts_are_shown_in_singapore_time_and_plain_units():

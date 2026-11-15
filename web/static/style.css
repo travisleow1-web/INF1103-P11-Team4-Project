@@ -202,6 +202,11 @@ tr.row-errors td { color: var(--error-ink); font-size: 0.9rem; padding-top: 0; }
   td[data-label]::before { content: attr(data-label); color: var(--muted); font-size: 0.85rem; }
   td[data-label] > .badge { justify-self: start; }
   table.results td.minor { display: none; }
+  table.results tr.reschedule-row { display: none; }
+  .switch-input:checked ~ .table-wrap table.results tr.reschedule-row {
+    display: block; border: 1px solid var(--line); border-top: 0; border-bottom: 0; background: var(--info-bg); padding: 0 0.25rem;
+  }
+  .todo { flex-direction: column; align-items: stretch; }
 
   .detail-grid { grid-template-columns: 1fr; }
   table.inner, table.inner tbody, table.inner tr { display: block; }
@@ -210,5 +215,43 @@ tr.row-errors td { color: var(--error-ink); font-size: 0.9rem; padding-top: 0; }
   table.inner td { border: 0; }
 }
 
-.reschedule { margin: 1.5rem 0; }
-.reschedule .why { min-width: 22rem; }
+/* The run report. On the streamed results page it is the last thing sent but is shown first. */
+main.stream { display: flex; flex-direction: column; }
+main.stream > h1, main.stream > .lede { order: -3; }
+main.stream > .report { order: -2; }
+.report { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 1rem 1.25rem; margin: 1rem 0; }
+.report h2 { font-size: 1.1rem; margin: 0 0 0.15rem; }
+.report h3 { font-size: 0.9rem; font-weight: 400; color: var(--muted); margin: 0.5rem 0 0.25rem; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: 0.5rem; margin: 0.75rem 0; }
+.tile { background: var(--page); border-radius: 6px; padding: 0.5rem 0.75rem; }
+.tile b { display: block; font-size: 1.5rem; line-height: 1.2; font-weight: 600; }
+.tile span { font-size: 0.85rem; color: var(--muted); }
+.tile-bad b { color: var(--error-ink); }
+.tile-warn b { color: #7a4b00; }
+.tile-info b { color: var(--accent); }
+.split { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 0 1.5rem; }
+.bar { display: flex; height: 0.9rem; border-radius: 4px; overflow: hidden; background: var(--line); }
+.seg { display: block; height: 100%; }
+.legend { list-style: none; display: flex; flex-wrap: wrap; gap: 0.15rem 1rem; padding: 0; margin: 0.35rem 0 0; font-size: 0.85rem; }
+.dot { display: inline-block; width: 0.6rem; height: 0.6rem; border-radius: 2px; margin-right: 0.35rem; }
+.seg-low, .seg-proceed { background: #3a9d5d; }
+.seg-medium, .seg-delay { background: #e0a526; }
+.seg-high { background: #e0702f; }
+.seg-extreme, .seg-reject { background: #b32626; }
+.seg-insure { background: var(--accent); }
+.seg-escalate { background: #7b8794; }
+.todo { display: flex; justify-content: space-between; align-items: center; gap: 1rem; border: 1px solid var(--line);
+        border-radius: 6px; padding: 0.5rem 0.75rem; margin-top: 0.5rem; }
+.todo .hint { display: block; }
+.button { display: inline-block; padding: 0.45rem 1rem; border: 1px solid var(--accent); border-radius: 4px;
+          background: #fff; color: var(--accent); cursor: pointer; white-space: nowrap; }
+
+/* "Show suggested dates": a checkbox before the table, flipped by a label in the report. */
+.switch-input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.switch-input:focus-visible ~ .report label[for="show-dates"] { outline: 3px solid #f0a500; outline-offset: 1px; }
+.when-on { display: none; }
+.switch-input:checked ~ .report .when-off { display: none; }
+.switch-input:checked ~ .report .when-on { display: inline; }
+tr.reschedule-row { display: none; }
+.switch-input:checked ~ .table-wrap tr.reschedule-row { display: table-row; }
+tr.reschedule-row td { background: var(--info-bg); font-size: 0.9rem; padding: 0.5rem 0.75rem; }

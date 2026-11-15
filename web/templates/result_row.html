@@ -1,4 +1,4 @@
-{% from "_macros.html" import risk_badge, outcome_badge, yes_no, details_row %}
+{% from "_macros.html" import risk_badge, outcome_badge, yes_no, details_row, reschedule_row %}
     <tr class="summary">
       <td class="progress" data-label="Progress">{{ number }} of {{ total }}</td>
       <th scope="row">{{ row.shipment_id }}{% if row.ai_unavailable %} <span class="badge badge-warn">AI unavailable</span>{% endif %}</th>
@@ -12,4 +12,5 @@
       <td data-label="Needs human">{{ yes_no(row.needs_human) }}</td>
       <td data-label="Saved">{% if save_error %}<span class="badge badge-error">Not saved</span> <span class="hint">{{ save_error }}</span>{% else %}Saved{% endif %}</td>
     </tr>
+{% if reschedule %}{{ reschedule_row(reschedule, 11) }}{% endif %}
 {{ details_row(result, 11) }}

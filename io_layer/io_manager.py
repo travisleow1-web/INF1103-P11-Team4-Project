@@ -27,9 +27,6 @@ class IOManager:
     and only reads saved records (through DataManager.find).
     """
 
-    NO_RESCHEDULE = ("No new date suggested: the AI found no clear weather window in the forecast, "
-                     "or the shipment has already left.")
-
     def __init__(self, validator: ShipmentValidator, data: DataManager, ports: PortRegistry,
                  forecast_days: int = 16):
         self.__forecast_days = forecast_days    # how far ahead the AI can see the weather (for the report)
@@ -132,7 +129,7 @@ class IOManager:
     def show_reschedule(self, records: List[ShipmentRecord]) -> List[dict]:
         """One row per High or Extreme risk shipment: its planned dates, the suggested dates and why.
 
-        A shipment with no suggestion says so; suggested is then None.
+        A shipment with no suggestion says why; suggested is then None.
         """
         rows = []
         for r in records:
@@ -141,7 +138,8 @@ class IOManager:
             s, plan = r.shipment, r.decision.reschedule
             row = {"shipment_id": s.shipment_id, "route": f"{s.origin.code} \u2192 {s.destination.code}",
                    "planned": f"{s.departure:%d/%m/%Y} to {s.arrival:%d/%m/%Y}", "suggested": None,
-                   "days_later": None, "reasoning": self.NO_RESCHEDULE}
+                   "days_later": None,
+                   "reasoning": f"No new date suggested: {self.__reason_text(self.__no_date_code(r), 1)}."}
             if plan:
                 new_departure = date.fromisoformat(plan["new_departure"])
                 row.update(suggested=f"{new_departure:%d/%m/%Y} to "
@@ -259,23 +257,34 @@ class IOManager:
         """One sentence on why high-risk shipments got no new date, or None when every one got a date."""
         if not records:
             return None
-        reasons = {}
-        for r in records:
-            reasons.setdefault(self.__no_date_reason(r), []).append(r.shipment.shipment_id)
-        parts = [f"{len(ids)} because {reason}" for reason, ids in reasons.items()]
+        codes = [self.__no_date_code(r) for r in records]
         count = len(records)
-        return f"{count} {'has' if count == 1 else 'have'} none: " + "; ".join(parts) + "."
+        start = f"{count} {'has' if count == 1 else 'have'} none"
+        if len(set(codes)) == 1:
+            return f"{start} because {self.__reason_text(codes[0], count)}."
+        parts = [f"{codes.count(code)} because {self.__reason_text(code, codes.count(code))}" for code in dict.fromkeys(codes)]
+        return f"{start}: " + "; ".join(parts) + "."
 
-    def __no_date_reason(self, record: ShipmentRecord) -> str:
+    def __no_date_code(self, record: ShipmentRecord) -> str:
         s, assessed_on = record.shipment, record.saved_at.date()
         if s.departure < assessed_on:
-            return "it had already left"
+            return "left"
         if s.arrival > assessed_on + timedelta(days=self.__forecast_days):
-            return f"its arrival is after the {self.__forecast_days}-day forecast"
+            return "forecast"
         if not any(f.type is RiskType.WEATHER and f.severity >= RiskLevel.HIGH
                    for f in record.assessment.risk_factors):
-            return "its risk is not a weather problem"
-        return "no clear day was found in the forecast"
+            return "not_weather"
+        return "no_window"
+
+    def __reason_text(self, code: str, count: int) -> str:
+        """The reason in words, for one shipment or several."""
+        one = count == 1
+        days = self.__forecast_days
+        return {"left": "it had already left" if one else "they had already left",
+                "forecast": f"its arrival is after the {days}-day forecast" if one
+                else f"their arrivals are after the {days}-day forecast",
+                "not_weather": "its risk is not a weather problem" if one else "their risks are not weather problems",
+                "no_window": "no clear day was found in the forecast"}[code]
 
     @staticmethod
     def __duration(seconds: Optional[float]) -> Optional[str]:

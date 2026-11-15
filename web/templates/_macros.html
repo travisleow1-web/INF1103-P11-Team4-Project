@@ -14,32 +14,64 @@
 {{ value | replace("_", " ") }}
 {%- endmacro %}
 
-{% macro reschedule_panel(items) -%}
-<details class="reschedule">
-  <summary><strong>Show reschedule suggestions ({{ items | length }})</strong></summary>
-  {% if items %}
-  <p>Every High or Extreme risk shipment, with the new dates the forecast scan suggests and why.</p>
-  <div class="table-wrap">
-  <table class="results">
-    <thead>
-      <tr><th scope="col">Shipment</th><th scope="col">Route</th><th scope="col">Planned</th>
-          <th scope="col">Suggested</th><th scope="col">Why</th></tr>
-    </thead>
-    <tbody>
-      {% for item in items %}
-      <tr>
-        <th scope="row">{{ item.shipment_id }}</th>
-        <td class="route" data-label="Route">{{ item.route }}</td>
-        <td data-label="Planned">{{ item.planned }}</td>
-        <td data-label="Suggested">{% if item.suggested %}<span class="badge badge-warn">Reschedule</span> {{ item.suggested }} ({{ item.days_later }} day{{ "" if item.days_later == 1 else "s" }} later){% else %}None{% endif %}</td>
-        <td class="why" data-label="Why">{{ item.reasoning }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+{# The switch behind "Show suggested dates". It sits before the table so CSS can reach the rows after it;
+   the button that flips it is in the report, and a label can sit anywhere on the page. #}
+{% macro dates_switch() -%}
+<input type="checkbox" id="show-dates" class="switch-input">
+{%- endmacro %}
+
+{# Hidden until the switch is on. One line under a High or Extreme risk row: the new dates, or why none. #}
+{% macro reschedule_row(item, columns) -%}
+    <tr class="reschedule-row">
+      <td colspan="{{ columns }}">
+        {% if item.suggested %}<strong>New dates for {{ item.shipment_id }}:</strong> {{ item.suggested }}
+        ({{ item.days_later }} day{{ "" if item.days_later == 1 else "s" }} later). {{ item.reasoning }}
+        {% else %}<strong>{{ item.shipment_id }}:</strong> {{ item.reasoning }}{% endif %}
+      </td>
+    </tr>
+{%- endmacro %}
+
+{% macro report_bar(parts, name) -%}
+<div class="bar" role="img" aria-label="{% for part in parts %}{{ part.label }} {{ part.count }}{{ ", " if not loop.last }}{% endfor %}">
+  {% for part in parts if part.count %}<i class="seg seg-{{ part.label | lower }}" style="width: {{ part.share }}%"></i>{% endfor %}
+</div>
+<ul class="legend" aria-label="{{ name }}">
+  {% for part in parts %}<li><span class="dot seg-{{ part.label | lower }}"></span>{{ part.label }} {{ part.count }}</li>{% endfor %}
+</ul>
+{%- endmacro %}
+
+{% macro report_card(report, title) -%}
+<section class="report" aria-labelledby="report-title">
+  <h2 id="report-title">{{ title }}</h2>
+  <p class="hint">{{ report.assessed }} shipment{{ "" if report.assessed == 1 else "s" }}{% if report.finished_at %} &middot; {{ report.finished_at }}{% endif %}{% if report.took %} &middot; took {{ report.took }}{% endif %}</p>
+  {% if report.stopped %}<p class="alert alert-error" role="alert">{{ report.stopped }}</p>{% endif %}
+  <div class="tiles">
+    <div class="tile"><b>{{ report.saved }}</b><span>Assessed and saved</span></div>
+    {% if report.not_saved %}<div class="tile tile-bad"><b>{{ report.not_saved }}</b><span>Not saved</span></div>{% endif %}
+    <div class="tile{{ " tile-bad" if report.high_or_extreme }}"><b>{{ report.high_or_extreme }}</b><span>High or extreme</span></div>
+    <div class="tile{{ " tile-warn" if report.needs_human }}"><b>{{ report.needs_human }}</b><span>Need a person</span></div>
+    <div class="tile{{ " tile-warn" if report.ai_unavailable }}"><b>{{ report.ai_unavailable }}</b><span>AI unavailable</span></div>
+    <div class="tile{{ " tile-info" if report.suggested }}"><b>{{ report.suggested }}</b><span>New dates suggested</span></div>
   </div>
-  {% else %}<p>No High or Extreme risk shipments, so no new dates are suggested.</p>{% endif %}
-</details>
+  <div class="split">
+    <div><h3>Overall risk</h3>{{ report_bar(report.risk, "Overall risk") }}</div>
+    <div><h3>Outcome</h3>{{ report_bar(report.outcome, "Outcome") }}</div>
+  </div>
+  {% if report.ai_unavailable %}
+  <div class="todo">
+    <div><strong>{{ report.ai_unavailable }} shipment{{ " has" if report.ai_unavailable == 1 else "s have" }} no AI assessment</strong>
+      <span class="hint">{{ report.ai_unavailable_ids | join(", ") }}. {{ "It was" if report.ai_unavailable == 1 else "They were" }} escalated for a person to check.</span></div>
+  </div>
+  {% endif %}
+  {% if report.high_total %}
+  <div class="todo">
+    <div><strong>{{ report.suggested }} of {{ report.high_total }} high-risk shipment{{ "" if report.high_total == 1 else "s" }} {{ "has" if report.high_total == 1 else "have" }} a new date</strong>
+      {% if report.no_date %}<span class="hint">{{ report.no_date }}</span>{% endif %}</div>
+    <label for="show-dates" class="button secondary"><span class="when-off">Show suggested dates</span><span class="when-on">Hide suggested dates</span></label>
+  </div>
+  {% endif %}
+  {% if not report.ai_unavailable and not report.high_total %}<p class="hint">Nothing needs attention.</p>{% endif %}
+</section>
 {%- endmacro %}
 
 {% macro details_row(result, colspan) -%}

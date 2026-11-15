@@ -1,5 +1,7 @@
 """The web layer: thin FastAPI routes that pass raw form fields to IOManager and render what it returns."""
 import logging
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Iterable, Iterator, List, Optional, Tuple
 import jinja2
@@ -97,17 +99,24 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
         total = len(shipments)
         done = 0
         finished = []
+        not_saved = 0
+        started = time.monotonic()
         yield render("results_start.html", total=total)
         try:
             for record, save_error in run(shipments, ai, logic, data):
                 done += 1
                 finished.append(record)
+                not_saved += 1 if save_error else 0
+                suggestion = io.show_reschedule([record])
                 yield render("result_row.html", row=io.show_summary([record])[0], result=io.show_result(record),
-                             number=done, total=total, save_error=save_error)
+                             number=done, total=total, save_error=save_error,
+                             reschedule=suggestion[0] if suggestion else None)
         except Exception:                       # the page has already started, so say so in the table
             logger.exception("Assessment stopped after %d of %d shipments", done, total)
             yield render("result_stopped.html", done=done, total=total)
-        yield render("results_end.html", done=done, total=total, reschedule=io.show_reschedule(finished))
+        report = io.show_report(finished, not_saved=not_saved, planned=total, seconds=time.monotonic() - started,
+                                finished_at=datetime.now(timezone.utc))
+        yield render("results_end.html", done=done, total=total, report=report)
 
     @app.get("/", response_class=HTMLResponse)
     def index(request: Request) -> HTMLResponse:

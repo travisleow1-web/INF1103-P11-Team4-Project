@@ -1,4 +1,4 @@
-{% from "_macros.html" import risk_badge, outcome_badge, yes_no, details_row, reschedule_panel, date_field %}
+{% from "_macros.html" import risk_badge, outcome_badge, yes_no, details_row, report_card, reschedule_row, dates_switch, date_field %}
 {% set title = "Search" %}
 {% include "_header.html" %}
 <h1>Search saved records</h1>
@@ -48,6 +48,8 @@
 <p class="alert alert-info" role="status">{{ result.message }} <a href="/">Assess new shipments</a></p>
 {% else %}
 <p role="status">{{ result.summary | length }} record{{ "" if result.summary | length == 1 else "s" }}, newest first.</p>
+{{ dates_switch() }}
+{{ report_card(result.report, "Summary of these records") }}
 <div class="table-wrap">
 <table class="results">
   <thead>
@@ -69,12 +71,12 @@
       <td data-label="Outcome">{{ outcome_badge(row.outcome) }}</td>
       <td data-label="Needs human">{{ yes_no(row.needs_human) }}</td>
     </tr>
+{% set item = result.reschedule | selectattr("shipment_id", "equalto", row.shipment_id) | first %}{% if item %}{{ reschedule_row(item, 8) }}{% endif %}
 {{ details_row(record, 8) }}
     {% endfor %}
   </tbody>
 </table>
 </div>
-{{ reschedule_panel(result.reschedule) }}
 {% endif %}
 <script src="{{ static_url('date_picker.js') }}"></script>
 {% include "_footer.html" %}
