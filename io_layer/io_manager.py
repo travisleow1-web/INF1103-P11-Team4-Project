@@ -1,12 +1,13 @@
 import logging
 import re
 import threading
-from datetime import date, timedelta, timezone
-from typing import List
+from datetime import date, datetime, timedelta, timezone
+from typing import List, Optional
 from data_layer.data_manager import DataManager
 from model.outcome import Outcome
 from model.port_registry import PortRegistry
 from model.risk_level import RiskLevel
+from model.risk_type import RiskType
 from model.search_criteria import SearchCriteria
 from model.shipment_record import ShipmentRecord
 from model.storage_error import StorageError
@@ -29,7 +30,9 @@ class IOManager:
     NO_RESCHEDULE = ("No new date suggested: the AI found no clear weather window in the forecast, "
                      "or the shipment has already left.")
 
-    def __init__(self, validator: ShipmentValidator, data: DataManager, ports: PortRegistry):
+    def __init__(self, validator: ShipmentValidator, data: DataManager, ports: PortRegistry,
+                 forecast_days: int = 16):
+        self.__forecast_days = forecast_days    # how far ahead the AI can see the weather (for the report)
         self.__validator = validator
         self.__data = data              # IO only reads from it
         self.__ports = ports
@@ -74,7 +77,8 @@ class IOManager:
             return self.show_no_records()
         return {"kind": "results", "summary": self.show_summary(records),
                 "records": [self.show_result(r) for r in records],
-                "reschedule": self.show_reschedule(records)}
+                "reschedule": self.show_reschedule(records),
+                "report": self.show_report(records)}
 
     # The show_* methods return the data a web template needs. They do not print.
     def show_input_form(self) -> dict:
@@ -146,6 +150,37 @@ class IOManager:
             rows.append(row)
         return rows
 
+    def show_report(self, records: List[ShipmentRecord], not_saved: int = 0, planned: Optional[int] = None,
+                    seconds: Optional[float] = None, finished_at: Optional[datetime] = None) -> dict:
+        """The summary at the top of the results and search pages: counts, and what needs attention.
+
+        not_saved is how many of these records could not be stored, planned how many shipments the run
+        meant to assess (the report says so when it stopped early), seconds how long the run took.
+        """
+        total = len(records)
+        high = [r for r in records if r.decision.risk_level >= RiskLevel.HIGH]
+        failed = [r.shipment.shipment_id for r in records if r.assessment.is_fallback()]
+        suggested = [r for r in high if r.decision.reschedule]
+        without = [r for r in high if not r.decision.reschedule]
+        return {
+            "assessed": total,
+            "saved": total - not_saved,
+            "not_saved": not_saved,
+            "stopped": f"Stopped after {total} of {planned} shipments." if planned and planned > total else None,
+            "high_or_extreme": len(high),
+            "needs_human": sum(1 for r in records if r.decision.needs_human),
+            "ai_unavailable": len(failed),
+            "ai_unavailable_ids": failed,
+            "risk": self.__counts([r.decision.risk_level.label for r in records], [l.label for l in RiskLevel]),
+            "outcome": self.__counts([r.decision.outcome.value for r in records], [o.value for o in Outcome],
+                                     text=str.capitalize),
+            "high_total": len(high),
+            "suggested": len(suggested),
+            "no_date": self.__no_date_text(without),
+            "finished_at": self.__local_time(finished_at) if finished_at else None,
+            "took": self.__duration(seconds),
+        }
+
     def show_no_records(self) -> dict:
         """The search result when nothing matches."""
         return {"kind": "empty", "message": "No records match."}
@@ -212,6 +247,42 @@ class IOManager:
     def __local_time(self, moment):
         """DD/MM/YYYY HH:MM in Singapore time, for display."""
         return moment.astimezone(SGT).strftime("%d/%m/%Y %H:%M SGT")
+
+    @staticmethod
+    def __counts(values, order, text=str):
+        """[{"label", "count", "share"}] for each name in order, share being the percent of all values."""
+        total = len(values) or 1
+        return [{"label": text(name), "count": values.count(name), "share": round(100 * values.count(name) / total, 1)}
+                for name in order]
+
+    def __no_date_text(self, records) -> Optional[str]:
+        """One sentence on why high-risk shipments got no new date, or None when every one got a date."""
+        if not records:
+            return None
+        reasons = {}
+        for r in records:
+            reasons.setdefault(self.__no_date_reason(r), []).append(r.shipment.shipment_id)
+        parts = [f"{len(ids)} because {reason}" for reason, ids in reasons.items()]
+        count = len(records)
+        return f"{count} {'has' if count == 1 else 'have'} none: " + "; ".join(parts) + "."
+
+    def __no_date_reason(self, record: ShipmentRecord) -> str:
+        s, assessed_on = record.shipment, record.saved_at.date()
+        if s.departure < assessed_on:
+            return "it had already left"
+        if s.arrival > assessed_on + timedelta(days=self.__forecast_days):
+            return f"its arrival is after the {self.__forecast_days}-day forecast"
+        if not any(f.type is RiskType.WEATHER and f.severity >= RiskLevel.HIGH
+                   for f in record.assessment.risk_factors):
+            return "its risk is not a weather problem"
+        return "no clear day was found in the forecast"
+
+    @staticmethod
+    def __duration(seconds: Optional[float]) -> Optional[str]:
+        if seconds is None:
+            return None
+        whole = max(0, round(seconds))
+        return f"{whole // 60} min {whole % 60} s" if whole >= 60 else f"{whole} s"
 
     def __risk_text(self, risk_type, severity):
         """'port_congestion', 'MEDIUM' -> 'Port congestion (Medium)'; no severity -> just the name."""

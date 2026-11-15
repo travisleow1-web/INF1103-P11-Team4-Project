@@ -116,7 +116,8 @@ def create_app() -> FastAPI:
     else:
         data = build_data(ports)
         ai, logic = build_ai(), build_logic(data, ports)
-    io = IOManager(ShipmentValidator(ports), data, ports)
+    from ai_layer.ai_settings import FORECAST_DAYS      # only a number; the AI layer is not started here
+    io = IOManager(ShipmentValidator(ports), data, ports, FORECAST_DAYS)
     notices = [data.message] if isinstance(data, UnavailableDataManager) else []
     return create_web_app(io, ai, logic, data, demo, notices, run=assess_shipments)
 
