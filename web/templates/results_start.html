@@ -2,7 +2,8 @@
 {% set main_class = "stream" %}
 {% include "_header.html" %}
 <h1>Results</h1>
-<p class="lede">Assessing {{ total }} shipment{{ "" if total == 1 else "s" }}. Each row appears as soon as its shipment is done.</p>
+<p class="lede">{% if rerun %}Assessing {{ total }} shipment{{ "" if total == 1 else "s" }} again, replacing the saved record{{ "" if total == 1 else "s" }}.{% else %}Assessing {{ total }} shipment{{ "" if total == 1 else "s" }}.{% endif %} Each row appears as soon as its shipment is done.</p>
+{% if skipped %}<p class="hint">Not re-run (not saved, or already assessed by the AI): {{ skipped | join(", ") }}.</p>{% endif %}
 {% from "_macros.html" import dates_switch %}
 {{ dates_switch() }}
 <div class="table-wrap">

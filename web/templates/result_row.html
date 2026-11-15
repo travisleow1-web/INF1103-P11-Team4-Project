@@ -1,7 +1,7 @@
-{% from "_macros.html" import risk_badge, outcome_badge, yes_no, details_row, reschedule_row %}
+{% from "_macros.html" import risk_badge, outcome_badge, yes_no, details_row, reschedule_row, rerun_form %}
     <tr class="summary">
       <td class="progress" data-label="Progress">{{ number }} of {{ total }}</td>
-      <th scope="row">{{ row.shipment_id }}{% if row.ai_unavailable %} <span class="badge badge-warn">AI unavailable</span>{% endif %}</th>
+      <th scope="row">{{ row.shipment_id }}{% if row.ai_unavailable %} <span class="badge badge-warn">AI unavailable</span> {{ rerun_form([row.shipment_id], "Re-run", small=True) }}{% endif %}</th>
       <td class="route" data-label="Route">{{ row.route }}</td>
       <td data-label="Departure">{{ result.departure }}</td>
       <td class="minor" data-label="Arrival">{{ result.arrival }}</td>

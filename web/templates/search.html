@@ -1,4 +1,4 @@
-{% from "_macros.html" import risk_badge, outcome_badge, yes_no, details_row, report_card, reschedule_row, dates_switch, date_field %}
+{% from "_macros.html" import risk_badge, outcome_badge, yes_no, details_row, report_card, reschedule_row, dates_switch, rerun_form, date_field %}
 {% set title = "Search" %}
 {% include "_header.html" %}
 <h1>Search saved records</h1>
@@ -62,7 +62,7 @@
   <tbody>
     {% for row in result.summary %}{% set record = result.records[loop.index0] %}
     <tr class="summary">
-      <th scope="row">{{ row.shipment_id }}{% if row.ai_unavailable %} <span class="badge badge-warn">AI unavailable</span>{% endif %}</th>
+      <th scope="row">{{ row.shipment_id }}{% if row.ai_unavailable %} <span class="badge badge-warn">AI unavailable</span> {{ rerun_form([row.shipment_id], "Re-run", small=True) }}{% endif %}</th>
       <td class="route" data-label="Route">{{ row.route }}</td>
       <td data-label="Departure">{{ record.departure }}</td>
       <td data-label="Primary risk">{{ row.primary_risk }}</td>

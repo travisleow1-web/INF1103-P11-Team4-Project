@@ -673,3 +673,89 @@ def test_search_shows_the_summary_and_hidden_date_lines(data):
     page = client.get("/search").text
     assert "Summary of these records" in page and "Show suggested dates" in page
     assert page.count('class="reschedule-row"') == 1 and page.count('id="show-dates"') == 1
+
+
+# re-running shipments the AI could not assess
+
+def has_rerun_form(text, shipment_id):
+    """True if the page has a Re-run form for that shipment."""
+    return re.search(rf'action="/rerun"[^>]*>\s*<input type="hidden" name="shipment_id" value="{shipment_id}">', text) is not None
+
+
+def failed_run(data, count=9):
+    """Submit count shipments with the demo AI: the ninth fails the first time. Returns the client."""
+    client = client_for(data, FakeAI(), FakeLogic(), demo=True)
+    client.post("/submit", data=good_rows(count))
+    return client
+
+
+def test_a_failed_shipment_has_a_rerun_button_in_the_results_and_in_the_report(data):
+    failed_run(data)
+    text = client_for(data, FakeAI(), FakeLogic(), demo=True).get("/search").text
+    assert has_rerun_form(text, "SHP-009") and "Re-run it" in text
+    assert not has_rerun_form(text, "SHP-001")                      # only the failed one
+
+
+def test_the_results_page_of_a_run_offers_the_rerun_for_the_failed_row(data):
+    client = client_for(data, FakeAI(), FakeLogic(), demo=True)
+    text = client.post("/submit", data=good_rows(9)).text
+    assert has_rerun_form(text, "SHP-009") and "Re-run it" in text
+    assert text.count('name="shipment_id" value="SHP-009"') == 2     # the row's button and the report's
+
+
+def test_rerun_assesses_the_shipment_again_and_replaces_its_record(data):
+    client = client_for(data, FakeAI(), FakeLogic(), demo=True)
+    client.post("/submit", data=good_rows(9))
+    text = client.post("/rerun", data={"shipment_id": ["SHP-009"]}).text
+    assert "again, replacing the saved record." in text and "Done: 1 of 1" in text
+    saved = data.find(SearchCriteria())
+    assert len(saved) == 9 and saved[0].shipment.shipment_id == "SHP-009"
+    assert not saved[0].assessment.is_fallback()
+    assert not has_rerun_form(client.get("/search").text, "SHP-009")   # nothing left to re-run
+
+
+def test_rerun_of_several_shipments_runs_each_once(data):
+    client = client_for(data, FakeAI(), FakeLogic(), demo=True)
+    client.post("/submit", data=good_rows(18))                      # SHP-009 and SHP-018 fail
+    text = client.post("/rerun", data={"shipment_id": ["SHP-009", "SHP-018", "SHP-009"]}).text
+    assert "Done: 2 of 2" in text
+    assert len(data.find(SearchCriteria())) == 18
+
+
+def test_rerun_skips_shipments_that_are_not_failed_and_says_so(data):
+    client = client_for(data, FakeAI(), FakeLogic(), demo=True)
+    client.post("/submit", data=good_rows(9))
+    text = client.post("/rerun", data={"shipment_id": ["SHP-009", "SHP-001", "SHP-077"]}).text
+    assert "Done: 1 of 1" in text
+    assert "Not re-run (not saved, or already assessed by the AI): SHP-001, SHP-077." in text
+
+
+def test_rerun_with_nothing_to_run_is_an_error_and_changes_nothing(data):
+    client = client_for(data, FakeAI(), FakeLogic(), demo=True)
+    client.post("/submit", data=good_rows(3))
+    before = [(r.shipment.shipment_id, r.saved_at) for r in data.find(SearchCriteria())]
+    page = client.post("/rerun", data={"shipment_id": ["SHP-001"]})
+    assert page.status_code == 400 and "Nothing was re-run" in page.text
+    assert [(r.shipment.shipment_id, r.saved_at) for r in data.find(SearchCriteria())] == before
+
+
+def test_rerun_without_an_id_is_an_error(data):
+    page = client_for(data, FakeAI(), FakeLogic(), demo=True).post("/rerun")
+    assert page.status_code == 400 and "Choose at least one shipment to re-run." in page.text
+
+
+def test_rerun_when_the_ai_is_not_connected_is_refused(data):
+    page = client_for(data).post("/rerun", data={"shipment_id": ["SHP-001"]})
+    assert page.status_code == 503 and "Nothing was re-run." in page.text
+
+
+def test_rerun_when_the_saved_records_cannot_be_read_shows_the_storage_error():
+    data = UnavailableDataManager("Database is down")
+    page = client_for(data, FakeAI(), FakeLogic()).post("/rerun", data={"shipment_id": ["SHP-001"]})
+    assert page.status_code == 503 and "Database is down Nothing was re-run." in page.text
+
+
+def test_the_ids_in_a_rerun_form_are_escaped(data):
+    data.save(saved_record("SHP-001", fallback=True))
+    text = client_for(data, FakeAI(), FakeLogic()).post("/rerun", data={"shipment_id": ["SHP-001", "<b>x</b>"]}).text
+    assert "<B>X</B>" not in text and "&lt;B&gt;X&lt;/B&gt;" in text      # IDs are shown upper-cased, and escaped

@@ -94,16 +94,19 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
                 return HTMLResponse(html, status_code=413)
         return await call_next(request)
 
-    def stream_results(shipments: list) -> Iterator[str]:
-        """The results page in pieces: the table head, then one row as each shipment finishes, then the end."""
+    def stream_results(shipments: list, replace: bool = False, skipped: Optional[List[str]] = None) -> Iterator[str]:
+        """The results page in pieces: the table head, then one row as each shipment finishes, then the end.
+
+        replace=True is a re-run: each result overwrites the saved record. skipped are IDs that were not re-run.
+        """
         total = len(shipments)
         done = 0
         finished = []
         not_saved = 0
         started = time.monotonic()
-        yield render("results_start.html", total=total)
+        yield render("results_start.html", total=total, rerun=replace, skipped=skipped or [])
         try:
-            for record, save_error in run(shipments, ai, logic, data):
+            for record, save_error in run(shipments, ai, logic, data, replace=replace):
                 done += 1
                 finished.append(record)
                 not_saved += 1 if save_error else 0
@@ -164,6 +167,23 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
             return input_page(request, rows, info=f"{valid} {not_connected}")
         return StreamingResponse(stream_results(shipments), media_type="text/html; charset=utf-8",
                                  headers={"X-Accel-Buffering": "no"})
+
+    @app.post("/rerun", response_class=HTMLResponse)
+    def rerun(request: Request, shipment_id: List[str] = Form(default=[])) -> HTMLResponse:
+        """Assess again the saved shipments the AI could not assess; each new record replaces the old one."""
+        if not_connected:
+            return input_page(request, [], 503, error=f"{not_connected} Nothing was re-run.")
+        if not any(text.strip() for text in shipment_id):
+            return input_page(request, [], 400, error="Choose at least one shipment to re-run.")
+        try:
+            shipments, skipped = io.shipments_to_rerun(shipment_id)
+        except StorageError as error:
+            return input_page(request, [], 503, error=f"{error} Nothing was re-run.")
+        if not shipments:
+            return input_page(request, [], 400, error="Nothing was re-run: those shipments are not saved or "
+                                                      "already have an AI assessment.")
+        return StreamingResponse(stream_results(shipments, replace=True, skipped=skipped),
+                                 media_type="text/html; charset=utf-8", headers={"X-Accel-Buffering": "no"})
 
     @app.get("/search", response_class=HTMLResponse)
     def search(request: Request) -> HTMLResponse:

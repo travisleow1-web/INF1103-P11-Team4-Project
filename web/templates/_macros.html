@@ -40,6 +40,14 @@
 </ul>
 {%- endmacro %}
 
+{# A button that assesses the listed shipments again. Only shipments with no AI assessment can be re-run. #}
+{% macro rerun_form(ids, label, small=False) -%}
+<form method="post" action="/rerun" class="rerun{{ " rerun-small" if small }}">
+  {% for id in ids %}<input type="hidden" name="shipment_id" value="{{ id }}">{% endfor %}
+  <button type="submit" class="secondary">{{ label }}</button>
+</form>
+{%- endmacro %}
+
 {% macro report_card(report, title) -%}
 <section class="report" aria-labelledby="report-title">
   <h2 id="report-title">{{ title }}</h2>
@@ -61,6 +69,7 @@
   <div class="todo">
     <div><strong>{{ report.ai_unavailable }} shipment{{ " has" if report.ai_unavailable == 1 else "s have" }} no AI assessment</strong>
       <span class="hint">{{ report.ai_unavailable_ids | join(", ") }}. {{ "It was" if report.ai_unavailable == 1 else "They were" }} escalated for a person to check.</span></div>
+    {{ rerun_form(report.ai_unavailable_ids, "Re-run these " ~ report.ai_unavailable if report.ai_unavailable > 1 else "Re-run it") }}
   </div>
   {% endif %}
   {% if report.high_total %}
