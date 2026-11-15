@@ -1,35 +1,71 @@
+import logging
 import threading
 import time
 from typing import Any, Dict, List, Optional
 import requests
 from model.shipment import Shipment
-from .ai_settings import NEWS_MIN_GAP
+from .ai_settings import NEWS_FAILURES_BEFORE_PAUSE, NEWS_MIN_GAP, NEWS_PAUSE, NEWS_TIMEOUT
 from .context_provider import ContextProvider
 
 GDELT_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
+
+log = logging.getLogger(__name__)
 
 
 class NewsProvider(ContextProvider):
     """Recent English headlines about piracy, congestion, strikes or unrest at the two ports (GDELT).
 
     GDELT allows one call every few seconds, so the provider remembers when it last called and
-    waits only for the rest of the gap.
+    waits only for the rest of the gap. GDELT is slow and sometimes down, so a call waits up to
+    `timeout` seconds, and after `pause_after` failures in a row the provider skips GDELT for
+    `pause_for` seconds (the shipments are then assessed without news) instead of waiting for every one.
     """
 
-    def __init__(self, http: Optional[requests.Session] = None, min_gap: float = NEWS_MIN_GAP):
-        super().__init__("news", http)
+    def __init__(self, http: Optional[requests.Session] = None, min_gap: float = NEWS_MIN_GAP,
+                 timeout: float = NEWS_TIMEOUT, pause_after: int = NEWS_FAILURES_BEFORE_PAUSE,
+                 pause_for: float = NEWS_PAUSE):
+        super().__init__("news", http, timeout)
         self.__min_gap = min_gap
+        self.__pause_after = pause_after
+        self.__pause_for = pause_for
         self.__last_call: Optional[float] = None
+        self.__failures = 0                     # failed calls in a row
+        self.__paused_until: Optional[float] = None
         self.__lock = threading.Lock()          # web requests run in several threads
 
-    def _request(self, shipment: Shipment) -> List[Dict[str, Any]]:
+    def _request(self, shipment: Shipment) -> Optional[List[Dict[str, Any]]]:
+        if self.__is_paused():
+            return None                         # no call, no wait: the AI runs without news for now
         self.__wait_for_gap()
         query = (f'("{shipment.origin.name}" OR "{shipment.destination.name}")'
                  ' (piracy OR "armed robbery" OR "port congestion" OR strike OR protest OR unrest)'
                  ' sourcelang:english')
         params = {"query": query, "mode": "ArtList", "maxrecords": 8, "format": "json", "timespan": "3d"}
-        articles = self._get_json(GDELT_URL, params).get("articles", [])
-        return [{"title": a["title"], "seen": a["seendate"]} for a in articles]
+        try:
+            articles = self._get_json(GDELT_URL, params).get("articles", [])
+            result = [{"title": a["title"], "seen": a["seendate"]} for a in articles]
+        except Exception:                       # fetch() logs it and gives None; here it only counts the failure
+            self.__record_failure()
+            raise
+        self.__failures = 0
+        return result
+
+    def __is_paused(self) -> bool:
+        if self.__paused_until is None:
+            return False
+        if time.monotonic() < self.__paused_until:
+            return True
+        self.__paused_until = None              # the pause is over: try GDELT again
+        return False
+
+    def __record_failure(self) -> None:
+        with self.__lock:
+            self.__failures += 1
+            if self.__failures >= self.__pause_after:
+                self.__failures = 0
+                self.__paused_until = time.monotonic() + self.__pause_for
+                log.warning("GDELT failed %d times in a row; skipping news for %d seconds",
+                            self.__pause_after, self.__pause_for)
 
     def __wait_for_gap(self) -> None:
         with self.__lock:                       # held while sleeping, so callers queue up

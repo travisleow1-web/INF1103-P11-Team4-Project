@@ -13,6 +13,9 @@ HTTP_TIMEOUT = 20          # seconds, for the weather and news feeds
 GEMINI_TIMEOUT = 40        # seconds, for one model call
 MAX_RETRIES = 3            # attempts per model call (only retryable errors are tried again)
 NEWS_MIN_GAP = 6.0         # seconds between the starts of two GDELT calls (GDELT allows one every 5 s)
+NEWS_TIMEOUT = 30          # seconds to wait for GDELT; its answers are slow, so longer than HTTP_TIMEOUT
+NEWS_FAILURES_BEFORE_PAUSE = 2   # GDELT calls failing in a row before news is skipped for a while
+NEWS_PAUSE = 300           # seconds news is skipped after that, so a down GDELT does not slow every shipment
 
 ALLOWED_IMPACT = ("Delay", "Cost Increase", "Cargo Damage", "Cargo Destruction", "None")
 ALLOWED_SOURCES = ("open_meteo_weather", "open_meteo_marine", "open_meteo_historical_forecast",

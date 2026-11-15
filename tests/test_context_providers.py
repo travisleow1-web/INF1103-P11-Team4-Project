@@ -180,3 +180,44 @@ def test_concurrent_news_calls_keep_the_gap():
     starts = sorted(session.starts)
     assert len(starts) == 4
     assert all(later - earlier >= 0.045 for earlier, later in zip(starts, starts[1:]))
+
+
+# ---- news: a slow or down GDELT ----
+
+def test_news_waits_longer_than_the_other_feeds():
+    session = FakeSession(gdelt())
+    with patch("ai_layer.news_provider.time.sleep"):
+        NewsProvider(session).fetch(make_shipment())
+    assert session.calls[0][2]["timeout"] == 30
+
+
+def test_after_two_failures_in_a_row_news_is_skipped_without_calling_gdelt():
+    session = FakeSession(requests.Timeout("slow"), requests.Timeout("slow"), gdelt("never asked"))
+    provider = NewsProvider(session, min_gap=0)
+    with patch("ai_layer.news_provider.time.sleep"):
+        results = [provider.fetch(make_shipment()) for _ in range(3)]
+    assert results == [None, None, None]
+    assert len(session.calls) == 2                      # the third shipment did not call or wait
+
+
+def test_one_success_between_failures_keeps_news_on():
+    session = FakeSession(requests.Timeout("slow"), gdelt("ok"), requests.Timeout("slow"), gdelt("ok again"))
+    provider = NewsProvider(session, min_gap=0)
+    with patch("ai_layer.news_provider.time.sleep"):
+        results = [provider.fetch(make_shipment()) for _ in range(4)]
+    assert [bool(r) for r in results] == [False, True, False, True]
+    assert len(session.calls) == 4
+
+
+def test_news_is_tried_again_once_the_pause_is_over():
+    session = FakeSession(requests.Timeout("slow"), requests.Timeout("slow"), gdelt("back"))
+    provider = NewsProvider(session, min_gap=0, pause_for=300)
+    now = [1000.0]
+    with patch("ai_layer.news_provider.time.monotonic", side_effect=lambda: now[0]), \
+            patch("ai_layer.news_provider.time.sleep"):
+        provider.fetch(make_shipment())
+        provider.fetch(make_shipment())                 # second failure starts the pause
+        now[0] += 299
+        assert provider.fetch(make_shipment()) is None and len(session.calls) == 2
+        now[0] += 2                                     # 301 s after the pause began
+        assert provider.fetch(make_shipment()) == [{"title": "back", "seen": "20261113T010000Z"}]
