@@ -1,4 +1,5 @@
 import copy
+from datetime import date
 from typing import Iterable, Optional
 from .flag import Flag
 from .outcome import Outcome
@@ -21,6 +22,7 @@ class Decision:
         self.__actions = []
         self.__alerts = []
         self.__rationale = []
+        self.__reschedule = None
 
     @property
     def shipment_id(self) -> str:
@@ -64,6 +66,11 @@ class Decision:
     def rationale(self) -> tuple:
         return tuple(self.__rationale)
 
+    @property
+    def reschedule(self) -> Optional[dict]:
+        """The suggested new dates and the reasons, or None. A copy; dates are ISO text (YYYY-MM-DD)."""
+        return dict(self.__reschedule) if self.__reschedule else None
+
     def has_flag(self, flag: Flag) -> bool:
         """True if a rule has already put this flag on the decision."""
         return flag in self.__flags
@@ -84,6 +91,11 @@ class Decision:
     def add_action(self, action: str) -> None:
         """Add a step someone should take, such as 'Buy extra insurance'."""
         self.__actions.append(action)
+
+    def suggest_reschedule(self, new_departure: date, new_arrival: date, reasoning: str) -> None:
+        """Record a later departure to consider instead of the planned one, and why it is better."""
+        self.__reschedule = {"new_departure": new_departure.isoformat(), "new_arrival": new_arrival.isoformat(),
+                             "reasoning": str(reasoning)}
 
     def raise_risk(self, level: RiskLevel) -> None:
         """Risk only ever goes up; a later rule cannot undo an earlier High."""
@@ -119,6 +131,7 @@ class Decision:
             "actions": list(self.__actions),
             "alerts": copy.deepcopy(self.__alerts),
             "rationale": list(self.__rationale),
+            "reschedule": self.reschedule,
         }
 
     @classmethod
@@ -134,4 +147,8 @@ class Decision:
         for alert in data["alerts"]:
             decision.add_alert(alert["recipient"], alert["channels"], alert["message"])
         decision.__rationale = [str(r) for r in data["rationale"]]
+        saved = data.get("reschedule")      # records saved before this feature have no such key
+        if saved:
+            decision.suggest_reschedule(date.fromisoformat(saved["new_departure"]),
+                                        date.fromisoformat(saved["new_arrival"]), saved["reasoning"])
         return decision

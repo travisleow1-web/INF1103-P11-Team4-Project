@@ -1,3 +1,4 @@
+from datetime import date
 import pytest
 from model.decision import Decision
 from model.flag import Flag
@@ -101,6 +102,7 @@ def test_to_dict_uses_the_label_and_enum_values():
         "actions": ["Hold at port"],
         "alerts": [{"recipient": "Insurer", "channels": ["email"], "message": "Premium review"}],
         "rationale": ["Storm and congestion", "Premium up"],
+        "reschedule": None,
     }
 
 
@@ -123,4 +125,32 @@ def test_from_dict_rejects_a_missing_key():
     data = full_decision().to_dict()
     del data["rationale"]
     with pytest.raises(KeyError):
+        Decision.from_dict(data)
+
+
+def test_a_reschedule_suggestion_is_stored_as_iso_text_and_survives_a_round_trip():
+    d = full_decision()
+    d.suggest_reschedule(date(2026, 12, 5), date(2027, 1, 1), "Clear from 05/12/2026")
+    assert d.reschedule == {"new_departure": "2026-12-05", "new_arrival": "2027-01-01",
+                            "reasoning": "Clear from 05/12/2026"}
+    assert Decision.from_dict(d.to_dict()).reschedule == d.reschedule
+
+
+def test_changing_the_returned_reschedule_does_not_change_the_decision():
+    d = full_decision()
+    d.suggest_reschedule(date(2026, 12, 5), date(2027, 1, 1), "why")
+    d.reschedule["reasoning"] = "tampered"
+    assert d.reschedule["reasoning"] == "why"
+
+
+def test_a_record_saved_before_the_feature_loads_with_no_suggestion():
+    data = full_decision().to_dict()
+    del data["reschedule"]
+    assert Decision.from_dict(data).reschedule is None
+
+
+def test_a_bad_saved_reschedule_date_is_a_value_error():
+    data = {**full_decision().to_dict(),
+            "reschedule": {"new_departure": "soon", "new_arrival": "2027-01-01", "reasoning": "x"}}
+    with pytest.raises(ValueError):
         Decision.from_dict(data)
