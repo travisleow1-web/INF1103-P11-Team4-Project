@@ -1,6 +1,7 @@
 """Web pages through FastAPI's TestClient, with a temp-file JSON data manager. No network."""
 import json
 import logging
+import re
 import threading
 from unittest.mock import patch
 import pytest
@@ -54,7 +55,7 @@ def test_input_page_dates_have_a_calendar_button_and_still_post_text(data):
     assert page.count('class="date-button"') == 2 and page.count('type="date"') == 2
     assert page.count('name="departure_time"') == 1 and page.count('name="arrival_time"') == 1
     assert 'name="departure_time" placeholder="DD/MM/YYYY"' in page      # the text box is what is submitted
-    assert '<script src="/static/date_picker.js">' in page
+    assert '<script src="/static/date_picker.js?v=' in page
 
 
 def test_the_invalid_mark_stays_on_the_text_box_not_the_hidden_picker(data):
@@ -70,7 +71,17 @@ def test_search_page_date_filters_are_a_start_and_an_end_picker(data):
     assert page.count('class="date-field"') == 2
     assert page.count('data-range="start" data-gap="0"') == 1
     assert page.count('data-range="end" data-gap="0"') == 1              # same day is allowed
-    assert '<script src="/static/date_picker.js">' in page
+    assert '<script src="/static/date_picker.js?v=' in page
+
+
+def test_pages_link_the_styles_and_scripts_with_a_version_so_browsers_reload_changes(data):
+    client = client_for(data)
+    for url in ("/", "/search"):
+        page = client.get(url).text
+        assert re.search(r'href="/static/style\.css\?v=\d+"', page)
+        assert re.search(r'src="/static/date_picker\.js\?v=\d+"', page)
+    link = re.search(r'/static/style\.css\?v=\d+', client.get("/").text).group(0)
+    assert client.get(link).status_code == 200                           # the query string is ignored by the server
 
 
 def test_static_files_are_served(data):

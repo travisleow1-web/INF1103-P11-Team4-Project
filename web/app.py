@@ -39,6 +39,11 @@ logger = logging.getLogger(__name__)
 Runner = Callable[..., Iterable[Tuple[ShipmentRecord, Optional[str]]]]
 
 
+def static_url(name: str) -> str:
+    """Link to a file in web/static with its change time, so a browser never shows an old copy after an update."""
+    return f"/static/{name}?v={int((WEB_DIR / 'static' / name).stat().st_mtime)}"
+
+
 def not_connected_message(ai, logic) -> Optional[str]:
     """What to tell users when the AI or Logic layer is missing, or None when both are connected."""
     if ai is None and logic is None:
@@ -60,6 +65,7 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
     notices = list(notices or [])
     not_connected = not_connected_message(ai, logic)
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(WEB_DIR / "templates")), autoescape=True)
+    env.globals["static_url"] = static_url
     templates = Jinja2Templates(env=env)
     app = FastAPI(title="Supply Chain Risk Assessor")
     app.mount("/static", StaticFiles(directory=str(WEB_DIR / "static")), name="static")
