@@ -60,27 +60,35 @@ legend { font-weight: 600; padding: 0 0.25rem; }
 input, select, button { font: inherit; }
 input, select {
   width: 100%;
+  height: 2.3rem;                 /* every box and dropdown the same height, whatever the font */
   padding: 0.35rem 0.5rem;
   border: 1px solid var(--line);
   border-radius: 4px;
 }
-input[type="file"] { border: 0; padding: 0.35rem 0; }
+input[type="file"] { height: auto; border: 0; padding: 0.35rem 0; }
 
-/* DD/MM/YYYY box with a calendar button inside its right edge (the button only shows with JavaScript) */
+/* DD/MM/YYYY box with a calendar button inside its right edge (the button only shows with JavaScript).
+   The button is as tall as the box, so the icon sits in the middle of it. */
 .date-field { position: relative; display: block; }
 .date-button { display: none; }
 .has-datepicker .date-button {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   position: absolute;
-  right: 3px;
-  bottom: 3px;
-  padding: 0.2rem 0.4rem;
+  right: 1px;
+  bottom: 1px;
+  width: 2.3rem;
+  height: calc(2.3rem - 2px);              /* the box height minus its border */
+  padding: 0;
   border: 0;
+  border-radius: 0 4px 4px 0;
   background: transparent;
-  color: var(--accent);
+  color: var(--muted);
   line-height: 0;
 }
-.has-datepicker .date-field input:not([type="date"]) { padding-right: 2.2rem; }
+.has-datepicker .date-button:hover { color: var(--accent); }
+.has-datepicker .date-field input:not([type="date"]) { padding-right: 2.5rem; }
 .date-native {
   position: absolute;
   left: 0;
