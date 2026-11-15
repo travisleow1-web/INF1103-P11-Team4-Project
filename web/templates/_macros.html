@@ -24,9 +24,13 @@
 {% macro reschedule_row(item, columns) -%}
     <tr class="reschedule-row">
       <td colspan="{{ columns }}">
-        {% if item.suggested %}<strong>New dates for {{ item.shipment_id }}:</strong> {{ item.suggested }}
-        ({{ item.days_later }} day{{ "" if item.days_later == 1 else "s" }} later). {{ item.reasoning }}
-        {% else %}<strong>{{ item.shipment_id }}:</strong> {{ item.reasoning }}{% endif %}
+        <div class="plan">
+          <div><span class="plan-label">Planned</span>{{ item.planned }}</div>
+          <div><span class="plan-label">Suggested</span>
+            {% if item.suggested %}<span class="badge badge-warn">Reschedule</span> {{ item.suggested }}
+            ({{ item.days_later }} day{{ "" if item.days_later == 1 else "s" }} later){% else %}None{% endif %}</div>
+          <div><span class="plan-label">Why</span>{{ item.reasoning }}</div>
+        </div>
       </td>
     </tr>
 {%- endmacro %}

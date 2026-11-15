@@ -255,8 +255,16 @@ main.stream > .report { order: -2; }
 tr.reschedule-row { display: none; }
 .switch-input:checked ~ .table-wrap tr.reschedule-row { display: table-row; }
 tr.reschedule-row td { background: var(--info-bg); font-size: 0.9rem; padding: 0.5rem 0.75rem; }
+/* Planned and suggested dates side by side, then the reason (stacked on a phone). */
+.plan { display: grid; grid-template-columns: minmax(11rem, 1fr) minmax(14rem, 1.3fr) 3fr; gap: 0.25rem 1.25rem; }
+.plan-label { display: block; color: var(--muted); font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
+              letter-spacing: 0.03em; }
 
 /* Re-run buttons: one in the report, and a small one next to each "AI unavailable" badge. */
 form.rerun { display: inline; margin: 0; }
 form.rerun-small button { padding: 0.1rem 0.6rem; font-size: 0.85rem; }
 .todo form.rerun { flex-shrink: 0; }
+
+@media (max-width: 640px) {
+  .plan { grid-template-columns: 1fr; }
+}

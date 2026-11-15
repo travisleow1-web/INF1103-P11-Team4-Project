@@ -791,3 +791,29 @@ def test_the_results_and_search_pages_load_the_sorting_script(data):
     search = client.get("/search").text
     assert re.search(r'<script src="/static/show_dates\.js\?v=\d+"></script>', run)
     assert re.search(r'<script src="/static/show_dates\.js\?v=\d+"></script>', search)
+
+
+# the date line: planned and suggested side by side, then why
+
+def plan_cells(text):
+    """(label, text) of each cell in the first date line on the page."""
+    line = text[text.index('class="plan"'):text.index("</tr>", text.index('class="plan"'))]
+    cells = re.findall(r'<span class="plan-label">(\w+)</span>(.*?)</div>', line, flags=re.S)
+    return [(label, " ".join(re.sub(r"<[^>]+>", " ", body).split())) for label, body in cells]
+
+
+def test_a_new_date_is_shown_as_planned_then_suggested_then_why(data):
+    data.save(saved_record("SHP-002", risk="HIGH", outcome="ESCALATE", needs_human=True,
+                           reschedule=(date(2026, 12, 5), date(2026, 12, 24), "Clear from 5 December")))
+    cells = plan_cells(client_for(data).get("/search").text)
+    assert [label for label, _ in cells] == ["Planned", "Suggested", "Why"]
+    assert cells[0][1] == "01/12/2026 to 28/12/2026"
+    assert cells[1][1] == "Reschedule 05/12/2026 to 24/12/2026 (4 days later)"
+    assert cells[2][1] == "Clear from 5 December"
+
+
+def test_a_high_risk_shipment_with_no_new_date_shows_none_and_the_reason(data):
+    data.save(saved_record("SHP-001", risk="HIGH", outcome="ESCALATE", needs_human=True))
+    cells = plan_cells(client_for(data).get("/search").text)
+    assert cells[1] == ("Suggested", "None")
+    assert cells[2][1].startswith("No new date suggested:")

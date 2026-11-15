@@ -297,7 +297,7 @@ def test_a_shipment_that_already_left_gets_no_new_date_even_if_the_ai_gives_one(
     gemini.complete.return_value = high_weather_with_window((date.today() + timedelta(days=2)).isoformat())
     results = app.post("/submit", data=rows((f"{leave:%d/%m/%Y}", f"{arrive:%d/%m/%Y}"))).text
     assert "0 of 1 high-risk shipment has a new date" in results and "because it had already left" in results
-    assert "New dates for" not in results
+    assert '<span class="badge badge-warn">Reschedule</span>' not in results     # no suggestion, so no badge
 
 
 def test_a_calm_route_has_nothing_to_attend_to(app):
