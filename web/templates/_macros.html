@@ -15,8 +15,8 @@
 {%- endmacro %}
 
 {% macro reschedule_panel(items) -%}
-<details class="reschedule" open>
-  <summary><strong>Reschedule suggestions ({{ items | length }})</strong></summary>
+<details class="reschedule">
+  <summary><strong>Show reschedule suggestions ({{ items | length }})</strong></summary>
   {% if items %}
   <p>Every High or Extreme risk shipment, with the new dates the forecast scan suggests and why.</p>
   <div class="table-wrap">

@@ -116,7 +116,6 @@ class IOManager:
                 "primary_factor": primary,
                 "primary_severity": severity,
                 "primary_risk": self.__risk_text(primary, severity),
-                "suggested_departure": self.__suggested_departure(d["reschedule"]),
                 "n_risk_factors": len(factors),
                 "conflicting_sources": a.get("conflicting_sources"),
                 "overall_risk": d["overall_risk"],
@@ -213,11 +212,6 @@ class IOManager:
     def __local_time(self, moment):
         """DD/MM/YYYY HH:MM in Singapore time, for display."""
         return moment.astimezone(SGT).strftime("%d/%m/%Y %H:%M SGT")
-
-    @staticmethod
-    def __suggested_departure(plan):
-        """DD/MM/YYYY of the suggested departure, or None when there is no suggestion."""
-        return f"{date.fromisoformat(plan['new_departure']):%d/%m/%Y}" if plan else None
 
     def __risk_text(self, risk_type, severity):
         """'port_congestion', 'MEDIUM' -> 'Port congestion (Medium)'; no severity -> just the name."""

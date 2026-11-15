@@ -204,14 +204,6 @@ def test_search_criteria_to_dict_keeps_false_but_drops_blanks():
     assert SearchCriteria(needs_human=False, outcome="").to_dict() == {"needs_human": False}
 
 
-def test_the_summary_shows_the_suggested_departure_only_when_there_is_one():
-    plain = make_io().show_summary([saved_record("SHP-001", risk="HIGH")])[0]
-    suggested = make_io().show_summary([saved_record(
-        "SHP-002", risk="HIGH", reschedule=(date(2026, 12, 5), date(2027, 1, 1), "why"))])[0]
-    assert plain["suggested_departure"] is None
-    assert suggested["suggested_departure"] == "05/12/2026"
-
-
 def test_the_reschedule_overview_lists_every_high_risk_shipment_with_or_without_a_new_date():
     records = [saved_record("SHP-001", risk="LOW"), saved_record("SHP-002", risk="MEDIUM"),
                saved_record("SHP-003", risk="HIGH"),

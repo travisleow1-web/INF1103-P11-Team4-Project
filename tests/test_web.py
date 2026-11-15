@@ -615,7 +615,7 @@ def test_demo_mode_lists_the_high_risk_shipments_with_their_reasoning_after_the_
     rows["arrival_time"] = [(leave + timedelta(days=20)).strftime("%d/%m/%Y")] * 3
     text = demo_client(data).post("/submit", data=rows).text           # SHP-002 is the fake AI's high risk
     panel = text[text.index('<details class="reschedule"'):]
-    assert "Reschedule suggestions (1)" in panel
+    assert "Show reschedule suggestions (1)" in panel
     assert f"{leave + timedelta(days=4):%d/%m/%Y} to " in panel and "4 days later" in panel
     assert "meets High weather risk" in panel
     assert text.index("Done: 3 of 3") < text.index('<details class="reschedule"')   # shown once the rows are done
@@ -624,4 +624,4 @@ def test_demo_mode_lists_the_high_risk_shipments_with_their_reasoning_after_the_
 def test_search_shows_the_reschedule_panel(data):
     client = demo_client(data)
     client.post("/submit", data=good_rows(3))
-    assert "Reschedule suggestions (1)" in client.get("/search").text
+    assert "Show reschedule suggestions (1)" in client.get("/search").text

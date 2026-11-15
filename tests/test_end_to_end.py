@@ -265,10 +265,11 @@ def test_the_panel_and_table_show_the_new_date_and_why_on_the_live_path(app, gem
     clear = leave + timedelta(days=4)
     gemini.complete.return_value = high_weather_with_window(clear.isoformat())
     results = app.post("/submit", data=rows((f"{leave:%d/%m/%Y}", f"{arrive:%d/%m/%Y}"))).text
-    cell = f'<td data-label="Suggested departure"><span class="badge badge-warn">Reschedule</span> {clear:%d/%m/%Y}</td>'
-    assert cell in results and cell in app.get("/search").text
+    assert "Suggested departure" not in results                 # no extra column: the panel is an option
+    assert '<details class="reschedule">' in results            # closed until the user opens it
+    assert '<details class="reschedule">' in app.get("/search").text
     panel = results[results.index('<details class="reschedule"'):]
-    assert "Reschedule suggestions (1)" in panel
+    assert "Show reschedule suggestions (1)" in panel
     assert f"Departing on {leave:%d/%m/%Y} meets High weather risk at SGSIN (test)" in panel
     assert f"starting {clear:%d/%m/%Y}, 4 days later" in panel
 
@@ -277,18 +278,18 @@ def test_a_high_risk_shipment_with_no_clear_window_is_listed_without_a_date(app,
     leave, arrive = date.today() + timedelta(days=5), date.today() + timedelta(days=20)
     gemini.complete.return_value = high_weather_with_window("")
     results = app.post("/submit", data=rows((f"{leave:%d/%m/%Y}", f"{arrive:%d/%m/%Y}"))).text
-    assert '<td data-label="Suggested departure">-</td>' in results
     panel = results[results.index('<details class="reschedule"'):]
-    assert "Reschedule suggestions (1)" in panel and "No new date suggested" in panel
+    assert "Show reschedule suggestions (1)" in panel and "No new date suggested" in panel
 
 
 def test_a_shipment_that_already_left_gets_no_new_date_even_if_the_ai_gives_one(app, gemini):
     leave, arrive = date.today() - timedelta(days=3), date.today() + timedelta(days=10)
     gemini.complete.return_value = high_weather_with_window((date.today() + timedelta(days=2)).isoformat())
     results = app.post("/submit", data=rows((f"{leave:%d/%m/%Y}", f"{arrive:%d/%m/%Y}"))).text
-    assert '<td data-label="Suggested departure">-</td>' in results
+    panel = results[results.index('<details class="reschedule"'):]
+    assert "No new date suggested" in panel and "Reschedule</span>" not in panel
 
 
 def test_a_calm_route_has_an_empty_panel(app):
     results = app.post("/submit", data=rows(("01/12/2026", "20/12/2026"))).text
-    assert "Reschedule suggestions (0)" in results and "so no new dates are suggested" in results
+    assert "Show reschedule suggestions (0)" in results and "so no new dates are suggested" in results
