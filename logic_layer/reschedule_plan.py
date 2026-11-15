@@ -36,6 +36,11 @@ class ReschedulePlan:
         return self.__new_arrival
 
     @property
+    def days_later(self) -> int:
+        """How many days after the planned departure the new one is."""
+        return (self.__new_departure - self.__original_departure).days
+
+    @property
     def reason(self) -> str:
         return self.__reason
 
