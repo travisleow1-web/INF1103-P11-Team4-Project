@@ -8,6 +8,7 @@ from model.outcome import Outcome
 from model.port_registry import PortRegistry
 from model.risk_level import RiskLevel
 from model.risk_type import RiskType
+from model.shipment import Shipment
 from model.search_criteria import SearchCriteria
 from model.shipment_record import ShipmentRecord
 from model.storage_error import StorageError
@@ -60,6 +61,22 @@ class IOManager:
             if not preview.has_problems():
                 self.__last_handed_out = next_number - 1
         return preview
+
+    def shipments_to_rerun(self, shipment_ids: List[str]) -> "tuple[List[Shipment], List[str]]":
+        """The saved shipments to assess again, for IDs whose record has no AI assessment (AI unavailable).
+
+        Returns (shipments, skipped): skipped are IDs that are not saved or already have an AI assessment.
+        If the saved records cannot be read, this raises StorageError.
+        """
+        shipments, skipped = [], []
+        for shipment_id in dict.fromkeys(text.strip().upper() for text in shipment_ids if text.strip()):
+            found = self.__data.find(SearchCriteria(shipment_id=shipment_id))
+            saved = next((r for r in found if r.shipment.shipment_id == shipment_id), None)
+            if saved and saved.assessment.is_fallback():
+                shipments.append(saved.shipment)
+            else:
+                skipped.append(shipment_id)
+        return shipments, skipped
 
     def search(self, fields: dict) -> dict:
         """fields is the raw search form: strings in, a display dict out."""

@@ -219,3 +219,31 @@ def test_the_reschedule_overview_lists_every_high_risk_shipment_with_or_without_
 def test_search_results_carry_the_reschedule_overview():
     data = FakeData([saved_record("SHP-003", risk="HIGH")])
     assert [r["shipment_id"] for r in make_io(data).search({})["reschedule"]] == ["SHP-003"]
+
+
+# shipments to run again
+
+def test_only_shipments_without_an_ai_assessment_can_be_run_again():
+    io = make_io(FakeData([record("SHP-001", fallback=True), record("SHP-002"), record("SHP-003", fallback=True)]))
+    shipments, skipped = io.shipments_to_rerun(["SHP-001", "SHP-002", "SHP-003", "SHP-009"])
+    assert [s.shipment_id for s in shipments] == ["SHP-001", "SHP-003"]
+    assert skipped == ["SHP-002", "SHP-009"]                      # already assessed, and not saved
+
+
+def test_the_ids_to_run_again_are_cleaned_and_each_is_used_once():
+    data = FakeData([record("SHP-001", fallback=True)])
+    shipments, skipped = make_io(data).shipments_to_rerun([" shp-001 ", "SHP-001", "", "  "])
+    assert [s.shipment_id for s in shipments] == ["SHP-001"] and skipped == []
+    assert data.last_criteria == SearchCriteria(shipment_id="SHP-001")
+
+
+def test_the_shipment_to_run_again_is_the_saved_one_with_its_ports_and_dates():
+    shipment = make_io(FakeData([record("SHP-001", fallback=True)])).shipments_to_rerun(["SHP-001"])[0][0]
+    assert shipment.origin.code == "SGSIN" and shipment.destination.code == "NLRTM"
+    assert shipment.departure == date(2026, 12, 1) and shipment.arrival == date(2026, 12, 20)
+
+
+def test_running_again_with_unreadable_records_raises_the_storage_error():
+    io = make_io(FakeData(error=StorageError("Database is down")))
+    with pytest.raises(StorageError, match="Database is down"):
+        io.shipments_to_rerun(["SHP-001"])
