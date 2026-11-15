@@ -5,4 +5,5 @@
 <p role="status">Done: {{ done }} of {{ total }} shipment{{ "" if total == 1 else "s" }} assessed.</p>
 {{ report_card(report, "Assessment report") }}
 <p><a href="/">Assess more shipments</a> or <a href="/search">search saved records</a></p>
+<script src="{{ static_url('show_dates.js') }}"></script>
 {% include "_footer.html" %}

@@ -1,5 +1,5 @@
 {% from "_macros.html" import risk_badge, outcome_badge, yes_no, details_row, reschedule_row, rerun_form %}
-    <tr class="summary">
+    <tr class="summary" data-rank="{{ 0 if reschedule and reschedule.suggested else (1 if reschedule else 2) }}">
       <td class="progress" data-label="Progress">{{ number }} of {{ total }}</td>
       <th scope="row">{{ row.shipment_id }}{% if row.ai_unavailable %} <span class="badge badge-warn">AI unavailable</span> {{ rerun_form([row.shipment_id], "Re-run", small=True) }}{% endif %}</th>
       <td class="route" data-label="Route">{{ row.route }}</td>

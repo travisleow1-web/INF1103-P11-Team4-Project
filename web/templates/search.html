@@ -61,7 +61,8 @@
   </thead>
   <tbody>
     {% for row in result.summary %}{% set record = result.records[loop.index0] %}
-    <tr class="summary">
+    {% set item = result.reschedule | selectattr("shipment_id", "equalto", row.shipment_id) | first %}
+    <tr class="summary" data-rank="{{ 0 if item and item.suggested else (1 if item else 2) }}">
       <th scope="row">{{ row.shipment_id }}{% if row.ai_unavailable %} <span class="badge badge-warn">AI unavailable</span> {{ rerun_form([row.shipment_id], "Re-run", small=True) }}{% endif %}</th>
       <td class="route" data-label="Route">{{ row.route }}</td>
       <td data-label="Departure">{{ record.departure }}</td>
@@ -71,7 +72,7 @@
       <td data-label="Outcome">{{ outcome_badge(row.outcome) }}</td>
       <td data-label="Needs human">{{ yes_no(row.needs_human) }}</td>
     </tr>
-{% set item = result.reschedule | selectattr("shipment_id", "equalto", row.shipment_id) | first %}{% if item %}{{ reschedule_row(item, 8) }}{% endif %}
+{% if item %}{{ reschedule_row(item, 8) }}{% endif %}
 {{ details_row(record, 8) }}
     {% endfor %}
   </tbody>
@@ -79,4 +80,5 @@
 </div>
 {% endif %}
 <script src="{{ static_url('date_picker.js') }}"></script>
+<script src="{{ static_url('show_dates.js') }}"></script>
 {% include "_footer.html" %}

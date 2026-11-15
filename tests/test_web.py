@@ -3,6 +3,7 @@ import json
 import logging
 import re
 import threading
+from datetime import date
 from unittest.mock import patch
 import pytest
 import requests
@@ -759,3 +760,34 @@ def test_the_ids_in_a_rerun_form_are_escaped(data):
     data.save(saved_record("SHP-001", fallback=True))
     text = client_for(data, FakeAI(), FakeLogic()).post("/rerun", data={"shipment_id": ["SHP-001", "<b>x</b>"]}).text
     assert "<B>X</B>" not in text and "&lt;B&gt;X&lt;/B&gt;" in text      # IDs are shown upper-cased, and escaped
+
+
+# sorting rows when the suggested dates are shown
+
+def ranks_by_id(text):
+    """{shipment id: data-rank} for each summary row on the page."""
+    return {i: r for r, i in re.findall(r'<tr class="summary" data-rank="(\d)">\s*<th scope="row">(SHP-\d+)', text)}
+
+
+def test_each_row_is_ranked_so_rows_with_a_new_date_can_come_first(data):
+    client = client_for(data, FakeAI(), FakeLogic(), demo=True)
+    client.post("/submit", data=good_rows(6))           # SHP-002 and SHP-005 are high risk with a new date
+    found = ranks_by_id(client.get("/search").text)
+    assert found == {"SHP-001": "2", "SHP-002": "0", "SHP-003": "2", "SHP-004": "2", "SHP-005": "0", "SHP-006": "2"}
+
+
+def test_a_high_risk_row_with_no_new_date_is_ranked_between(data):
+    data.save(saved_record("SHP-001", risk="HIGH", outcome="ESCALATE", needs_human=True))      # high, no date
+    data.save(saved_record("SHP-002", risk="HIGH", outcome="ESCALATE", needs_human=True,
+                           reschedule=(date(2026, 12, 5), date(2026, 12, 30), "Clear from 5 December")))
+    data.save(saved_record("SHP-003"))
+    page = client_for(data).get("/search").text
+    assert ranks_by_id(page) == {"SHP-001": "1", "SHP-002": "0", "SHP-003": "2"}
+
+
+def test_the_results_and_search_pages_load_the_sorting_script(data):
+    client = client_for(data, FakeAI(), FakeLogic(), demo=True)
+    run = client.post("/submit", data=good_rows(1)).text
+    search = client.get("/search").text
+    assert re.search(r'<script src="/static/show_dates\.js\?v=\d+"></script>', run)
+    assert re.search(r'<script src="/static/show_dates\.js\?v=\d+"></script>', search)
