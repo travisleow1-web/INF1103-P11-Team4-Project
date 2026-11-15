@@ -14,16 +14,13 @@ from .record_serializer import RecordSerializer
 
 
 class JsonDataManager(DataManager):
-    """Keeps records in one JSON file. Needs no database, so it is the default.
+    """Keeps records in one JSON file; needs no database, so it is the default. Use one per file.
 
     The web server handles requests on several threads, so saves are serialised with a lock.
-    Use one JsonDataManager per file.
     """
 
     def __init__(self, path: Union[str, Path], ports: PortRegistry):
-        self.__path = Path(path)
-        self.__serializer = RecordSerializer(ports)
-        self.__lock = threading.Lock()
+        self.__path, self.__serializer, self.__lock = Path(path), RecordSerializer(ports), threading.Lock()
 
     def save(self, record: ShipmentRecord) -> None:
         """Add the record to the file. A shipment_id that is already saved is a StorageError."""
@@ -32,23 +29,19 @@ class JsonDataManager(DataManager):
             documents = self.__load()
             if any(d.get("shipment_id") == shipment_id for d in documents):
                 raise StorageError(f"{shipment_id} is already saved")
-            documents.append(self.__serializer.to_document(record))
-            self.__write(documents)
+            self.__write(documents + [self.__serializer.to_document(record)])
 
     def find(self, criteria: SearchCriteria) -> List[ShipmentRecord]:
         """The records that match, newest first. Damaged records are skipped and logged."""
-        records = self.__serializer.from_documents(self.__load())
-        matching = [r for r in records if criteria.matches(r)]
-        return self.__newest_first(matching)
+        return self.__newest_first(r for r in self.__serializer.from_documents(self.__load()) if criteria.matches(r))
 
     def find_route_history(self, route_id: str, since: datetime) -> List[ShipmentRecord]:
         """Records on the route saved at or after since, skipping FALLBACK assessments, newest first."""
         if since.tzinfo is None:
             raise ValueError("since must be timezone-aware")
-        records = self.__serializer.from_documents(self.__load())
-        matching = [r for r in records if r.shipment.route_id() == route_id
-                    and r.saved_at >= since and not r.assessment.is_fallback()]
-        return self.__newest_first(matching)
+        return self.__newest_first(r for r in self.__serializer.from_documents(self.__load())
+                                   if r.shipment.route_id() == route_id and r.saved_at >= since
+                                   and not r.assessment.is_fallback())
 
     def __newest_first(self, records):
         return sorted(records, key=lambda r: (r.saved_at, r.shipment.shipment_id), reverse=True)
@@ -66,12 +59,10 @@ class JsonDataManager(DataManager):
         return documents
 
     def __write(self, documents):
-        """Write to a new temporary file next to the real one, then swap it in, so a crash cannot
-        leave half a file and readers always see a whole one."""
+        """Write a temp file next to the real one, then swap it in, so readers never see half a file."""
         temp = None
         try:
-            handle, temp = tempfile.mkstemp(dir=self.__path.parent, prefix=self.__path.stem + ".",
-                                            suffix=".json.tmp")
+            handle, temp = tempfile.mkstemp(dir=self.__path.parent, prefix=self.__path.stem + ".", suffix=".json.tmp")
             with os.fdopen(handle, "w", encoding="utf-8") as file:
                 json.dump(documents, file, indent=2)
             os.replace(temp, self.__path)

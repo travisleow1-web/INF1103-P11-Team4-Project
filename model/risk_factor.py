@@ -6,7 +6,6 @@ from .risk_type import RiskType
 @dataclass(frozen=True)
 class RiskFactor:
     """One risk the AI found on a route, with where it is and which feed reported it."""
-
     type: RiskType
     severity: RiskLevel
     location: str

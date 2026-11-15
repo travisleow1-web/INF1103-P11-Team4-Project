@@ -6,7 +6,6 @@ from .risk_type import RiskType
 @dataclass(frozen=True)
 class Insight:
     """A short coded finding from the AI, such as POTENTIAL_DELAY, that the rules can act on."""
-
     code: str
     risk_type: RiskType
     severity: RiskLevel

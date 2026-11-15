@@ -19,8 +19,7 @@ REASON_LIMIT = 200      # longest part of Google's error message kept in an AISe
 class GeminiClient:
     """Sends one prompt to Gemini and returns the JSON reply as a dict.
 
-    The system prompt and response schema belong to the client. Timeouts, connection errors,
-    429 and 5xx are retried with backoff; a missing key and other 4xx errors are not.
+    Timeouts, connection errors, 429 and 5xx are retried with backoff; a missing key and other 4xx are not.
     """
 
     def __init__(self, api_key: Optional[str], model: str, system_prompt: str, response_schema: dict,
@@ -28,21 +27,13 @@ class GeminiClient:
                  http: Optional[requests.Session] = None):
         if max_retries < 1:
             raise ValueError("max_retries must be at least 1")
-        self.__api_key = self.__clean_key(api_key)
-        self.__model = model
-        self.__system_prompt = system_prompt
+        self.__api_key, self.__model, self.__system_prompt = self.__clean_key(api_key), model, system_prompt
         self.__response_schema = copy.deepcopy(response_schema)
-        self.__max_retries = max_retries
-        self.__timeout = timeout
-        # One Session is shared by every request thread. That is acceptable here: it only pools
-        # connections, and holds no cookies or auth state (the key is sent per request in a header).
-        self.__http = http or requests.Session()
+        self.__max_retries, self.__timeout = max_retries, timeout
+        self.__http = http or requests.Session()    # shared by threads; the key goes per request in a header
 
     def complete(self, prompt: str) -> dict:
-        """Return the model's JSON reply. Raises AIServiceError or InvalidResponseError.
-
-        The last attempt always returns or raises, so the loop never ends without a result.
-        """
+        """Return the model's JSON reply. Raises AIServiceError or InvalidResponseError."""
         delay = 1.0
         for attempt in range(1, self.__max_retries + 1):
             try:
@@ -63,56 +54,44 @@ class GeminiClient:
     def __clean_key(api_key: Optional[str]) -> Optional[str]:
         """The key without surrounding spaces, or None if it is empty or not plain printable ASCII."""
         key = (api_key or "").strip()
-        if not key or not key.isascii() or not key.isprintable():
-            return None
-        return key
+        return key if key and key.isascii() and key.isprintable() else None
 
     def __send(self, prompt: str) -> dict:
         if self.__api_key is None:
             raise AIServiceError("GEMINI_API_KEY is not set or invalid", retryable=False)
-        body = {
-            "systemInstruction": {"parts": [{"text": self.__system_prompt}]},
-            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "temperature": 0, "seed": 0,
-                "responseMimeType": "application/json",
-                "responseSchema": self.__response_schema,
-            },
-        }
+        body = {"systemInstruction": {"parts": [{"text": self.__system_prompt}]},
+                "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                "generationConfig": {"temperature": 0, "seed": 0, "responseMimeType": "application/json",
+                                     "responseSchema": self.__response_schema}}
         try:
-            reply = self.__http.post(GEMINI_URL.format(model=self.__model),
-                                     headers={"x-goog-api-key": self.__api_key},
+            reply = self.__http.post(GEMINI_URL.format(model=self.__model), headers={"x-goog-api-key": self.__api_key},
                                      json=body, timeout=self.__timeout)
         # Only the error's type goes in the message: some requests errors quote the header (the key).
         except (requests.Timeout, requests.ConnectionError, requests.exceptions.ChunkedEncodingError) as error:
             raise AIServiceError(f"network problem: {type(error).__name__}", retryable=True) from None
         except (requests.RequestException, ValueError, UnicodeError) as error:
             raise AIServiceError(f"request failed: {type(error).__name__}", retryable=False) from None
-        if reply.status_code == 429 or reply.status_code >= 500:
-            raise AIServiceError(f"HTTP {reply.status_code}{self.__reason(reply)}", retryable=True)
         if reply.status_code >= 400:
-            raise AIServiceError(f"HTTP {reply.status_code}{self.__reason(reply)}", retryable=False)
+            raise AIServiceError(f"HTTP {reply.status_code}{self.__reason(reply)}",
+                                 retryable=reply.status_code == 429 or reply.status_code >= 500)
         try:
             return json.loads(reply.json()["candidates"][0]["content"]["parts"][0]["text"])
         except (KeyError, IndexError, TypeError, ValueError) as error:
             raise InvalidResponseError(f"unreadable model reply: {error}") from error
 
     def __reason(self, reply: requests.Response) -> str:
-        """Google's error status and message from an error reply, e.g. ' (INVALID_ARGUMENT: API key not valid)'.
+        """Google's error status and message, e.g. ' (INVALID_ARGUMENT: API key not valid)', or '' if none.
 
-        Empty if the body has none. Shortened to REASON_LIMIT characters, and the key is masked just in case.
+        Shortened to REASON_LIMIT characters, and the key is masked just in case.
         """
         try:
             error = reply.json()["error"]
             parts = [str(error.get(name) or "").strip() for name in ("status", "message")]
         except (KeyError, TypeError, ValueError, AttributeError):
             return ""
-        reason = ": ".join(part for part in parts if part)
+        reason = " ".join(": ".join(part for part in parts if part).split())
         if not reason:
             return ""
-        reason = " ".join(reason.split())
         if self.__api_key:
             reason = reason.replace(self.__api_key, "***")
-        if len(reason) > REASON_LIMIT:
-            reason = reason[:REASON_LIMIT - 3] + "..."
-        return f" ({reason})"
+        return f" ({reason[:REASON_LIMIT - 3] + '...' if len(reason) > REASON_LIMIT else reason})"

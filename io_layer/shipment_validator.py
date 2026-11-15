@@ -9,10 +9,8 @@ from .validation_result import ValidationResult
 class ShipmentValidator:
     """Checks one raw row: required fields, known ports, DD/MM/YYYY dates, arrival after departure.
 
-    Every field that is present is checked even when another is missing, so the user sees all the
-    problems in a row at once. Messages use plain field names ("Arrival date is missing").
+    Every present field is checked even when another is missing, so the user sees all of a row's problems at once.
     """
-
     REQUIRED = ["origin_port", "destination_port", "departure_time", "arrival_time"]
     DATE_FORMAT = "%d/%m/%Y"
 
@@ -26,13 +24,10 @@ class ShipmentValidator:
         destination = self.__check_port(row.get("destination_port"), "Destination", errors)
         departure = self.__check_date(row.get("departure_time"), "Departure", errors)
         arrival = self.__check_date(row.get("arrival_time"), "Arrival", errors)
-
-        # Cross-field checks only when both sides are valid.
         if origin and destination and origin == destination:
             errors.append("Origin and destination are the same port")
         if departure and arrival and arrival <= departure:
             errors.append("Arrival must be after departure")
-
         if errors:
             return ValidationResult(None, errors)
         return ValidationResult(Shipment(shipment_id, origin, destination, departure, arrival), [])

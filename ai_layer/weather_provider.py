@@ -18,9 +18,8 @@ MARINE_URL = "https://marine-api.open-meteo.com/v1/marine"
 class WeatherProvider(ContextProvider):
     """Hourly wind, pressure, visibility and waves at the origin and destination ports (Open-Meteo).
 
-    Future shipments get the 16-day forecast. Shipments that departed within the last
-    `history_days` days get historical data for their own dates instead.
-    A port whose weather cannot be fetched gets None, and the other port keeps its data.
+    Future shipments get the 16-day forecast; shipments that departed within the last `history_days` days get
+    historical data for their own dates. A port whose weather fails gets None, and the other keeps its data.
     """
 
     def __init__(self, http: Optional[requests.Session] = None, history_days: int = HISTORY_DAYS):
@@ -43,23 +42,19 @@ class WeatherProvider(ContextProvider):
     def __history_window(self, shipment: Shipment, today: date) -> Optional[Tuple[str, str]]:
         """(start, end) ISO dates when the shipment departed recently, else None."""
         if today - timedelta(days=self.__history_days) <= shipment.departure < today:
-            # The archive API's latest allowed end date is yesterday.
-            end = min(shipment.arrival, today - timedelta(days=1))
+            end = min(shipment.arrival, today - timedelta(days=1))     # the archive ends yesterday
             return shipment.departure.isoformat(), end.isoformat()
         return None
 
     def __port_weather(self, port: Port, window: Optional[Tuple[str, str]]) -> Dict[str, Any]:
-        common: Dict[str, Any] = {"latitude": port.lat, "longitude": port.lon, "timezone": "auto"}
-        if window:
-            common.update(start_date=window[0], end_date=window[1])
-        else:
-            common["forecast_days"] = 16
+        common: Dict[str, Any] = {"latitude": port.lat, "longitude": port.lon, "timezone": "auto",
+                                  **({"start_date": window[0], "end_date": window[1]} if window
+                                     else {"forecast_days": 16})}
         weather_params = {**common, "hourly": "wind_speed_10m,wind_gusts_10m,pressure_msl,visibility",
                           "cell_selection": "sea"}
         marine_params = {**common, "hourly": "wave_height,swell_wave_height,wave_period"}
-        weather = self._get_json(HISTORICAL_FORECAST_URL if window else FORECAST_URL, weather_params)["hourly"]
-        marine = self._get_json(MARINE_URL, marine_params)["hourly"]
-        result = {**weather, **marine}
+        result = {**self._get_json(HISTORICAL_FORECAST_URL if window else FORECAST_URL, weather_params)["hourly"],
+                  **self._get_json(MARINE_URL, marine_params)["hourly"]}
         if window:
             result["historical_weather"] = self._get_json(ARCHIVE_URL, weather_params)["hourly"]
         return result

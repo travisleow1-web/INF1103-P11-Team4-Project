@@ -15,26 +15,17 @@ class ShipmentRecord:
         """saved_at defaults to now (UTC). A naive saved_at is a ValueError: storage needs a timezone."""
         if saved_at is not None and saved_at.tzinfo is None:
             raise ValueError("saved_at must be timezone-aware")
-        self.__shipment = shipment
-        self.__assessment = assessment
-        self.__decision = decision
+        self.__shipment, self.__assessment, self.__decision = shipment, assessment, decision
         self.__saved_at = saved_at or datetime.now(timezone.utc)
 
     @property
-    def shipment(self) -> Shipment:
-        return self.__shipment
-
+    def shipment(self) -> Shipment: return self.__shipment
     @property
-    def assessment(self) -> AIAssessment:
-        return self.__assessment
-
+    def assessment(self) -> AIAssessment: return self.__assessment
     @property
-    def decision(self) -> Decision:
-        return self.__decision
-
+    def decision(self) -> Decision: return self.__decision
     @property
-    def saved_at(self) -> datetime:
-        return self.__saved_at
+    def saved_at(self) -> datetime: return self.__saved_at
 
     def is_flagged(self) -> bool:
         """True if the shipment needed a human or had any risk above Low."""

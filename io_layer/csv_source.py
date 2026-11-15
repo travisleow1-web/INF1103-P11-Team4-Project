@@ -7,17 +7,15 @@ from .source_error import SourceError
 
 class CsvSource(ShipmentSource):
     """Rows from an uploaded CSV file. Header names are trimmed and lower-cased."""
-
     UNREADABLE = "This file is not a readable CSV (UTF-8 text)."
 
     def __init__(self, content: bytes):
-        self.__content = content        # the uploaded file as bytes
+        self.__content = content
 
     def read(self) -> "list[dict]":
         """Return one dict per data row. An unreadable file, missing columns or no rows raise SourceError."""
         try:
-            text = self.__content.decode("utf-8-sig")
-            reader = csv.DictReader(io.StringIO(text))
+            reader = csv.DictReader(io.StringIO(self.__content.decode("utf-8-sig")))
             reader.fieldnames = [h.strip().lower() for h in reader.fieldnames or []]
             rows = list(reader)
         except (UnicodeDecodeError, csv.Error) as error:

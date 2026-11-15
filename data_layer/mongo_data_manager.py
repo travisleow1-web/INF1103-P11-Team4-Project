@@ -11,7 +11,6 @@ from model.storage_error import StorageError
 from .data_manager import DataManager
 from .record_serializer import RecordSerializer
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -20,38 +19,31 @@ class MongoDataManager(DataManager):
 
     Driver errors are logged in full; users only see the short UNAVAILABLE message.
     """
-
     UNAVAILABLE = "Database unavailable. Results will not be saved."
 
     def __init__(self, collection: Collection, ports: PortRegistry):
         """Use an open collection (mongomock in tests). Makes shipment_id unique."""
-        self.__collection = collection
-        self.__serializer = RecordSerializer(ports)
+        self.__collection, self.__serializer = collection, RecordSerializer(ports)
         try:
             collection.create_index("shipment_id", unique=True)
         except PyMongoError as error:
             raise self.__unavailable("Cannot prepare the collection", error) from error
 
     @classmethod
-    def connect(cls, uri: str, db_name: str, ports: PortRegistry, collection_name: str = "shipment_records") -> "MongoDataManager":
-        """Open a collection from a connection string. Nothing is read from the environment here.
-
-        Raises StorageError if the address or database name is invalid or the server cannot be reached.
-        """
+    def connect(cls, uri: str, db_name: str, ports: PortRegistry,
+                collection_name: str = "shipment_records") -> "MongoDataManager":
+        """Open a collection from a connection string. Raises StorageError if it is invalid or unreachable."""
         from pymongo import MongoClient
         try:
-            client = MongoClient(uri, serverSelectionTimeoutMS=3000)
-            collection = client[db_name][collection_name]
+            collection = MongoClient(uri, serverSelectionTimeoutMS=3000)[db_name][collection_name]
         except (PyMongoError, ValueError) as error:       # ValueError: e.g. a port above 65535
             raise cls.__unavailable("Cannot open the database", error) from error
         return cls(collection, ports)
 
     def save(self, record: ShipmentRecord) -> None:
         """Insert the record. A shipment_id that is already saved is a StorageError."""
-        print("test")
-        document = self.__with_real_dates(self.__serializer.to_document(record))
         try:
-            self.__collection.insert_one(document)
+            self.__collection.insert_one(self.__with_real_dates(self.__serializer.to_document(record)))
         except DuplicateKeyError as error:
             raise StorageError(f"{record.shipment.shipment_id} is already saved") from error
         except PyMongoError as error:
@@ -66,17 +58,12 @@ class MongoDataManager(DataManager):
         if since.tzinfo is None:
             raise ValueError("since must be timezone-aware")      # MongoDB would read it as UTC silently
         origin, _, destination = route_id.partition("-")
-        return self.__find_newest_first({
-            "origin": origin,
-            "destination": destination,
-            "saved_at": {"$gte": since},
-            "assessment.ai_status": {"$ne": AIStatus.FALLBACK.value},
-        })
+        return self.__find_newest_first({"origin": origin, "destination": destination, "saved_at": {"$gte": since},
+                                         "assessment.ai_status": {"$ne": AIStatus.FALLBACK.value}})
 
     def __find_newest_first(self, query):
         try:
-            cursor = self.__collection.find(query)
-            documents = list(cursor.sort([("saved_at", -1), ("shipment_id", -1)]))
+            documents = list(self.__collection.find(query).sort([("saved_at", -1), ("shipment_id", -1)]))
         except PyMongoError as error:
             raise self.__unavailable("Cannot search the database", error) from error
         return self.__serializer.from_documents(documents)

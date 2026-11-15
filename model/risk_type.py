@@ -3,7 +3,6 @@ from enum import Enum
 
 class RiskType(str, Enum):
     """The kinds of risk the AI may report. NONE means no risk was found."""
-
     WEATHER = "weather"
     SEVERE_CROSSWINDS = "severe_crosswinds"
     PORT_CONGESTION = "port_congestion"

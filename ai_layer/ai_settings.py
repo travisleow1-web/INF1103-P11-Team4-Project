@@ -1,8 +1,4 @@
-"""Constants for the AI layer: model name, prompt, response schema and the closed value lists.
-
-Ported from the old config.py. Risk types and severities come from the shared enums, so the
-schema and the parser always agree with the model classes.
-"""
+"""AI layer constants. Risk types and severities come from the shared enums, so schema and parser agree."""
 from model.risk_level import RiskLevel
 from model.risk_type import RiskType
 
@@ -19,8 +15,8 @@ ALLOWED_SOURCES = ("open_meteo_weather", "open_meteo_marine", "open_meteo_histor
 INSIGHT_CODES = ("POTENTIAL_DELAY", "MULTIPLE_RISKS", "CONFLICTING_DATA", "OUTDATED_DATA",
                  "MISSING_DATA", "NEEDS_HUMAN_REVIEW")
 
-# The open lists ResponseParser checks against. RiskType and RiskLevel are checked by their enums.
-ALLOWED_LISTS = {"impact": ALLOWED_IMPACT, "source": ALLOWED_SOURCES, "insight_code": INSIGHT_CODES}
+ALLOWED_LISTS = {  # what ResponseParser checks; RiskType and RiskLevel use their enums
+    "impact": ALLOWED_IMPACT, "source": ALLOWED_SOURCES, "insight_code": INSIGHT_CODES}
 
 RISK_TYPES = [t.value for t in RiskType if t is not RiskType.NONE]   # a real risk
 ALL_RISK_TYPES = [t.value for t in RiskType]                          # also "none"
@@ -51,43 +47,27 @@ Rules:
   estimated_delay_days is your best estimate of added delay in whole days (0 if none or unknown).
   Use MULTIPLE_RISKS when two or more risk factors are Medium or higher."""
 
-RESPONSE_SCHEMA = {
-    # Gemini's schema format (upper-case type names).
+RESPONSE_SCHEMA = {  # Gemini's schema format (upper-case type names)
     "type": "OBJECT",
     "properties": {
-        "risk_factors": {
-            "type": "ARRAY",
-            "items": {
-                "type": "OBJECT",
-                "properties": {
-                    "type": {"type": "STRING", "enum": RISK_TYPES},
-                    "severity": {"type": "STRING", "enum": SEVERITIES},
-                    "location": {"type": "STRING"},
-                    "source": {"type": "STRING", "enum": list(ALLOWED_SOURCES)},
-                    "detail": {"type": "STRING"},
-                },
-                "required": ["type", "severity", "location", "source", "detail"],
-            },
-        },
+        "risk_factors": {"type": "ARRAY", "items": {
+            "type": "OBJECT",
+            "properties": {"type": {"type": "STRING", "enum": RISK_TYPES},
+                           "severity": {"type": "STRING", "enum": SEVERITIES}, "location": {"type": "STRING"},
+                           "source": {"type": "STRING", "enum": list(ALLOWED_SOURCES)}, "detail": {"type": "STRING"}},
+            "required": ["type", "severity", "location", "source", "detail"]}},
         "primary_risk_factor": {"type": "STRING", "enum": ALL_RISK_TYPES},
         "affected_location": {"type": "STRING"},
         "expected_impact": {"type": "STRING", "enum": list(ALLOWED_IMPACT)},
         "confidence_score": {"type": "NUMBER"},
         "conflicting_sources": {"type": "BOOLEAN"},
-        "insights": {
-            "type": "ARRAY",
-            "items": {
-                "type": "OBJECT",
-                "properties": {
-                    "code": {"type": "STRING", "enum": list(INSIGHT_CODES)},
-                    "risk_type": {"type": "STRING", "enum": ALL_RISK_TYPES},
-                    "severity": {"type": "STRING", "enum": SEVERITIES},
-                    "location": {"type": "STRING"},
-                    "estimated_delay_days": {"type": "INTEGER"},
-                },
-                "required": ["code", "risk_type", "severity", "location", "estimated_delay_days"],
-            },
-        },
+        "insights": {"type": "ARRAY", "items": {
+            "type": "OBJECT",
+            "properties": {"code": {"type": "STRING", "enum": list(INSIGHT_CODES)},
+                           "risk_type": {"type": "STRING", "enum": ALL_RISK_TYPES},
+                           "severity": {"type": "STRING", "enum": SEVERITIES}, "location": {"type": "STRING"},
+                           "estimated_delay_days": {"type": "INTEGER"}},
+            "required": ["code", "risk_type", "severity", "location", "estimated_delay_days"]}},
     },
     "required": ["risk_factors", "primary_risk_factor", "affected_location", "expected_impact",
                  "confidence_score", "conflicting_sources", "insights"],

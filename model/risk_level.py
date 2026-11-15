@@ -6,11 +6,7 @@ class RiskLevel(IntEnum):
 
     Based on Jun Jie's RiskLevel (Logic_ManagerPart2), with EXTREME added and strict parsing.
     """
-
-    LOW = 1
-    MEDIUM = 2
-    HIGH = 3
-    EXTREME = 4
+    LOW, MEDIUM, HIGH, EXTREME = 1, 2, 3, 4
 
     @property
     def label(self) -> str:

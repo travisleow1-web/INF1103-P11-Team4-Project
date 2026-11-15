@@ -11,19 +11,14 @@ class AIAssessment:
 
     def __init__(self, risk_factors: Iterable[RiskFactor], insights: Iterable[Insight],
                  primary_risk_factor: RiskType, affected_location: str, expected_impact: str,
-                 confidence_score: float, conflicting_sources: bool, status: AIStatus,
-                 fetched_at: datetime):
+                 confidence_score: float, conflicting_sources: bool, status: AIStatus, fetched_at: datetime):
         if fetched_at.tzinfo is None:
             raise ValueError("fetched_at must be timezone-aware")
-        self.__risk_factors = tuple(risk_factors)
-        self.__insights = tuple(insights)
+        self.__risk_factors, self.__insights = tuple(risk_factors), tuple(insights)
         self.__primary_risk_factor = RiskType(primary_risk_factor)
-        self.__affected_location = affected_location
-        self.__expected_impact = expected_impact
-        self.__confidence_score = float(confidence_score)
-        self.__conflicting_sources = bool(conflicting_sources)
-        self.__status = AIStatus(status)
-        self.__fetched_at = fetched_at
+        self.__affected_location, self.__expected_impact = affected_location, expected_impact
+        self.__confidence_score, self.__conflicting_sources = float(confidence_score), bool(conflicting_sources)
+        self.__status, self.__fetched_at = AIStatus(status), fetched_at
 
     @classmethod
     def fallback(cls, now: Optional[datetime] = None) -> "AIAssessment":
@@ -32,40 +27,23 @@ class AIAssessment:
                    now or datetime.now(timezone.utc))
 
     @property
-    def risk_factors(self) -> tuple:
-        return self.__risk_factors
-
+    def risk_factors(self) -> tuple: return self.__risk_factors
     @property
-    def insights(self) -> tuple:
-        return self.__insights
-
+    def insights(self) -> tuple: return self.__insights
     @property
-    def primary_risk_factor(self) -> RiskType:
-        return self.__primary_risk_factor
-
+    def primary_risk_factor(self) -> RiskType: return self.__primary_risk_factor
     @property
-    def affected_location(self) -> str:
-        return self.__affected_location
-
+    def affected_location(self) -> str: return self.__affected_location
     @property
-    def expected_impact(self) -> str:
-        return self.__expected_impact
-
+    def expected_impact(self) -> str: return self.__expected_impact
     @property
-    def confidence_score(self) -> float:
-        return self.__confidence_score
-
+    def confidence_score(self) -> float: return self.__confidence_score
     @property
-    def conflicting_sources(self) -> bool:
-        return self.__conflicting_sources
-
+    def conflicting_sources(self) -> bool: return self.__conflicting_sources
     @property
-    def status(self) -> AIStatus:
-        return self.__status
-
+    def status(self) -> AIStatus: return self.__status
     @property
-    def fetched_at(self) -> datetime:
-        return self.__fetched_at
+    def fetched_at(self) -> datetime: return self.__fetched_at
 
     def is_fallback(self) -> bool:
         """True when the AI did not run for this shipment."""
@@ -73,35 +51,20 @@ class AIAssessment:
 
     def to_dict(self) -> dict:
         """Plain dict for saving and display. Enums become their values, the time ISO text."""
-        return {
-            "risk_factors": [f.to_dict() for f in self.__risk_factors],
-            "insights": [i.to_dict() for i in self.__insights],
-            "primary_risk_factor": self.__primary_risk_factor.value,
-            "affected_location": self.__affected_location,
-            "expected_impact": self.__expected_impact,
-            "confidence_score": self.__confidence_score,
-            "conflicting_sources": self.__conflicting_sources,
-            "ai_status": self.__status.value,
-            "fetched_at": self.__fetched_at.isoformat(),
-        }
+        return {"risk_factors": [f.to_dict() for f in self.__risk_factors],
+                "insights": [i.to_dict() for i in self.__insights],
+                "primary_risk_factor": self.__primary_risk_factor.value, "affected_location": self.__affected_location,
+                "expected_impact": self.__expected_impact, "confidence_score": self.__confidence_score,
+                "conflicting_sources": self.__conflicting_sources, "ai_status": self.__status.value,
+                "fetched_at": self.__fetched_at.isoformat()}
 
     @classmethod
     def from_dict(cls, data: dict) -> "AIAssessment":
         """Rebuild from to_dict() output. A missing key is a KeyError, a bad value a ValueError."""
         text = str(data["fetched_at"])
-        if text.endswith("Z"):                     # Python 3.10 fromisoformat does not read "Z"
-            text = text[:-1] + "+00:00"
-        fetched_at = datetime.fromisoformat(text)
-        if fetched_at.tzinfo is None:
-            fetched_at = fetched_at.replace(tzinfo=timezone.utc)
-        return cls(
-            [RiskFactor.from_dict(f) for f in data["risk_factors"]],
-            [Insight.from_dict(i) for i in data["insights"]],
-            RiskType(data["primary_risk_factor"]),
-            str(data["affected_location"]),
-            str(data["expected_impact"]),
-            data["confidence_score"],
-            data["conflicting_sources"],
-            AIStatus(data["ai_status"]),
-            fetched_at,
-        )
+        fetched_at = datetime.fromisoformat(text[:-1] + "+00:00" if text.endswith("Z") else text)  # 3.10 can't read Z
+        fetched_at = fetched_at if fetched_at.tzinfo else fetched_at.replace(tzinfo=timezone.utc)
+        return cls([RiskFactor.from_dict(f) for f in data["risk_factors"]],
+                   [Insight.from_dict(i) for i in data["insights"]], RiskType(data["primary_risk_factor"]),
+                   str(data["affected_location"]), str(data["expected_impact"]), data["confidence_score"],
+                   data["conflicting_sources"], AIStatus(data["ai_status"]), fetched_at)

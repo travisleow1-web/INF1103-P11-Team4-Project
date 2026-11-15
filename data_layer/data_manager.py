@@ -14,16 +14,10 @@ class DataManager(ABC):
 
     @abstractmethod
     def find(self, criteria: SearchCriteria) -> List[ShipmentRecord]:
-        """Return the records that match a SearchCriteria, newest first. No filters returns everything.
-
-        A damaged record is skipped (and logged); StorageError means the store itself could not be read.
-        """
+        """Records matching criteria, newest first (no filters: everything). Damaged records are skipped and logged;
+        StorageError means the store itself could not be read."""
 
     @abstractmethod
     def find_route_history(self, route_id: str, since: datetime) -> List[ShipmentRecord]:
-        """Return the records on a route ('SGSIN-NLRTM') saved at or after since, newest first.
-
-        since must be timezone-aware (UTC inside the app); a naive datetime is a ValueError.
-
-        Records whose assessment is a FALLBACK are skipped: the AI never looked at them.
-        """
+        """Records on a route ('SGSIN-NLRTM') saved at or after since (timezone-aware, else ValueError), newest
+        first. FALLBACK assessments are skipped: the AI never looked at them."""

@@ -9,7 +9,6 @@ from .business_rule import BusinessRule
 
 class UnregisteredLocationRule(BusinessRule):
     """Notes any factor or insight location that is not a registered port, so a reader can check it."""
-
     GENERAL_LOCATIONS = frozenset({"Route", "Unknown"})
 
     def __init__(self, ports: PortRegistry):

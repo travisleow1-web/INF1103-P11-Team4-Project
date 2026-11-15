@@ -16,13 +16,11 @@ class PortRegistry:
     def from_json(cls, path: Union[str, Path] = DEFAULT_PORTS_FILE) -> "PortRegistry":
         """Load the ports from a JSON file shaped like ports_reference_4.json ({"ports": [...]})."""
         with open(path, encoding="utf-8") as f:
-            data = json.load(f)["ports"]
-        return cls([Port(p["code"], p["name"], p["country"], p["lat"], p["lon"]) for p in data])
+            return cls([Port(p["code"], p["name"], p["country"], p["lat"], p["lon"]) for p in json.load(f)["ports"]])
 
     def find(self, text: str) -> Optional[Port]:
         """Accept 'SGSIN' or the full label 'SGSIN - Singapore, SG'. Return a Port or None."""
-        code = str(text).split(" - ")[0].strip().upper()
-        return self.__ports.get(code)
+        return self.__ports.get(str(text).split(" - ")[0].strip().upper())
 
     def labels(self) -> List[str]:
         """Every port's label, in file order, for the form suggestions."""

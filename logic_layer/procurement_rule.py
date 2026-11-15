@@ -11,17 +11,12 @@ class ProcurementRule(BusinessRule):
 
     Based on Jun Jie's ProcurementRule (Logic_ManagerPart2).
     """
-
     DESTRUCTION_IMPACTS = frozenset({"Cargo Destruction"})
 
     def apply(self, shipment: Shipment, assessment: AIAssessment, decision: Decision, now: datetime) -> None:
-        """Hold the shipment and alert procurement when the goods may be destroyed before they leave.
-
-        The affected location is open text, so 'sgsin' and 'SGSIN - Singapore, SG' both match SGSIN.
-        """
+        """Hold and alert procurement when Cargo Destruction is predicted at the origin (code or label, any case)."""
         destroyed = assessment.expected_impact in self.DESTRUCTION_IMPACTS
-        place = assessment.affected_location.split(" - ")[0].strip().upper()
-        at_origin = place == shipment.origin.code
+        at_origin = assessment.affected_location.split(" - ")[0].strip().upper() == shipment.origin.code
         if destroyed and at_origin:
             decision.hold()
             decision.add_alert("procurement_team", ["email"],

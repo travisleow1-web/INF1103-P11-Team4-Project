@@ -1,7 +1,4 @@
-"""Composition root: the only module that knows every manager.
-
-Run the web app with:  uvicorn main:create_app --factory
-"""
+"""Composition root: the only module that knows every manager. Run with:  uvicorn main:create_app --factory"""
 import logging
 import os
 from datetime import datetime, timezone
@@ -20,7 +17,7 @@ from model.shipment_record import ShipmentRecord
 from model.storage_error import StorageError
 from web.app import create_web_app
 
-if TYPE_CHECKING:       # for type hints only; the layers are imported inside build_ai and build_logic
+if TYPE_CHECKING:       # type hints only; the layers are imported inside build_ai and build_logic
     from ai_layer.ai_manager import AIManager
     from logic_layer.logic_manager import LogicManager
 
@@ -31,13 +28,11 @@ def assess_shipments(shipments: Iterable[Shipment], ai: "AIManager", logic: "Log
                      data: DataManager) -> Iterator[Tuple[ShipmentRecord, Optional[str]]]:
     """Assess, decide and save one shipment at a time, yielding (record, save_error) as each finishes.
 
-    save_error is None when the record was saved, otherwise the reason it was not. A failed save
-    does not stop the remaining shipments.
+    save_error is None when the record was saved, else the reason. A failed save does not stop the rest.
     """
     for shipment in shipments:
         assessment = ai.assess(shipment)
-        decision = logic.evaluate(shipment, assessment, datetime.now(timezone.utc))
-        record = ShipmentRecord(shipment, assessment, decision)
+        record = ShipmentRecord(shipment, assessment, logic.evaluate(shipment, assessment, datetime.now(timezone.utc)))
         save_error = None
         try:
             data.save(record)
@@ -48,28 +43,23 @@ def assess_shipments(shipments: Iterable[Shipment], ai: "AIManager", logic: "Log
 
 
 def build_ai() -> Optional["AIManager"]:
-    """The AI manager built from GEMINI_API_KEY, or None when no key is set.
-
-    GEMINI_MODEL picks the model and AI_CACHE_FILE the cache file (default ai_cache.json).
-    """
+    """The AI manager from GEMINI_API_KEY (None if unset). GEMINI_MODEL and AI_CACHE_FILE are optional."""
     from ai_layer.ai_manager import AIManager
     from ai_layer.ai_settings import ALLOWED_LISTS, DEFAULT_MODEL, RESPONSE_SCHEMA, SYSTEM_PROMPT
     from ai_layer.gemini_client import GeminiClient
     from ai_layer.news_provider import NewsProvider
     from ai_layer.weather_provider import WeatherProvider
-
     key = os.getenv("GEMINI_API_KEY", "").strip()
     if not key:
         return None
     client = GeminiClient(key, os.getenv("GEMINI_MODEL") or DEFAULT_MODEL, SYSTEM_PROMPT, RESPONSE_SCHEMA)
-    return AIManager(client, [WeatherProvider(), NewsProvider()],
-                     os.getenv("AI_CACHE_FILE") or "ai_cache.json", ALLOWED_LISTS)
+    return AIManager(client, [WeatherProvider(), NewsProvider()], os.getenv("AI_CACHE_FILE") or "ai_cache.json",
+                     ALLOWED_LISTS)
 
 
 def build_logic(data: DataManager, ports: PortRegistry) -> Optional["LogicManager"]:
     """The Logic manager with the default rule thresholds. Route history comes from data."""
     from logic_layer.logic_manager import LogicManager
-
     return LogicManager(data, ports)
 
 
@@ -101,8 +91,8 @@ def build_mongo(ports: PortRegistry) -> MongoDataManager:
 def create_app() -> FastAPI:
     """Set up logging if nothing has, read .env, compose the managers and return the FastAPI app.
 
-    DEMO_MODE=1 uses the fake AI and Logic from tests/fakes.py and keeps its records in DEMO_DATA_FILE
-    (default demo_records.json), never in MongoDB or DATA_FILE. Every page then shows a demo banner.
+    DEMO_MODE=1 uses the fakes from tests/fakes.py and stores records only in DEMO_DATA_FILE
+    (default demo_records.json); every page then shows a demo banner.
     """
     if not logging.getLogger().handlers:        # leave a host's own logging setup alone
         logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -116,10 +106,9 @@ def create_app() -> FastAPI:
     else:
         data = build_data(ports)
         ai, logic = build_ai(), build_logic(data, ports)
-    io = IOManager(ShipmentValidator(ports), data, ports)
     notices = [data.message] if isinstance(data, UnavailableDataManager) else []
-    print(data)
-    return create_web_app(io, ai, logic, data, demo, notices, run=assess_shipments)
+    return create_web_app(IOManager(ShipmentValidator(ports), data, ports), ai, logic, data, demo, notices,
+                          run=assess_shipments)
 
 
 if __name__ == "__main__":

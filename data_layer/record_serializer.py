@@ -8,7 +8,6 @@ from model.shipment import Shipment
 from model.shipment_record import ShipmentRecord
 from model.storage_error import StorageError
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -21,20 +20,13 @@ class RecordSerializer:
     def to_document(self, record: ShipmentRecord) -> dict:
         """A plain dict for storage: port codes, ISO dates, and the assessment and decision as dicts."""
         s = record.shipment
-        return {
-            "shipment_id": s.shipment_id,
-            "origin": s.origin.code,
-            "destination": s.destination.code,
-            "departure": s.departure.isoformat(),
-            "arrival": s.arrival.isoformat(),
-            "assessment": record.assessment.to_dict(),
-            "decision": record.decision.to_dict(),
-            "saved_at": record.saved_at.isoformat(),
-        }
+        return {"shipment_id": s.shipment_id, "origin": s.origin.code, "destination": s.destination.code,
+                "departure": s.departure.isoformat(), "arrival": s.arrival.isoformat(),
+                "assessment": record.assessment.to_dict(), "decision": record.decision.to_dict(),
+                "saved_at": record.saved_at.isoformat()}
 
     def from_documents(self, docs: Iterable[dict]) -> List[ShipmentRecord]:
-        """Every record that can be read. A damaged document is skipped and logged, so one bad
-        record does not hide all the others."""
+        """Every record that can be read. A damaged one is skipped and logged, so it cannot hide the others."""
         records = []
         for index, doc in enumerate(docs):
             try:
@@ -47,13 +39,8 @@ class RecordSerializer:
     def from_document(self, doc: dict) -> ShipmentRecord:
         """Accepts ISO strings (JSON) or datetimes (MongoDB). A damaged document raises StorageError."""
         try:
-            shipment = Shipment(
-                doc["shipment_id"],
-                self.__port(doc["origin"]),
-                self.__port(doc["destination"]),
-                self.__date(doc["departure"]),
-                self.__date(doc["arrival"]),
-            )
+            shipment = Shipment(doc["shipment_id"], self.__port(doc["origin"]), self.__port(doc["destination"]),
+                                self.__date(doc["departure"]), self.__date(doc["arrival"]))
             return ShipmentRecord(shipment, AIAssessment.from_dict(self.__mapping(doc["assessment"])),
                                   Decision.from_dict(self.__mapping(doc["decision"])), self.__time(doc["saved_at"]))
         except (KeyError, TypeError, ValueError, AttributeError) as error:
@@ -73,17 +60,11 @@ class RecordSerializer:
     def __date(self, value):
         if isinstance(value, datetime):
             return value.date()
-        if isinstance(value, date):
-            return value
-        return date.fromisoformat(value)
+        return value if isinstance(value, date) else date.fromisoformat(value)
 
     def __time(self, value):
         """A datetime from MongoDB (naive UTC) or ISO text, always returned timezone-aware."""
-        if isinstance(value, datetime):
-            moment = value
-        else:
+        if not isinstance(value, datetime):
             text = str(value)
-            if text.endswith("Z"):                 # Python 3.10 fromisoformat does not read "Z"
-                text = text[:-1] + "+00:00"
-            moment = datetime.fromisoformat(text)
-        return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+            value = datetime.fromisoformat(text[:-1] + "+00:00" if text.endswith("Z") else text)  # 3.10 can't read Z
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)

@@ -17,7 +17,6 @@ class PerfectStormRule(BusinessRule):
 
     Based on Jun Jie's PerfectStormRule (Logic_ManagerPart2).
     """
-
     STORM_FACTORS = frozenset({RiskType.WEATHER, RiskType.PORT_CONGESTION, RiskType.LABOR_SHORTAGE})
 
     def __init__(self, config: "RuleConfig"):
@@ -28,12 +27,10 @@ class PerfectStormRule(BusinessRule):
         levels = {}
         for factor in assessment.risk_factors:
             levels[factor.type] = max(levels.get(factor.type, RiskLevel.LOW), factor.severity)
-
         worst = max(levels.values(), default=RiskLevel.LOW)
         if worst >= RiskLevel.HIGH:
             decision.raise_risk(worst)
             decision.add_note(f"Rule 1: at least one risk factor is {worst.label}")
-
         mediums = sorted(t.value for t in self.STORM_FACTORS if levels.get(t, RiskLevel.LOW) >= RiskLevel.MEDIUM)
         if len(mediums) >= self.__config.perfect_storm_min_mediums:
             decision.raise_risk(RiskLevel.HIGH)

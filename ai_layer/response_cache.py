@@ -15,23 +15,18 @@ log = logging.getLogger(__name__)
 class ResponseCache:
     """A JSON file of raw model replies, keyed by route, dates, the UTC day and the client fingerprint.
 
-    Each entry records the UTC day it was made for; entries from other days are dropped when the
-    file is loaded and when a new entry is added, so the file holds one day at most. An unreadable
-    file counts as empty and a failed write is logged, so the cache can never stop an assessment.
+    Entries from other UTC days are dropped on load and on every add, so the file holds one day at most.
+    An unreadable file counts as empty and a failed write is logged, so the cache never stops an assessment.
     One lock guards the entries and the file, because web requests run in several threads.
     """
 
     def __init__(self, path: Union[str, Path], version: str):
-        self.__path = Path(path)
-        self.__version = version          # GeminiClient.fingerprint()
+        self.__path, self.__version = Path(path), version      # version: GeminiClient.fingerprint()
         self.__entries: Optional[Dict[str, Any]] = None
         self.__lock = threading.Lock()
 
     def make_key(self, shipment: Shipment, today: date) -> str:
-        """Key for this shipment's route and dates on `today`, the current UTC date.
-
-        The shipment ID is left out, so two shipments on the same route and dates share a reply.
-        """
+        """Key for this shipment's route and dates on `today` (UTC). Same route and dates share a reply."""
         details = {"origin": shipment.origin.code, "destination": shipment.destination.code,
                    "departure": shipment.departure.isoformat(), "arrival": shipment.arrival.isoformat()}
         payload = json.dumps(details, sort_keys=True) + f"|{today.isoformat()}|{self.__version}"
@@ -52,9 +47,8 @@ class ResponseCache:
 
     @staticmethod
     def __keep_day(entries: Dict[str, Any], day: date) -> Dict[str, Any]:
-        text = day.isoformat()
         return {key: entry for key, entry in entries.items()
-                if isinstance(entry, dict) and entry.get("day") == text}
+                if isinstance(entry, dict) and entry.get("day") == day.isoformat()}
 
     def __load(self) -> Dict[str, Any]:
         if self.__entries is None:
@@ -73,10 +67,8 @@ class ResponseCache:
 
     def __save(self, entries: Dict[str, Any]) -> None:
         temp = None
-        try:
-            # A unique temp file per write, so two processes never write the same one.
-            handle, temp = tempfile.mkstemp(prefix=self.__path.name + ".", suffix=".tmp",
-                                            dir=str(self.__path.parent))
+        try:   # a unique temp file per write, so two processes never write the same one
+            handle, temp = tempfile.mkstemp(prefix=self.__path.name + ".", suffix=".tmp", dir=str(self.__path.parent))
             with os.fdopen(handle, "w", encoding="utf-8") as f:
                 json.dump(entries, f, indent=2)
             os.replace(temp, self.__path)

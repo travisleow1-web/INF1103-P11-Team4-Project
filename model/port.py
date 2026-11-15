@@ -4,7 +4,6 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class Port:
     """One port from ports_reference_4.json: UN/LOCODE, name, country and position."""
-
     code: str
     name: str
     country: str

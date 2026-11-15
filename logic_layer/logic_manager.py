@@ -23,29 +23,23 @@ logger = logging.getLogger(__name__)
 class LogicManager:
     """Turns one shipment's AI assessment into a Decision by running every business rule, then the resolver.
 
-    Based on Jun Jie's LogicManager (Logic_ManagerPart2). Each rule runs on its own: a rule that fails
-    leaves a "Rule error" note for a human instead of stopping the shipment.
+    Based on Jun Jie's LogicManager (Logic_ManagerPart2). A rule that fails leaves a "Rule error" note for a
+    human instead of stopping the shipment.
     """
 
     def __init__(self, data: DataManager, ports: PortRegistry, config: Optional[RuleConfig] = None):
         """Build the rules with the given thresholds, or the defaults when config is None."""
-        self.__data = data      # association: used for route history, not owned
-        self.__ports = ports
+        self.__data, self.__ports = data, ports     # association: used for route history, not owned
         self.__resolver = OutcomeResolver()
         self.__build(config or RuleConfig())
 
     def __build(self, config: RuleConfig) -> None:
-        # Composition: the rules are created here and live only inside this LogicManager.
         self.__config = config
-        self.__rules = (
-            DataQualityRule(config),
-            PerfectStormRule(config),
-            AIInsightRule(config),
-            InsuranceRule(),
+        self.__rules = (                            # composition: the rules live only inside this LogicManager
+            DataQualityRule(config), PerfectStormRule(config), AIInsightRule(config), InsuranceRule(),
             UnregisteredLocationRule(self.__ports),
             RouteHistoryRule(config, self.__data),  # after the risk-raising rules
-            ProcurementRule(),
-        )
+            ProcurementRule())
 
     @property
     def config(self) -> RuleConfig:

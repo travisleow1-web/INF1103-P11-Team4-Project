@@ -33,28 +33,24 @@ Runner = Callable[..., Iterable[Tuple[ShipmentRecord, Optional[str]]]]
 
 def not_connected_message(ai, logic) -> Optional[str]:
     """What to tell users when the AI or Logic layer is missing, or None when both are connected."""
-    if ai is None and logic is None:
-        return NO_AI_OR_LOGIC
     if ai is None:
-        return NO_AI
-    if logic is None:
-        return NO_LOGIC
-    return None
+        return NO_AI_OR_LOGIC if logic is None else NO_AI
+    return NO_LOGIC if logic is None else None
 
 
 def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
                    notices: Optional[List[str]] = None, *, run: Runner) -> FastAPI:
     """Build the FastAPI app. ai and logic may be None while those layers are not connected.
 
-    notices are problems found at startup, such as an unreachable database; every page shows them in red.
+    notices are startup problems (such as an unreachable database) shown in red on every page.
     run is the assessment flow (main.assess_shipments), passed in so the web layer never imports main.
     """
-    notices = list(notices or [])
-    not_connected = not_connected_message(ai, logic)
+    notices, not_connected = list(notices or []), not_connected_message(ai, logic)
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(WEB_DIR / "templates")), autoescape=True)
     templates = Jinja2Templates(env=env)
     app = FastAPI(title="Supply Chain Risk Assessor")
     app.mount("/static", StaticFiles(directory=str(WEB_DIR / "static")), name="static")
+    blank_rows = lambda: [dict.fromkeys(ROW_FIELDS, "")]  # noqa: E731
 
     def page(request: Request, name: str, status_code: int = 200, **context) -> HTMLResponse:
         context = {"demo": demo, "notices": notices, "not_connected": not_connected, "form": io.show_input_form(),
@@ -62,7 +58,7 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
         return templates.TemplateResponse(request, name, context, status_code=status_code)
 
     def input_page(request: Request, rows: list, status_code: int = 200, **context) -> HTMLResponse:
-        return page(request, "index.html", status_code, rows=rows or [dict.fromkeys(ROW_FIELDS, "")], **context)
+        return page(request, "index.html", status_code, rows=rows or blank_rows(), **context)
 
     def render(name: str, **context) -> str:
         return env.get_template(name).render(demo=demo, notices=notices, not_connected=not_connected, **context)
@@ -70,18 +66,16 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
     @app.middleware("http")
     async def reject_large_uploads(request: Request, call_next):
         """Refuse an oversized submission from its Content-Length, before the form is read."""
-        if request.method == "POST" and request.url.path == "/submit":
-            length = request.headers.get("content-length", "")
-            if length.isdigit() and int(length) > MAX_REQUEST_BYTES:
-                html = render("index.html", form=io.show_input_form(), error=TOO_LARGE,
-                              rows=[dict.fromkeys(ROW_FIELDS, "")])
-                return HTMLResponse(html, status_code=413)
+        length = request.headers.get("content-length", "")
+        if (request.method == "POST" and request.url.path == "/submit" and length.isdigit()
+                and int(length) > MAX_REQUEST_BYTES):
+            html = render("index.html", form=io.show_input_form(), error=TOO_LARGE, rows=blank_rows())
+            return HTMLResponse(html, status_code=413)
         return await call_next(request)
 
     def stream_results(shipments: list) -> Iterator[str]:
-        """The results page in pieces: the table head, then one row as each shipment finishes, then the end."""
-        total = len(shipments)
-        done = 0
+        """The results page in pieces: the table head, one row as each shipment finishes, then the end."""
+        total, done = len(shipments), 0
         yield render("results_start.html", total=total)
         try:
             for record, save_error in run(shipments, ai, logic, data):
@@ -99,16 +93,13 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
         return input_page(request, [])
 
     @app.post("/submit", response_class=HTMLResponse)
-    def submit(request: Request,
-               origin_port: List[str] = Form(default=[]),
-               destination_port: List[str] = Form(default=[]),
-               departure_time: List[str] = Form(default=[]),
+    def submit(request: Request, origin_port: List[str] = Form(default=[]),
+               destination_port: List[str] = Form(default=[]), departure_time: List[str] = Form(default=[]),
                arrival_time: List[str] = Form(default=[]),
                csv_file: Optional[UploadFile] = File(default=None)) -> HTMLResponse:
         """Validate every row. If all are valid, assess them; otherwise show every error and run nothing."""
-        typed = {"origin_port": origin_port, "destination_port": destination_port,
-                 "departure_time": departure_time, "arrival_time": arrival_time}
-        typed_sources = FormSource.many(typed)
+        typed_sources = FormSource.many({"origin_port": origin_port, "destination_port": destination_port,
+                                         "departure_time": departure_time, "arrival_time": arrival_time})
         rows = [source.read()[0] for source in typed_sources]            # to fill the form again
         sources = []
         if csv_file is not None and csv_file.filename:
@@ -126,13 +117,10 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
         except StorageError as error:
             return input_page(request, rows, 503, error=f"{error} Nothing was assessed.")
         if preview.has_problems():
-            # Typed rows come after any CSV rows, so typed row i is preview row offset + i.
-            offset = preview.total() - len(rows)
+            offset = preview.total() - len(rows)        # typed rows come after any CSV rows
             by_number = dict(preview.problems())
-            row_errors = [by_number.get(offset + i) for i in range(1, len(rows) + 1)]
-            return input_page(request, rows, 422, problems=preview.problems(),
-                              row_errors=row_errors, offset=offset)
-
+            return input_page(request, rows, 422, problems=preview.problems(), offset=offset,
+                              row_errors=[by_number.get(offset + i) for i in range(1, len(rows) + 1)])
         shipments = preview.valid_shipments()
         if not_connected:
             valid = "1 shipment is valid." if len(shipments) == 1 else f"{len(shipments)} shipments are valid."

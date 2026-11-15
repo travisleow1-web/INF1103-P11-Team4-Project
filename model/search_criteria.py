@@ -13,7 +13,6 @@ class SearchCriteria:
 
     matches() filters records in Python (JSON backend); to_query() builds the same filter for MongoDB.
     """
-
     shipment_id: Optional[str] = None
     origin: Optional[str] = None                                # port code
     destination: Optional[str] = None                           # port code
@@ -36,12 +35,8 @@ class SearchCriteria:
 
     def matches(self, record: ShipmentRecord) -> bool:
         """True if a saved record passes every filter that is set. Text is compared ignoring case."""
-        f = self.to_dict()
-        shipment, decision = record.shipment, record.decision.to_dict()
-
-        def same(a: object, b: object) -> bool:
-            return str(a).upper() == str(b).upper()
-
+        f, shipment, decision = self.to_dict(), record.shipment, record.decision.to_dict()
+        same = lambda a, b: str(a).upper() == str(b).upper()  # noqa: E731
         return all([
             "shipment_id" not in f or same(shipment.shipment_id, f["shipment_id"]),
             "origin" not in f or same(shipment.origin.code, f["origin"]),
@@ -56,20 +51,12 @@ class SearchCriteria:
     def to_query(self) -> dict:
         """The same filters as a MongoDB query. Risk and outcome live under 'decision.'."""
         f = self.to_dict()
-        query = {}
-        for key in ("shipment_id", "origin", "destination"):
-            if key in f:
-                query[key] = str(f[key]).upper()
-        for key in ("overall_risk", "outcome"):
-            if key in f:
-                query[f"decision.{key}"] = {"$regex": f"^{re.escape(str(f[key]))}$", "$options": "i"}
+        query = {k: str(f[k]).upper() for k in ("shipment_id", "origin", "destination") if k in f}
+        query.update({f"decision.{k}": {"$regex": f"^{re.escape(str(f[k]))}$", "$options": "i"}
+                      for k in ("overall_risk", "outcome") if k in f})
         if "needs_human" in f:
             query["decision.needs_human"] = f["needs_human"]
-        days = {}
-        if "departure_from" in f:
-            days["$gte"] = self.__midnight(f["departure_from"])
-        if "departure_to" in f:
-            days["$lte"] = self.__midnight(f["departure_to"])
+        days = {op: self.__midnight(f[k]) for op, k in (("$gte", "departure_from"), ("$lte", "departure_to")) if k in f}
         if days:
             query["departure"] = days
         return query

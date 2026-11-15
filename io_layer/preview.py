@@ -7,7 +7,7 @@ class Preview:
     """Every submitted row after validation, numbered in the order it was read."""
 
     def __init__(self, results: List[Tuple[int, ValidationResult]]):
-        self.__results = results        # list of (row_number, ValidationResult)
+        self.__results = results        # (row_number, ValidationResult)
 
     def total(self) -> int:
         """How many rows were submitted."""

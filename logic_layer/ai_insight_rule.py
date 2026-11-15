@@ -17,7 +17,6 @@ class AIInsightRule(BusinessRule):
 
     Based on Jun Jie's AIInsightRule (Logic_ManagerPart2).
     """
-
     DATA_QUALITY_CODES = frozenset({"CONFLICTING_DATA", "OUTDATED_DATA", "MISSING_DATA", "NEEDS_HUMAN_REVIEW"})
 
     def __init__(self, config: "RuleConfig"):
@@ -29,20 +28,18 @@ class AIInsightRule(BusinessRule):
         for insight in insights:
             if insight.code in self.DATA_QUALITY_CODES:
                 decision.add_note(f"Rule 1b: {self.describe(insight)} -> human review", Flag.AI_FLAGGED, human=True)
-
-        delays = [i for i in insights if i.code == "POTENTIAL_DELAY"]
-        worst = max(delays, key=lambda i: i.estimated_delay_days, default=None)
+        worst = max((i for i in insights if i.code == "POTENTIAL_DELAY"), key=lambda i: i.estimated_delay_days,
+                    default=None)
         if worst is not None and worst.estimated_delay_days >= self.__config.delay_days_limit:
             high = worst.estimated_delay_days >= self.__config.delay_days_high
             decision.raise_risk(RiskLevel.HIGH if high else RiskLevel.MEDIUM)
             decision.add_note(f"Rule 1b: {self.describe(worst)} -> risk {decision.overall_risk}",
                               Flag.SIGNIFICANT_DELAY)
-
         for insight in insights:
             if insight.code == "MULTIPLE_RISKS" and insight.severity >= RiskLevel.HIGH:
-                level = max(RiskLevel.HIGH, insight.severity)
-                decision.raise_risk(level)
-                decision.add_note(f"Rule 1b: {self.describe(insight)} -> risk {level.label}", Flag.COMPOUND_RISK)
+                decision.raise_risk(insight.severity)
+                decision.add_note(f"Rule 1b: {self.describe(insight)} -> risk {insight.severity.label}",
+                                  Flag.COMPOUND_RISK)
 
     @staticmethod
     def describe(insight: Insight) -> str:

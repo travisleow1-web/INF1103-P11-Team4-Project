@@ -12,8 +12,8 @@ from .invalid_response_error import InvalidResponseError
 class ResponseParser:
     """Turns the model's JSON reply into an AIAssessment, or rejects the whole reply.
 
-    Closed values (risk type, severity, impact, source, insight code) must be in their list;
-    locations are open text. Any invalid value raises InvalidResponseError.
+    Closed values (risk type, severity, impact, source, insight code) must be in their list; locations are
+    open text. Any invalid value raises InvalidResponseError.
     """
 
     def __init__(self, allowed_lists: Dict[str, Iterable[str]]):
@@ -29,14 +29,11 @@ class ResponseParser:
                 raise ValueError("confidence_score must be between 0 and 1")
             if not isinstance(raw["conflicting_sources"], bool):    # bool("false") would be True
                 raise ValueError("conflicting_sources must be true or false")
-            return AIAssessment(
-                [self.__factor(f) for f in raw["risk_factors"]],
-                [self.__insight(i) for i in raw["insights"]],
-                RiskType(raw["primary_risk_factor"]),
-                self.__text(raw["affected_location"], "affected_location"),
-                self.__check("impact", raw["expected_impact"]),
-                score, raw["conflicting_sources"], status, fetched_at,
-            )
+            return AIAssessment([self.__factor(f) for f in raw["risk_factors"]],
+                                [self.__insight(i) for i in raw["insights"]], RiskType(raw["primary_risk_factor"]),
+                                self.__text(raw["affected_location"], "affected_location"),
+                                self.__check("impact", raw["expected_impact"]),
+                                score, raw["conflicting_sources"], status, fetched_at)
         except (KeyError, TypeError, ValueError, AttributeError, OverflowError) as error:
             raise InvalidResponseError(f"invalid AI response: {error}") from error
 
