@@ -1,7 +1,7 @@
 import logging
 import re
 import threading
-from datetime import timedelta, timezone
+from datetime import date, timedelta, timezone
 from typing import List
 from data_layer.data_manager import DataManager
 from model.outcome import Outcome
@@ -25,6 +25,9 @@ class IOManager:
     It takes raw strings in and returns plain dicts out. It never prints, never calls the AI or Logic,
     and only reads saved records (through DataManager.find).
     """
+
+    NO_RESCHEDULE = ("No new date suggested: the AI found no clear weather window in the forecast, "
+                     "or the shipment has already left.")
 
     def __init__(self, validator: ShipmentValidator, data: DataManager, ports: PortRegistry):
         self.__validator = validator
@@ -70,7 +73,8 @@ class IOManager:
         if not records:
             return self.show_no_records()
         return {"kind": "results", "summary": self.show_summary(records),
-                "records": [self.show_result(r) for r in records]}
+                "records": [self.show_result(r) for r in records],
+                "reschedule": self.show_reschedule(records)}
 
     # The show_* methods return the data a web template needs. They do not print.
     def show_input_form(self) -> dict:
@@ -112,6 +116,7 @@ class IOManager:
                 "primary_factor": primary,
                 "primary_severity": severity,
                 "primary_risk": self.__risk_text(primary, severity),
+                "suggested_departure": self.__suggested_departure(d["reschedule"]),
                 "n_risk_factors": len(factors),
                 "conflicting_sources": a.get("conflicting_sources"),
                 "overall_risk": d["overall_risk"],
@@ -119,6 +124,27 @@ class IOManager:
                 "needs_human": d["needs_human"],
                 "ai_unavailable": r.assessment.is_fallback(),
             })
+        return rows
+
+    def show_reschedule(self, records: List[ShipmentRecord]) -> List[dict]:
+        """One row per High or Extreme risk shipment: its planned dates, the suggested dates and why.
+
+        A shipment with no suggestion says so; suggested is then None.
+        """
+        rows = []
+        for r in records:
+            if r.decision.risk_level < RiskLevel.HIGH:
+                continue
+            s, plan = r.shipment, r.decision.reschedule
+            row = {"shipment_id": s.shipment_id, "route": f"{s.origin.code} \u2192 {s.destination.code}",
+                   "planned": f"{s.departure:%d/%m/%Y} to {s.arrival:%d/%m/%Y}", "suggested": None,
+                   "days_later": None, "reasoning": self.NO_RESCHEDULE}
+            if plan:
+                new_departure = date.fromisoformat(plan["new_departure"])
+                row.update(suggested=f"{new_departure:%d/%m/%Y} to "
+                                     f"{date.fromisoformat(plan['new_arrival']):%d/%m/%Y}",
+                           days_later=(new_departure - s.departure).days, reasoning=plan["reasoning"])
+            rows.append(row)
         return rows
 
     def show_no_records(self) -> dict:
@@ -187,6 +213,11 @@ class IOManager:
     def __local_time(self, moment):
         """DD/MM/YYYY HH:MM in Singapore time, for display."""
         return moment.astimezone(SGT).strftime("%d/%m/%Y %H:%M SGT")
+
+    @staticmethod
+    def __suggested_departure(plan):
+        """DD/MM/YYYY of the suggested departure, or None when there is no suggestion."""
+        return f"{date.fromisoformat(plan['new_departure']):%d/%m/%Y}" if plan else None
 
     def __risk_text(self, risk_type, severity):
         """'port_congestion', 'MEDIUM' -> 'Port congestion (Medium)'; no severity -> just the name."""

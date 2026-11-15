@@ -1,6 +1,8 @@
   </tbody>
 </table>
 </div>
+{% from "_macros.html" import reschedule_panel %}
 <p role="status">Done: {{ done }} of {{ total }} shipment{{ "" if total == 1 else "s" }} assessed.</p>
+{{ reschedule_panel(reschedule) }}
 <p><a href="/">Assess more shipments</a> or <a href="/search">search saved records</a></p>
 {% include "_footer.html" %}

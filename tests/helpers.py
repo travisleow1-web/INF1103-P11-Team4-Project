@@ -61,7 +61,7 @@ def record(shipment_id="SHP-001", fallback=False):
 
 def saved_record(shipment_id="SHP-001", risk="LOW", outcome="PROCEED", needs_human=False,
                  departure=date(2026, 12, 1), arrival=date(2026, 12, 28), fallback=False, saved_at=None,
-                 origin=SINGAPORE, destination=ROTTERDAM):
+                 origin=SINGAPORE, destination=ROTTERDAM, reschedule=None):
     """A real ShipmentRecord of the kind the Data manager stores."""
     shipment = Shipment(shipment_id, origin, destination, departure, arrival)
     assessment = AIAssessment.fallback(FETCHED_AT) if fallback else live_assessment()
@@ -70,5 +70,7 @@ def saved_record(shipment_id="SHP-001", risk="LOW", outcome="PROCEED", needs_hum
     decision.set_outcome(Outcome(outcome))
     if needs_human:
         decision.require_human()
+    if reschedule:
+        decision.suggest_reschedule(*reschedule)
     return ShipmentRecord(shipment, assessment, decision,
                           saved_at or datetime(2026, 11, 1, 9, 0, tzinfo=timezone.utc))

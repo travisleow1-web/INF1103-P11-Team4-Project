@@ -14,6 +14,34 @@
 {{ value | replace("_", " ") }}
 {%- endmacro %}
 
+{% macro reschedule_panel(items) -%}
+<details class="reschedule" open>
+  <summary><strong>Reschedule suggestions ({{ items | length }})</strong></summary>
+  {% if items %}
+  <p>Every High or Extreme risk shipment, with the new dates the forecast scan suggests and why.</p>
+  <div class="table-wrap">
+  <table class="results">
+    <thead>
+      <tr><th scope="col">Shipment</th><th scope="col">Route</th><th scope="col">Planned</th>
+          <th scope="col">Suggested</th><th scope="col">Why</th></tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      <tr>
+        <th scope="row">{{ item.shipment_id }}</th>
+        <td class="route" data-label="Route">{{ item.route }}</td>
+        <td data-label="Planned">{{ item.planned }}</td>
+        <td data-label="Suggested">{% if item.suggested %}<span class="badge badge-warn">Reschedule</span> {{ item.suggested }} ({{ item.days_later }} day{{ "" if item.days_later == 1 else "s" }} later){% else %}None{% endif %}</td>
+        <td class="why" data-label="Why">{{ item.reasoning }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}<p>No High or Extreme risk shipments, so no new dates are suggested.</p>{% endif %}
+</details>
+{%- endmacro %}
+
 {% macro details_row(result, colspan) -%}
     <tr class="details">
       <td colspan="{{ colspan }}">

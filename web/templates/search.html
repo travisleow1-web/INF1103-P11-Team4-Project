@@ -1,4 +1,4 @@
-{% from "_macros.html" import risk_badge, outcome_badge, yes_no, details_row %}
+{% from "_macros.html" import risk_badge, outcome_badge, yes_no, details_row, reschedule_panel %}
 {% set title = "Search" %}
 {% include "_header.html" %}
 <h1>Search saved records</h1>
@@ -53,7 +53,7 @@
   <thead>
     <tr>
       <th scope="col">Shipment</th><th scope="col">Route</th><th scope="col">Departure</th>
-      <th scope="col">Primary risk</th><th scope="col">Confidence</th><th scope="col">Overall risk</th>
+      <th scope="col">Suggested departure</th><th scope="col">Primary risk</th><th scope="col">Confidence</th><th scope="col">Overall risk</th>
       <th scope="col">Outcome</th><th scope="col">Needs human</th>
     </tr>
   </thead>
@@ -63,16 +63,18 @@
       <th scope="row">{{ row.shipment_id }}{% if row.ai_unavailable %} <span class="badge badge-warn">AI unavailable</span>{% endif %}</th>
       <td class="route" data-label="Route">{{ row.route }}</td>
       <td data-label="Departure">{{ record.departure }}</td>
+      <td data-label="Suggested departure">{% if row.suggested_departure %}<span class="badge badge-warn">Reschedule</span> {{ row.suggested_departure }}{% else %}-{% endif %}</td>
       <td data-label="Primary risk">{{ row.primary_risk }}</td>
       <td class="minor" data-label="Confidence">{{ row.confidence_score }}</td>
       <td data-label="Overall risk">{{ risk_badge(row.overall_risk) }}</td>
       <td data-label="Outcome">{{ outcome_badge(row.outcome) }}</td>
       <td data-label="Needs human">{{ yes_no(row.needs_human) }}</td>
     </tr>
-{{ details_row(record, 8) }}
+{{ details_row(record, 9) }}
     {% endfor %}
   </tbody>
 </table>
 </div>
+{{ reschedule_panel(result.reschedule) }}
 {% endif %}
 {% include "_footer.html" %}

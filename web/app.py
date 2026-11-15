@@ -90,16 +90,18 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
         """The results page in pieces: the table head, then one row as each shipment finishes, then the end."""
         total = len(shipments)
         done = 0
+        finished = []
         yield render("results_start.html", total=total)
         try:
             for record, save_error in run(shipments, ai, logic, data):
                 done += 1
+                finished.append(record)
                 yield render("result_row.html", row=io.show_summary([record])[0], result=io.show_result(record),
                              number=done, total=total, save_error=save_error)
         except Exception:                       # the page has already started, so say so in the table
             logger.exception("Assessment stopped after %d of %d shipments", done, total)
             yield render("result_stopped.html", done=done, total=total)
-        yield render("results_end.html", done=done, total=total)
+        yield render("results_end.html", done=done, total=total, reschedule=io.show_reschedule(finished))
 
     @app.get("/", response_class=HTMLResponse)
     def index(request: Request) -> HTMLResponse:

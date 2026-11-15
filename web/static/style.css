@@ -174,3 +174,6 @@ tr.row-errors td { color: var(--error-ink); font-size: 0.9rem; padding-top: 0; }
   table.inner tr { border-bottom: 1px solid var(--line); padding: 0.25rem 0; }
   table.inner td { border: 0; }
 }
+
+.reschedule { margin: 1.5rem 0; }
+.reschedule .why { min-width: 22rem; }

@@ -1,6 +1,7 @@
 from datetime import date
 import pytest
-from helpers import FakeData, make_io, record, row
+from helpers import FakeData, make_io, record, row, saved_record
+from io_layer.io_manager import IOManager
 from io_layer.form_source import FormSource
 from model.search_criteria import SearchCriteria
 from model.storage_error import StorageError
@@ -201,3 +202,28 @@ def test_show_input_form_lists_risk_labels_and_outcomes_for_the_dropdowns():
 
 def test_search_criteria_to_dict_keeps_false_but_drops_blanks():
     assert SearchCriteria(needs_human=False, outcome="").to_dict() == {"needs_human": False}
+
+
+def test_the_summary_shows_the_suggested_departure_only_when_there_is_one():
+    plain = make_io().show_summary([saved_record("SHP-001", risk="HIGH")])[0]
+    suggested = make_io().show_summary([saved_record(
+        "SHP-002", risk="HIGH", reschedule=(date(2026, 12, 5), date(2027, 1, 1), "why"))])[0]
+    assert plain["suggested_departure"] is None
+    assert suggested["suggested_departure"] == "05/12/2026"
+
+
+def test_the_reschedule_overview_lists_every_high_risk_shipment_with_or_without_a_new_date():
+    records = [saved_record("SHP-001", risk="LOW"), saved_record("SHP-002", risk="MEDIUM"),
+               saved_record("SHP-003", risk="HIGH"),
+               saved_record("SHP-004", risk="EXTREME", reschedule=(date(2026, 12, 5), date(2027, 1, 1), "Clear soon"))]
+    rows = make_io().show_reschedule(records)
+    assert [r["shipment_id"] for r in rows] == ["SHP-003", "SHP-004"]
+    none, found = rows
+    assert none["suggested"] is None and none["days_later"] is None and none["reasoning"] == IOManager.NO_RESCHEDULE
+    assert found == {"shipment_id": "SHP-004", "route": "SGSIN \u2192 NLRTM", "planned": "01/12/2026 to 28/12/2026",
+                     "suggested": "05/12/2026 to 01/01/2027", "days_later": 4, "reasoning": "Clear soon"}
+
+
+def test_search_results_carry_the_reschedule_overview():
+    data = FakeData([saved_record("SHP-003", risk="HIGH")])
+    assert [r["shipment_id"] for r in make_io(data).search({})["reschedule"]] == ["SHP-003"]
