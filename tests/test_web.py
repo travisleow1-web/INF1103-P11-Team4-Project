@@ -605,3 +605,23 @@ def test_create_app_sets_up_logging_only_when_nothing_has(env):
     with patch.object(root, "handlers", [logging.NullHandler()]), patch("main.logging.basicConfig") as basic:
         main.create_app()
     basic.assert_not_called()
+
+
+def test_demo_mode_lists_the_high_risk_shipments_with_their_reasoning_after_the_table(data):
+    from datetime import date, timedelta
+    leave = date.today() + timedelta(days=5)
+    rows = good_rows(3)
+    rows["departure_time"] = [leave.strftime("%d/%m/%Y")] * 3
+    rows["arrival_time"] = [(leave + timedelta(days=20)).strftime("%d/%m/%Y")] * 3
+    text = demo_client(data).post("/submit", data=rows).text           # SHP-002 is the fake AI's high risk
+    panel = text[text.index('<details class="reschedule"'):]
+    assert "Reschedule suggestions (1)" in panel
+    assert f"{leave + timedelta(days=4):%d/%m/%Y} to " in panel and "4 days later" in panel
+    assert "meets High weather risk" in panel
+    assert text.index("Done: 3 of 3") < text.index('<details class="reschedule"')   # shown once the rows are done
+
+
+def test_search_shows_the_reschedule_panel(data):
+    client = demo_client(data)
+    client.post("/submit", data=good_rows(3))
+    assert "Reschedule suggestions (1)" in client.get("/search").text
