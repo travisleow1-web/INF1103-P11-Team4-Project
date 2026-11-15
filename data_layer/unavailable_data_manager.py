@@ -24,6 +24,10 @@ class UnavailableDataManager(DataManager):
         """Always fails: there is nowhere to save."""
         raise StorageError(self.__message)
 
+    def replace(self, record: ShipmentRecord) -> None:
+        """Always fails: there is nowhere to save."""
+        raise StorageError(self.__message)
+
     def find(self, criteria: SearchCriteria) -> List[ShipmentRecord]:
         """Always fails: there is nothing to search."""
         raise StorageError(self.__message)

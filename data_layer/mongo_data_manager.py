@@ -57,6 +57,17 @@ class MongoDataManager(DataManager):
         except PyMongoError as error:
             raise self.__unavailable(f"Cannot save {record.shipment.shipment_id}", error) from error
 
+    def replace(self, record: ShipmentRecord) -> None:
+        """Overwrite the saved record with the same shipment_id. One that is not saved is a StorageError."""
+        shipment_id = record.shipment.shipment_id
+        document = self.__with_real_dates(self.__serializer.to_document(record))
+        try:
+            result = self.__collection.replace_one({"shipment_id": shipment_id}, document)
+        except PyMongoError as error:
+            raise self.__unavailable(f"Cannot replace {shipment_id}", error) from error
+        if result.matched_count == 0:
+            raise StorageError(f"{shipment_id} is not saved, so it cannot be replaced")
+
     def find(self, criteria: SearchCriteria) -> List[ShipmentRecord]:
         """The records that match, newest first. Damaged records are skipped and logged."""
         return self.__find_newest_first(criteria.to_query())

@@ -13,6 +13,13 @@ class DataManager(ABC):
         """Store one ShipmentRecord. shipment_id is the unique key: saving a second one is an error."""
 
     @abstractmethod
+    def replace(self, record: ShipmentRecord) -> None:
+        """Overwrite the saved record that has the same shipment_id, for a shipment assessed again.
+
+        A shipment_id that is not saved is a StorageError: nothing is added.
+        """
+
+    @abstractmethod
     def find(self, criteria: SearchCriteria) -> List[ShipmentRecord]:
         """Return the records that match a SearchCriteria, newest first. No filters returns everything.
 

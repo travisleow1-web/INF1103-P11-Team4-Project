@@ -35,6 +35,17 @@ class JsonDataManager(DataManager):
             documents.append(self.__serializer.to_document(record))
             self.__write(documents)
 
+    def replace(self, record: ShipmentRecord) -> None:
+        """Overwrite the saved record with the same shipment_id. One that is not saved is a StorageError."""
+        shipment_id = record.shipment.shipment_id
+        with self.__lock:                      # read, check and write as one step
+            documents = self.__load()
+            position = next((i for i, d in enumerate(documents) if d.get("shipment_id") == shipment_id), None)
+            if position is None:
+                raise StorageError(f"{shipment_id} is not saved, so it cannot be replaced")
+            documents[position] = self.__serializer.to_document(record)
+            self.__write(documents)
+
     def find(self, criteria: SearchCriteria) -> List[ShipmentRecord]:
         """The records that match, newest first. Damaged records are skipped and logged."""
         records = self.__serializer.from_documents(self.__load())

@@ -77,6 +77,30 @@ def test_filters_combine(data):
     assert ids(found) == ["SHP-001"]
 
 
+def test_replace_overwrites_the_saved_record_and_keeps_one_copy(data):
+    data.save(saved_record("SHP-001", fallback=True, saved_at=datetime(2026, 11, 1, 9, tzinfo=timezone.utc)))
+    data.save(saved_record("SHP-002", saved_at=datetime(2026, 11, 2, 9, tzinfo=timezone.utc)))
+    data.replace(saved_record("SHP-001", risk="HIGH", saved_at=datetime(2026, 11, 3, 9, tzinfo=timezone.utc)))
+    found = data.find(SearchCriteria())
+    assert ids(found) == ["SHP-001", "SHP-002"]                  # one copy, now the newest
+    assert not found[0].assessment.is_fallback() and found[0].decision.to_dict()["overall_risk"] == "High"
+    assert found[1].assessment.is_fallback() is False and found[1].shipment.shipment_id == "SHP-002"
+
+
+def test_replace_of_an_unsaved_shipment_is_an_error_and_adds_nothing(data):
+    data.save(saved_record("SHP-001"))
+    with pytest.raises(StorageError, match="SHP-009 is not saved"):
+        data.replace(saved_record("SHP-009"))
+    assert ids(data.find(SearchCriteria())) == ["SHP-001"]
+
+
+def test_a_replaced_record_can_be_found_by_its_new_values(data):
+    data.save(saved_record("SHP-001", risk="LOW", outcome="PROCEED"))
+    data.replace(saved_record("SHP-001", risk="HIGH", outcome="ESCALATE", needs_human=True))
+    assert ids(data.find(SearchCriteria(overall_risk="HIGH"))) == ["SHP-001"]
+    assert data.find(SearchCriteria(overall_risk="LOW")) == []
+
+
 def test_saving_the_same_shipment_id_twice_is_an_error(data):
     data.save(saved_record("SHP-001"))
     with pytest.raises(StorageError, match="already saved"):
@@ -177,6 +201,8 @@ def test_a_corrupt_file_is_a_storage_error_and_is_not_overwritten(tmp_path):
         data.find(SearchCriteria())
     with pytest.raises(StorageError):
         data.save(saved_record())
+    with pytest.raises(StorageError):
+        data.replace(saved_record())
     assert path.read_text(encoding="utf-8") == "{not json"
 
 
@@ -192,6 +218,16 @@ def test_route_history_from_a_corrupt_file_is_a_storage_error(tmp_path):
     path.write_text("{not json", encoding="utf-8")
     with pytest.raises(StorageError):
         JsonDataManager(path, PORTS).find_route_history("SGSIN-NLRTM", datetime(2026, 11, 1, tzinfo=timezone.utc))
+
+
+def test_replacing_from_many_threads_keeps_every_record_whole(tmp_path):
+    data = JsonDataManager(tmp_path / "records.json", PORTS)
+    for number in range(1, 7):
+        data.save(saved_record(f"SHP-00{number}", fallback=True))
+    errors = run_in_threads(6, lambda n: data.replace(saved_record(f"SHP-00{n}", risk="HIGH")))
+    assert errors == []
+    found = data.find(SearchCriteria())
+    assert len(found) == 6 and not any(r.assessment.is_fallback() for r in found)
 
 
 def run_in_threads(count, work):

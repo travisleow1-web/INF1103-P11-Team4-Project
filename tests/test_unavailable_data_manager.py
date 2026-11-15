@@ -15,6 +15,7 @@ def test_it_is_a_data_manager_that_keeps_its_message():
 
 @pytest.mark.parametrize("call", [
     lambda d: d.save(saved_record()),
+    lambda d: d.replace(saved_record()),
     lambda d: d.find(SearchCriteria()),
     lambda d: d.find_route_history("SGSIN-NLRTM", datetime(2026, 11, 1, tzinfo=timezone.utc)),
 ])
