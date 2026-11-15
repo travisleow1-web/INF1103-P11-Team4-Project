@@ -1,4 +1,4 @@
-{% from "_macros.html" import risk_badge, outcome_badge, yes_no, details_row, reschedule_panel %}
+{% from "_macros.html" import risk_badge, outcome_badge, yes_no, details_row, reschedule_panel, date_field %}
 {% set title = "Search" %}
 {% include "_header.html" %}
 <h1>Search saved records</h1>
@@ -10,8 +10,8 @@
       <label>Shipment ID <input name="shipment_id" value="{{ fields.shipment_id }}" placeholder="SHP-001" autocomplete="off"></label>
       <label>Origin port <input name="origin" list="ports" value="{{ fields.origin }}" autocomplete="off"></label>
       <label>Destination port <input name="destination" list="ports" value="{{ fields.destination }}" autocomplete="off"></label>
-      <label>Departure from <input name="departure_from" value="{{ fields.departure_from }}" placeholder="DD/MM/YYYY" autocomplete="off"></label>
-      <label>Departure to <input name="departure_to" value="{{ fields.departure_to }}" placeholder="DD/MM/YYYY" autocomplete="off"></label>
+      {{ date_field("departure_from", fields.departure_from, "Departure from", "start") }}
+      {{ date_field("departure_to", fields.departure_to, "Departure to", "end") }}
       <label>Overall risk
         <select name="overall_risk">
           <option value="">Any</option>
@@ -76,4 +76,5 @@
 </div>
 {{ reschedule_panel(result.reschedule) }}
 {% endif %}
+<script src="/static/date_picker.js"></script>
 {% include "_footer.html" %}

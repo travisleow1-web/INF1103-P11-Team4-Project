@@ -46,10 +46,38 @@ def test_input_page_lists_the_ports_and_labels_every_box(data):
     assert "banner-error" not in page.text
 
 
+def test_input_page_dates_have_a_calendar_button_and_still_post_text(data):
+    page = client_for(data).get("/").text
+    assert page.count('class="date-field"') == 2
+    assert page.count('data-range="start" data-gap="0"') == 1
+    assert page.count('data-range="end" data-gap="1"') == 1             # arrival must be after departure
+    assert page.count('class="date-button"') == 2 and page.count('type="date"') == 2
+    assert page.count('name="departure_time"') == 1 and page.count('name="arrival_time"') == 1
+    assert 'name="departure_time" placeholder="DD/MM/YYYY"' in page      # the text box is what is submitted
+    assert '<script src="/static/date_picker.js">' in page
+
+
+def test_the_invalid_mark_stays_on_the_text_box_not_the_hidden_picker(data):
+    rows = good_rows(1)
+    rows["arrival_time"][0] = "nonsense"
+    page = client_for(data).post("/submit", data=rows).text
+    assert page.count('aria-invalid="true"') == 4                        # four text boxes in the bad row
+    assert 'type="date" class="date-native" tabindex="-1" aria-hidden="true">' in page
+
+
+def test_search_page_date_filters_are_a_start_and_an_end_picker(data):
+    page = client_for(data).get("/search").text
+    assert page.count('class="date-field"') == 2
+    assert page.count('data-range="start" data-gap="0"') == 1
+    assert page.count('data-range="end" data-gap="0"') == 1              # same day is allowed
+    assert '<script src="/static/date_picker.js">' in page
+
+
 def test_static_files_are_served(data):
     client = client_for(data)
     assert client.get("/static/style.css").status_code == 200
     assert "add-row" in client.get("/static/add_row.js").text
+    assert "showPicker" in client.get("/static/date_picker.js").text
 
 
 # submit without AI and Logic
