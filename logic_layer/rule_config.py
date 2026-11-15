@@ -51,7 +51,7 @@ class RuleConfig:
         if not isinstance(data, Mapping):
             raise ValueError("Rule settings must be a mapping of setting names to values")
         return cls(**{str(key): value for key, value in data.items()})
-        
+
     @classmethod
     def from_text(cls, fields: Mapping[str, str]) -> "RuleConfig":
         """Build a config from form text. Blank boxes keep their defaults; bad text raises ValueError."""
@@ -65,7 +65,6 @@ class RuleConfig:
             except ValueError:
                 raise ValueError(f"{key} must be a number, not {text!r}") from None
         return cls(**values)
-
 
     def to_dict(self) -> dict:
         """The thresholds as a plain dict (a copy)."""

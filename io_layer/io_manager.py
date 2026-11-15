@@ -103,15 +103,14 @@ class IOManager:
             d = r.decision.to_dict()
             factors = a.get("risk_factors", [])
             primary = a.get("primary_risk_factor")
-            severity = next((f["severity"] for f in factors if f["type"] == primary), "-")
             rows.append({
                 "shipment_id": r.shipment.shipment_id,
                 "route": f"{r.shipment.origin.code} \u2192 {r.shipment.destination.code}",
                 "expected_impact": a.get("expected_impact"),
                 "confidence_score": a.get("confidence_score"),
                 "primary_factor": primary,
-                "primary_severity": severity,
-                "primary_risk": self.__risk_text(primary),
+                "primary_severity": next((f["severity"] for f in factors if f["type"] == primary), "-"),
+                "primary_risk": str(primary or "none").replace("_", " ").capitalize(),
                 "n_risk_factors": len(factors),
                 "conflicting_sources": a.get("conflicting_sources"),
                 "overall_risk": d["overall_risk"],
@@ -142,9 +141,9 @@ class IOManager:
                                           [level.label for level in RiskLevel])
         outcome = self.__read_choice(fields.get("outcome"), "Outcome", errors,
                                      lambda text: Outcome(text.upper()).value, [o.value for o in Outcome])
-        shipment_id = self.__text(fields.get("shipment_id"))
+        shipment_id = str(fields.get("shipment_id") or "").strip().upper()
         criteria = SearchCriteria(
-            shipment_id=shipment_id.upper() if shipment_id else None,
+            shipment_id=shipment_id or None,
             origin=origin.code if origin else None,
             destination=destination.code if destination else None,
             overall_risk=overall_risk,
@@ -187,14 +186,6 @@ class IOManager:
     def __local_time(self, moment):
         """DD/MM/YYYY HH:MM in Singapore time, for display."""
         return moment.astimezone(SGT).strftime("%d/%m/%Y %H:%M SGT")
-
-    def __risk_text(self, risk_type):
-        """'port_congestion' -> 'Port congestion '; no severity -> just the name."""
-        name = str(risk_type or "none").replace("_", " ").capitalize()
-        return f"{name}"
-
-    def __text(self, value):
-        return str(value or "").strip() or None
 
     def __last_number(self):
         try:

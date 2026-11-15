@@ -35,7 +35,7 @@ class WeatherProvider(ContextProvider):
             "forecast_days": FORECAST_DAYS,
             "daily": "precipitation_sum, windgusts_10m_max, windspeed_10m_max, pressure_msl_min, pressure_msl_max, visibility_min, weathercode_max",
         }
-        return self._get_json("https://api.open-meteo.com/v1/forecast", params)
+        return self._get_json(FORECAST_URL, params)
 
     def __port_weather_or_none(self, shipment: Shipment, port: Port,
                                window: Optional[Tuple[str, str]]) -> Optional[Dict[str, Any]]:

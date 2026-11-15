@@ -7,8 +7,8 @@ from model.risk_level import RiskLevel
 from model.risk_type import RiskType
 
 DEFAULT_MODEL = "gemini-3.5-flash-lite"
-HISTORY_DAYS = 90          # shipments that departed this recently get historical weather 
-FORECAST_DAYS = 14         # 14-day outlook for identifying clear weather windows# shipments that departed this recently get historical weather
+HISTORY_DAYS = 90          # shipments that departed this recently get historical weather
+FORECAST_DAYS = 14         # outlook used to find a clear departure window
 HTTP_TIMEOUT = 20          # seconds, for the weather and news feeds
 GEMINI_TIMEOUT = 40        # seconds, for one model call
 MAX_RETRIES = 3            # attempts per model call (only retryable errors are tried again)
@@ -90,10 +90,10 @@ RESPONSE_SCHEMA = {
                     "location": {"type": "STRING"},
                     "estimated_delay_days": {"type": "INTEGER"},
                 },
-                "required": ["code", "risk_type", "severity", "location", "estimated_delay_days",],
+                "required": ["code", "risk_type", "severity", "location", "estimated_delay_days"],
             },
         },
     },
     "required": ["risk_factors", "primary_risk_factor", "affected_location", "expected_impact",
-                 "confidence_score", "conflicting_sources",  "earliest_clear_departure", "insights"],
+                 "confidence_score", "conflicting_sources", "earliest_clear_departure", "insights"],
 }
