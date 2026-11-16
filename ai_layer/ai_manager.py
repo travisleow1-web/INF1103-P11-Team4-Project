@@ -5,6 +5,9 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, Optional, Union
 from model.ai_assessment import AIAssessment
 from model.ai_status import AIStatus
+from model.fetch_event import FetchEvent
+from model.fetch_listener import FetchListener
+from model.fetch_stage import FetchStage
 from model.port import Port
 from model.shipment import Shipment
 from .ai_error import AIError
@@ -21,13 +24,16 @@ class AIManager:
     """Gives every shipment an AIAssessment: LIVE from the model, CACHED, or FALLBACK when the AI fails.
 
     It checks the cache, gathers context from the providers, calls the model and parses the reply.
-    It only reports facts; the Logic manager decides what to do with them.
+    It only reports facts; the Logic manager decides what to do with them. It also tells its
+    listeners how each fetch is going (FetchEvent), but never prints anything itself.
     """
 
     def __init__(self, client: GeminiClient, providers: Iterable[ContextProvider],
-                 cache_path: Union[str, Path], allowed_lists: Dict[str, Iterable[str]]):
+                 cache_path: Union[str, Path], allowed_lists: Dict[str, Iterable[str]],
+                 listeners: Iterable[FetchListener] = ()):
         self.__client = client                                            # aggregation
         self.__providers = tuple(providers)                               # aggregation
+        self.__listeners = tuple(listeners)                               # aggregation                             # aggregation
         self.__parser = ResponseParser(allowed_lists)                     # composition
         self.__cache = ResponseCache(cache_path, client.fingerprint())    # composition
 
@@ -38,17 +44,35 @@ class AIManager:
         cached = self.__from_cache(key)
         if cached is not None:
             log.info("AI cache hit for %s", shipment.shipment_id)
+            self.__notify(shipment, FetchStage.CACHE_HIT)
             return cached
+        self.__notify(shipment, FetchStage.STARTED)
         context = {provider.name: provider.fetch(shipment) for provider in self.__providers}
         fetched_at = datetime.now(timezone.utc)
+
+        def on_retry(attempt: int, max_attempts: int, error: AIError) -> None:
+            self.__notify(shipment, FetchStage.RETRYING, attempt, max_attempts, str(error))
+
         try:
-            raw = self.__client.complete(self.__build_prompt(shipment, context, today))
+            raw = self.__client.complete(self.__build_prompt(shipment, context, today), on_retry=on_retry)
             assessment = self.__parser.parse(raw, AIStatus.LIVE, fetched_at)
         except AIError as error:
             log.error("AI assessment failed for %s: %s", shipment.shipment_id, error)
+            self.__notify(shipment, FetchStage.FAILED, detail=str(error))
             return AIAssessment.fallback()
         self.__cache.set(key, raw, fetched_at.isoformat(), today)    # only a reply that parsed is cached
+        self.__notify(shipment, FetchStage.SUCCEEDED)
         return assessment
+
+    def __notify(self, shipment: Shipment, stage: FetchStage, attempt: Optional[int] = None,
+                 max_attempts: Optional[int] = None, detail: Optional[str] = None) -> None:
+        """Tell every listener about this stage. A listener that fails is logged and skipped."""
+        event = FetchEvent(shipment.shipment_id, stage, attempt, max_attempts, detail)
+        for listener in self.__listeners:
+            try:
+                listener.on_event(event)
+            except Exception as error:     # deliberate: a broken display must never stop an assessment
+                log.warning("%s failed on %s: %s", type(listener).__name__, stage.value, error)
 
     def __from_cache(self, key: str) -> Optional[AIAssessment]:
         entry = self.__cache.get(key)

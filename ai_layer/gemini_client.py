@@ -4,7 +4,7 @@ import json
 import logging
 import random
 import time
-from typing import Optional
+from typing import Callable, Optional
 import requests
 from .ai_service_error import AIServiceError
 from .ai_settings import GEMINI_TIMEOUT, MAX_RETRIES
@@ -38,9 +38,12 @@ class GeminiClient:
         # connections, and holds no cookies or auth state (the key is sent per request in a header).
         self.__http = http or requests.Session()
 
-    def complete(self, prompt: str) -> dict:
+    def complete(self, prompt: str,
+                 on_retry: Optional[Callable[[int, int, AIServiceError], None]] = None) -> dict:
         """Return the model's JSON reply. Raises AIServiceError or InvalidResponseError.
 
+        on_retry(attempt, max_attempts, error), if given, is called each time an attempt failed and
+        another will follow, just before the wait. The client itself reports nothing else.
         The last attempt always returns or raises, so the loop never ends without a result.
         """
         delay = 1.0
@@ -51,6 +54,8 @@ class GeminiClient:
                 if not error.retryable or attempt == self.__max_retries:
                     raise
                 log.warning("Gemini attempt %d/%d failed: %s", attempt, self.__max_retries, error)
+                if on_retry is not None:
+                    on_retry(attempt, self.__max_retries, error)
                 time.sleep(delay + random.random())     # backoff with jitter
                 delay *= 2
 
