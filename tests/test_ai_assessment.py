@@ -69,7 +69,8 @@ def test_fallback_is_empty_and_marked():
     assert a.to_dict() == {"risk_factors": [], "insights": [], "primary_risk_factor": "none",
                            "affected_location": "Unknown", "expected_impact": "None",
                            "confidence_score": 0.0, "conflicting_sources": False,
-                           "ai_status": "FALLBACK", "fetched_at": "2026-11-13T01:02:00+00:00"}
+                           "ai_status": "FALLBACK", "fetched_at": "2026-11-13T01:02:00+00:00",
+                           "earliest_clear_departure": None}
 
 
 def test_fallback_without_a_time_uses_now_in_utc():
