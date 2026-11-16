@@ -1,0 +1,13 @@
+# Never bake secrets or local data into the image; pass them at run time instead.
+.env
+.env.local
+.git
+.github
+**/__pycache__
+.pytest_cache
+*.json.tmp
+app.log
+shipment_records.json
+demo_records.json
+shipments.json
+ai_cache.json
