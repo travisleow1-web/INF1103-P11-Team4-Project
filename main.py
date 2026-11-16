@@ -57,13 +57,15 @@ def build_ai() -> Optional["AIManager"]:
     from ai_layer.gemini_client import GeminiClient
     from ai_layer.news_provider import NewsProvider
     from ai_layer.weather_provider import WeatherProvider
+    from io_layer.console_status_display import ConsoleStatusDisplay
 
     key = os.getenv("GEMINI_API_KEY", "").strip()
     if not key:
         return None
     client = GeminiClient(key, os.getenv("GEMINI_MODEL") or DEFAULT_MODEL, SYSTEM_PROMPT, RESPONSE_SCHEMA)
     return AIManager(client, [WeatherProvider(), NewsProvider()],
-                     os.getenv("AI_CACHE_FILE") or "ai_cache.json", ALLOWED_LISTS)
+                     os.getenv("AI_CACHE_FILE") or "ai_cache.json", ALLOWED_LISTS,
+                     listeners=[ConsoleStatusDisplay()])
 
 
 def build_logic(data: DataManager, ports: PortRegistry) -> Optional["LogicManager"]:
