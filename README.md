@@ -29,4 +29,14 @@ python -m pytest -q
 
 The tests use no network, no live Gemini and no real MongoDB (`mongomock` stands in).
 
+## Run with Docker
+
+```bash
+cp .env.example .env
+docker compose up --build
+docker compose run --rm app pytest -q
+```
+
+Open http://localhost:8000. The settings come from `.env`; saved records and the AI cache are kept in a Docker volume, so they survive a restart. The same tests run on every push in GitHub Actions (`.github/workflows/tests.yml`).
+
 More for teammates: [docs/handoff.md](docs/handoff.md).

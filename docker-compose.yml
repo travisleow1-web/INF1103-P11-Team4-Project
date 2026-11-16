@@ -1,0 +1,23 @@
+# Run the web app:   docker compose up --build        (http://localhost:8000)
+# Run the tests:     docker compose run --rm app pytest -q
+# Settings come from your .env file (copy .env.example). The data files live in the "records" volume.
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DEMO_MODE: ${DEMO_MODE:-}
+      DATA_BACKEND: ${DATA_BACKEND:-}
+      MONGO_URI: ${MONGO_URI:-}
+      DB_NAME: ${DB_NAME:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-}
+      DATA_FILE: /app/data/shipment_records.json
+      DEMO_DATA_FILE: /app/data/demo_records.json
+      AI_CACHE_FILE: /app/data/ai_cache.json
+    volumes:
+      - records:/app/data
+
+volumes:
+  records:

@@ -1,0 +1,27 @@
+# Keep secrets, local data and git history out of the image.
+.git
+.github
+.env
+.env.*
+!.env.example
+CLAUDE.md
+
+# Python and test caches
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# Local files the app writes (records live in the compose volume instead)
+app.log
+ai_cache.json
+shipments.json
+shipment_records.json
+demo_records.json
+*.json.tmp
+
+# Editor and transfer leftovers
+.vscode/
+.idea/
+*.bundle
