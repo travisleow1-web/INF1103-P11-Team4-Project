@@ -53,6 +53,19 @@ def test_static_files_are_served(data):
     crate = client.get("/static/crate.js").text
     assert "crate-strip" in crate
     assert "AudioContext" in crate and "playReveal(winner.rarity)" in crate
+    page = client.get("/").text
+    assert '<video id="pirate-overlay"' in page
+    assert 'src="/assets/Pirate.webm"' in page
+    assert 'data-fallback-src="/assets/Pirate-fallback.mp4"' in page
+    assert '<script src="/static/pirate.js"></script>' in page
+    assert client.get("/static/pirate.js").status_code == 200
+    assert "pointer-events: none" in client.get("/static/style.css").text
+    video = client.get("/assets/Pirate.webm")
+    assert video.status_code == 200
+    assert video.headers["content-type"].startswith("video/webm")
+    fallback = client.get("/assets/Pirate-fallback.mp4")
+    assert fallback.status_code == 200
+    assert fallback.headers["content-type"].startswith("video/mp4")
 
 
 @pytest.mark.parametrize("path, feature", [("/search", "Search"), ("/", "Shipment Assessment")])

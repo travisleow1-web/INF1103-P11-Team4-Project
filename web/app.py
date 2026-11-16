@@ -63,6 +63,7 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
     templates = Jinja2Templates(env=env)
     app = FastAPI(title="Supply Chain Risk Assessor")
     app.mount("/static", StaticFiles(directory=str(WEB_DIR / "static")), name="static")
+    app.mount("/assets", StaticFiles(directory=str(WEB_DIR / "assets")), name="assets")
 
     def page(request: Request, name: str, status_code: int = 200, **context) -> HTMLResponse:
         context = {"demo": demo, "notices": notices, "not_connected": not_connected, "form": io.show_input_form(),

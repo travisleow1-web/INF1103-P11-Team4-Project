@@ -204,6 +204,19 @@ tr.row-errors td { color: var(--error-ink); font-size: 0.9rem; padding-top: 0; }
 .crate button:disabled { opacity: 0.6; cursor: wait; }
 .crate button.secondary { background: transparent; color: #e8edf2; border-color: #5b6876; font-weight: 400; margin-left: 0.5rem; }
 
+.pirate-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  width: 100vw;
+  height: 100vh;
+  object-fit: contain;
+  background: transparent;
+  pointer-events: none;
+  background-blend-mode: lighten
+}
+.pirate-overlay[hidden] { display: none !important; }
+
 /* Prank paywall on the search page. */
 .paywall {
   max-width: 46rem;
