@@ -12,7 +12,8 @@ Read `docs/io-design.md` before touching the IO layer and `docs/handoff.md` for 
 | `ai_layer/` | `AIManager`, `GeminiClient`, `ContextProvider` with `WeatherProvider` and `NewsProvider`, `ResponseParser`, `ResponseCache`, errors, `ai_settings.py` |
 | `logic_layer/` | `LogicManager`, `RuleConfig`, `BusinessRule` (ABC) and its rules, `OutcomeResolver` |
 | `web/` | `app.py` (`create_web_app`, the FastAPI routes), `templates/`, `static/` |
-| `main.py` | Composition root: `assess_shipments`, `build_data`, `build_ai`, `build_logic`, `create_app` |
+| `main.py` | Composition root: `Application` (`create`, `create_app`, `build_data`, `build_ai`, `build_logic`) |
+| `assessment_pipeline.py` | `AssessmentPipeline`: runs each shipment through AI, then Logic, then Data |
 | `tests/` | pytest tests, `helpers.py`, `fakes.py` (FakeAI and FakeLogic, used by tests and demo mode) |
 
 There are no old function-based modules any more: all code lives in the packages above and `main.py`. Do not add module-level functions with global state.
@@ -26,7 +27,7 @@ There are no old function-based modules any more: all code lives in the packages
 - Jinja autoescape stays on; never use `|safe` on data. Risk and outcome are shown as text, not colour alone.
 - Dates are `DD/MM/YYYY` only. Ports come only from `ports_reference_4.json` (50 ports). Times are timezone-aware UTC inside the app.
 - Shipment IDs are generated (`SHP-001`, `SHP-002`, ...). A `shipment_id` column in an uploaded CSV is ignored.
-- The managers never call each other; only `main.py` knows all of them. Logic rules change a `Decision` only through its methods, and read thresholds from `RuleConfig`.
+- The managers never call each other; only `main.py` (and the `AssessmentPipeline` it builds) knows all of them. Logic rules change a `Decision` only through its methods, and read thresholds from `RuleConfig`.
 
 ## Tests
 

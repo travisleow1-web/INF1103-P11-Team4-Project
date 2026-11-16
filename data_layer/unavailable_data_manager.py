@@ -9,7 +9,7 @@ from .data_manager import DataManager
 class UnavailableDataManager(DataManager):
     """Stands in when the database could not be reached at startup. Every call raises StorageError.
 
-    The app keeps running: IO shows the message, and assess_shipments reports each record as not saved.
+    The app keeps running: IO shows the message, and AssessmentPipeline reports each record as not saved.
     """
 
     def __init__(self, message: str):

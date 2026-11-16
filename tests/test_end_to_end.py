@@ -1,4 +1,4 @@
-"""The whole app through main.create_app: real IO, AI, Logic and JSON storage; only Gemini and the feeds are mocked.
+"""The whole app through main.Application: real IO, AI, Logic and JSON storage; only Gemini and the feeds are mocked.
 
 No network: the Gemini client is Mock(spec=GeminiClient) and the context providers are stubs.
 """
@@ -58,7 +58,7 @@ def gemini():
 
 @pytest.fixture(params=["json", "mongo"])
 def app(request, monkeypatch, tmp_path, gemini):
-    """main.create_app with a clean environment and a real AIManager around the mock.
+    """main.Application.create with a clean environment and a real AIManager around the mock.
 
     Every test runs twice: on a temp JSON file and on MongoDB through mongomock.
     """
@@ -72,7 +72,9 @@ def app(request, monkeypatch, tmp_path, gemini):
         mongomock = pytest.importorskip("mongomock")
         collection = mongomock.MongoClient().db.shipment_records
         monkeypatch.setenv("DATA_BACKEND", "mongo")
-        monkeypatch.setattr(main, "build_mongo", lambda ports: MongoDataManager(collection, ports))
+        monkeypatch.setenv("MONGO_URI", "mongodb://test")
+        monkeypatch.setenv("DB_NAME", "team4")
+        monkeypatch.setattr(MongoDataManager, "connect", lambda uri, db_name, ports: MongoDataManager(collection, ports))
     providers = []
     for name in ("weather", "news"):
         provider = Mock(spec=ContextProvider)
@@ -80,8 +82,8 @@ def app(request, monkeypatch, tmp_path, gemini):
         provider.fetch.return_value = None
         providers.append(provider)
     ai = AIManager(gemini, providers, tmp_path / "ai_cache.json", ALLOWED_LISTS)
-    monkeypatch.setattr(main, "build_ai", lambda: ai)
-    return TestClient(main.create_app())
+    monkeypatch.setattr(main.Application, "build_ai", lambda self: ai)
+    return TestClient(main.Application.create())
 
 
 def outcome(name):

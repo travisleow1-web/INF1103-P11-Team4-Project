@@ -14,7 +14,7 @@ The web layer (`web/app.py`, FastAPI routes and Jinja templates) is a thin shell
 
 | Question | Decision |
 |---|---|
-| Who runs AI, then Logic, then Data? | `main.assess_shipments`, a generator that yields `(record, save_error)` per shipment. `main.create_app` passes it into `create_web_app(..., run=assess_shipments)`, so `web/` never imports `main`. No pipeline class |
+| Who runs AI, then Logic, then Data? | `AssessmentPipeline.run`, a generator that yields `(record, save_error)` per shipment. `main.Application` builds the pipeline and passes `run=pipeline.run` into `create_web_app`, so `web/` never imports `main` |
 | Shipment ID | Generated: `SHP-001`, `SHP-002`, ... continuing from the highest saved `SHP-###` or the highest already handed out to a running submission, whichever is larger (under a lock, so overlapping submissions never share an ID). Only valid rows in a preview without problems use up a number. A `shipment_id` column in a CSV is ignored |
 | Saved records cannot be read | `preview()` raises `StorageError("Cannot assign shipment IDs: saved records could not be read.")` instead of restarting at `SHP-001`; the submit page shows it and runs nothing, so no ID is handed out twice |
 | Dates | `DD/MM/YYYY` only. Arrival must be after departure. Stored as real dates, never strings. Times are shown as `DD/MM/YYYY HH:MM SGT` |

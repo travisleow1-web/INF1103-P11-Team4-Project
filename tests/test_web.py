@@ -15,6 +15,7 @@ from model.search_criteria import SearchCriteria
 from model.storage_error import StorageError
 from web.app import MAX_UPLOAD_BYTES, create_web_app
 import main
+from assessment_pipeline import AssessmentPipeline
 
 CSV = b"origin_port,destination_port,departure_time,arrival_time\nSGSIN,NLRTM,01/12/2026,20/12/2026\n"
 
@@ -30,7 +31,8 @@ def data(tmp_path):
 
 
 def client_for(data, ai=None, logic=None, demo=False, notices=None):
-    return TestClient(create_web_app(make_io(data), ai, logic, data, demo, notices, run=main.assess_shipments))
+    return TestClient(create_web_app(make_io(data), ai, logic, demo, notices,
+                                     run=AssessmentPipeline(ai, logic, data).run))
 
 
 # input page
@@ -360,7 +362,7 @@ def test_search_without_a_database_shows_the_message():
     assert '<p class="alert alert-error" role="alert">Database unavailable: timed out</p>' in text
 
 
-# main.create_app
+# main.Application
 
 @pytest.fixture
 def env(monkeypatch, tmp_path):
@@ -376,13 +378,13 @@ def env(monkeypatch, tmp_path):
 
 
 def test_create_app_serves_the_input_page_with_the_real_ports(env):
-    page = TestClient(main.create_app()).get("/")
+    page = TestClient(main.Application.create()).get("/")
     assert page.status_code == 200
     assert "SGSIN - Singapore" in page.text
 
 
 def test_ai_is_not_connected_without_a_key(env):
-    assert main.build_ai() is None
+    assert main.Application().build_ai() is None
 
 
 def test_ai_is_built_from_the_key_and_model(env, tmp_path):
@@ -390,7 +392,7 @@ def test_ai_is_built_from_the_key_and_model(env, tmp_path):
     env.setenv("GEMINI_MODEL", "test-model")
     env.setenv("AI_CACHE_FILE", str(tmp_path / "cache.json"))
     from ai_layer.ai_manager import AIManager
-    assert isinstance(main.build_ai(), AIManager)
+    assert isinstance(main.Application().build_ai(), AIManager)
 
 
 class RecordingSession:
@@ -415,7 +417,7 @@ def test_build_ai_uses_gemini_model_and_ai_cache_file(env, tmp_path):
     env.setenv("AI_CACHE_FILE", str(cache))
     session = RecordingSession()
     with patch("requests.Session", return_value=session):
-        ai = main.build_ai()
+        ai = main.Application().build_ai()
     assessment = ai.assess(make_shipment())
     assert assessment.status.value == "LIVE"
     assert len(session.posted) == 1 and "/models/my-test-model:generateContent" in session.posted[0]
@@ -424,39 +426,39 @@ def test_build_ai_uses_gemini_model_and_ai_cache_file(env, tmp_path):
 
 def test_logic_is_built_with_the_data_manager_and_ports(data):
     from logic_layer.logic_manager import LogicManager
-    logic = main.build_logic(data, PORTS)
+    logic = main.Application().build_logic(data, PORTS)
     assert isinstance(logic, LogicManager)
-    assert len(logic.rules) == 7
+    assert len(logic.rules) == 8
 
 
 def test_build_data_uses_json_by_default(env):
     env.delenv("DATA_BACKEND")
-    assert isinstance(main.build_data(PORTS), JsonDataManager)
+    assert isinstance(main.Application().build_data(PORTS), JsonDataManager)
 
 
 def test_empty_settings_from_env_example_mean_the_defaults(env):
     env.setenv("DATA_BACKEND", "")
     env.setenv("DEMO_MODE", "")
-    assert isinstance(main.build_data(PORTS), JsonDataManager)
-    assert "Demo mode" not in TestClient(main.create_app()).get("/").text
+    assert isinstance(main.Application().build_data(PORTS), JsonDataManager)
+    assert "Demo mode" not in TestClient(main.Application.create()).get("/").text
 
 
 def test_build_data_rejects_an_unknown_backend(env):
     env.setenv("DATA_BACKEND", "excel")
     with pytest.raises(ValueError):
-        main.build_data(PORTS)
+        main.Application().build_data(PORTS)
 
 
 def test_create_app_in_demo_mode_assesses_with_the_fakes(env):
     env.setenv("DEMO_MODE", "1")
-    client = TestClient(main.create_app())
+    client = TestClient(main.Application.create())
     page = client.post("/submit", files={"csv_file": ("s.csv", CSV, "text/csv")})
     assert "Demo mode: fake AI and rules" in page.text
     assert "1 of 1" in page.text and "SHP-001" in page.text
 
 
 def test_create_app_without_a_key_says_only_the_ai_is_not_connected(env):
-    page = TestClient(main.create_app()).post("/submit", files={"csv_file": ("s.csv", CSV, "text/csv")})
+    page = TestClient(main.Application.create()).post("/submit", files={"csv_file": ("s.csv", CSV, "text/csv")})
     assert f"1 shipment is valid. {NO_AI}" in page.text
     assert "Demo mode" not in page.text
 
@@ -466,7 +468,7 @@ SHORT = "Database unavailable. Results will not be saved."
 
 def test_build_data_without_mongo_settings_is_unavailable(env, caplog):
     env.setenv("DATA_BACKEND", "mongo")
-    data = main.build_data(PORTS)
+    data = main.Application().build_data(PORTS)
     assert isinstance(data, UnavailableDataManager)
     assert data.message == SHORT
     assert "MONGO_URI and DB_NAME must both be set" in caplog.text
@@ -479,14 +481,14 @@ def test_build_data_falls_back_when_mongo_cannot_be_reached(env):
     env.setenv("MONGO_URI", "mongodb://db.invalid")
     env.setenv("DB_NAME", "team4")
     env.setattr(main.MongoDataManager, "connect", unreachable)
-    data = main.build_data(PORTS)
+    data = main.Application().build_data(PORTS)
     assert isinstance(data, UnavailableDataManager)
     assert data.message == SHORT
 
 
 def test_create_app_shows_the_banner_when_the_database_is_unavailable(env):
     env.setenv("DATA_BACKEND", "mongo")
-    page = TestClient(main.create_app()).get("/")
+    page = TestClient(main.Application.create()).get("/")
     assert page.status_code == 200
     assert "banner-error" in page.text and "Database unavailable" in page.text
 
@@ -494,7 +496,7 @@ def test_create_app_shows_the_banner_when_the_database_is_unavailable(env):
 def test_demo_mode_keeps_its_records_apart_from_the_real_ones(env, tmp_path):
     env.setenv("DEMO_MODE", "1")
     env.setenv("DATA_BACKEND", "mongo")                      # ignored in demo mode
-    page = TestClient(main.create_app()).post("/submit", files={"csv_file": ("s.csv", CSV, "text/csv")})
+    page = TestClient(main.Application.create()).post("/submit", files={"csv_file": ("s.csv", CSV, "text/csv")})
     assert "1 of 1" in page.text and "banner-error" not in page.text
     assert (tmp_path / "demo.json").exists()
     assert not (tmp_path / "records.json").exists()
@@ -508,7 +510,7 @@ def test_bad_database_settings_show_only_the_short_message(env, caplog, uri, db_
     env.setenv("DATA_BACKEND", "mongo")
     env.setenv("MONGO_URI", uri)
     env.setenv("DB_NAME", db_name)
-    client = TestClient(main.create_app())
+    client = TestClient(main.Application.create())
     home, search = client.get("/").text, client.get("/search").text
     assert f'<div class="banner banner-error" role="alert">{SHORT}</div>' in home
     assert f'<p class="alert alert-error" role="alert">{SHORT}</p>' in search
@@ -546,10 +548,10 @@ def test_the_web_layer_does_not_import_main():
 def test_the_runner_passed_in_is_the_one_used(data):
     calls = []
 
-    def runner(shipments, ai, logic, data_manager):
+    def runner(shipments):
         calls.append([s.shipment_id for s in shipments])
         return iter(())
-    client = TestClient(create_web_app(make_io(data), FakeAI(), FakeLogic(), data, run=runner))
+    client = TestClient(create_web_app(make_io(data), FakeAI(), FakeLogic(), run=runner))
     assert "Done: 0 of 2" in client.post("/submit", data=good_rows(2)).text
     assert calls == [["SHP-001", "SHP-002"]]
 
@@ -557,7 +559,7 @@ def test_the_runner_passed_in_is_the_one_used(data):
 def test_create_app_reads_env_through_the_name_the_fixture_replaces(env):
     calls = []
     env.setattr(main, "load_dotenv", lambda *args, **kwargs: calls.append(args))
-    main.create_app()
+    main.Application.create()
     assert calls == [()]
 
 
@@ -579,7 +581,8 @@ class SlowFirstAI(FakeAI):
 
 
 def test_overlapping_submissions_get_distinct_ids_and_every_row_saves(data):
-    app = create_web_app(make_io(data), SlowFirstAI(), FakeLogic(), data, run=main.assess_shipments)
+    ai = SlowFirstAI()
+    app = create_web_app(make_io(data), ai, FakeLogic(), run=AssessmentPipeline(ai, FakeLogic(), data).run)
     pages = []
 
     def submit():
@@ -599,9 +602,14 @@ def test_overlapping_submissions_get_distinct_ids_and_every_row_saves(data):
 def test_create_app_sets_up_logging_only_when_nothing_has(env):
     root = logging.getLogger()
     with patch.object(root, "handlers", []), patch("main.logging.basicConfig") as basic:
-        main.create_app()
+        main.Application.create()
     basic.assert_called_once()
     assert basic.call_args.kwargs["level"] == logging.INFO
     with patch.object(root, "handlers", [logging.NullHandler()]), patch("main.logging.basicConfig") as basic:
-        main.create_app()
+        main.Application.create()
     basic.assert_not_called()
+
+
+def test_the_uvicorn_entry_point_used_by_docker_resolves():
+    from uvicorn.importer import import_from_string
+    assert import_from_string("main:Application.create") == main.Application.create

@@ -7,7 +7,7 @@ How the Phase 2 app is put together, and where your part plugs in.
 ```bash
 pip install -r requirements.txt
 cp .env.example .env
-DEMO_MODE=1 uvicorn main:create_app --factory --reload
+DEMO_MODE=1 uvicorn main:Application.create --factory --reload
 ```
 
 Open http://127.0.0.1:8000, upload `sample_data/shipments.csv`, then try **Search**. To run with the real AI and rules, see the README.
@@ -27,13 +27,14 @@ Without demo mode, the AI comes from `build_ai()` and the Logic from `build_logi
 | `data_layer/` | `DataManager` (ABC) with `JsonDataManager` (default), `MongoDataManager` and `UnavailableDataManager`; `RecordSerializer` |
 | `ai_layer/` | `AIManager`, `GeminiClient`, `ContextProvider` (ABC) with `WeatherProvider` and `NewsProvider`, `ResponseParser`, `ResponseCache`, the errors, and the prompt and schema constants in `ai_settings.py` |
 | `logic_layer/` | `LogicManager`, `RuleConfig`, `BusinessRule` (ABC) and its rules, `OutcomeResolver` |
-| `web/app.py` | `create_web_app(..., run=...)`: the FastAPI routes `GET /`, `POST /submit`, `GET /search`. `main.create_app` passes `assess_shipments` as `run`, so `web/` never imports `main` |
+| `web/app.py` | `create_web_app(..., run=...)`: the FastAPI routes `GET /`, `POST /submit`, `GET /search`. `main.Application` passes `AssessmentPipeline.run` as `run`, so `web/` never imports `main` |
 | `web/templates/` | Jinja templates. `_header.html` and `_footer.html` wrap every page; `_macros.html` holds the badges and the details row |
 | `web/static/` | `style.css` and `add_row.js` (the only JavaScript) |
-| `main.py` | Composition root: `assess_shipments`, `build_data`, `build_ai`, `build_logic`, `create_app` |
+| `main.py` | Composition root: `Application` (`create`, `create_app`, `build_data`, `build_ai`, `build_logic`) |
+| `assessment_pipeline.py` | `AssessmentPipeline(ai, logic, data).run(shipments)`: AI, then Logic, then Data, one shipment at a time |
 | `tests/` | pytest tests, `helpers.py` (shared test data) and `fakes.py` (FakeAI, FakeLogic) |
 
-The flow for one submission: the route calls `io.preview(...)`. If every row is valid, `main.assess_shipments` runs, for each shipment, `ai.assess` then `logic.evaluate` then `data.save`, and yields `(record, save_error)`. The route streams one table row per shipment. The managers never call each other; only `main.py` knows all of them.
+The flow for one submission: the route calls `io.preview(...)`. If every row is valid, `AssessmentPipeline.run` runs, for each shipment, `ai.assess` then `logic.evaluate` then `data.save`, and yields `(record, save_error)`. The route streams one table row per shipment. The managers never call each other; only `main.py` (and the pipeline it builds) knows all of them.
 
 ## How the AI and Logic layers are connected
 
