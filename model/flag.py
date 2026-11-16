@@ -18,3 +18,4 @@ class Flag(str, Enum):
     AI_UNAVAILABLE = "AI unavailable"
     UNREGISTERED_LOCATION = "Unregistered location"
     RULE_ERROR = "Rule error"
+    RESCHEDULE_SUGGESTED = "Reschedule suggested"

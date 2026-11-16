@@ -34,9 +34,10 @@ def insight(code="POTENTIAL_DELAY", severity=RiskLevel.MEDIUM, days=0, location=
 
 
 def assessment(factors=(), insights=(), primary=RiskType.NONE, location="SGSIN", impact="None",
-               confidence=0.9, conflicting=False, status=AIStatus.LIVE, fetched_at=NOW):
+               confidence=0.9, conflicting=False, status=AIStatus.LIVE, fetched_at=NOW, clear_departure=None):
     """A real AIAssessment. By default it is clean: no factors, high confidence, fresh data."""
-    return AIAssessment(factors, insights, primary, location, impact, confidence, conflicting, status, fetched_at)
+    return AIAssessment(factors, insights, primary, location, impact, confidence, conflicting, status, fetched_at,
+                        clear_departure)
 
 
 def decision(shipment_id="SHP-001"):

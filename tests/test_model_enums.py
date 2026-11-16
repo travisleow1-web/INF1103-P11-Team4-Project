@@ -49,7 +49,7 @@ def test_string_enums_compare_equal_to_their_values():
 def test_flags_keep_the_display_wording():
     assert Flag.PERFECT_STORM.value == "Perfect Storm"
     assert Flag("Route history unavailable") is Flag.ROUTE_HISTORY_UNAVAILABLE
-    assert len(Flag) == 14
+    assert len(Flag) == 15
 
 
 def test_an_unknown_value_is_an_error():

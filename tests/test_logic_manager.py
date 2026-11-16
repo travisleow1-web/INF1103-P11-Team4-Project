@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 import pytest
 from helpers import PORTS as DATA_PORTS, saved_record
 from logic_fixtures import NOW, PORTS, FakeHistory, assessment, factor, insight, shipment
@@ -9,6 +9,7 @@ from logic_layer.insurance_rule import InsuranceRule
 from logic_layer.logic_manager import LogicManager
 from logic_layer.perfect_storm_rule import PerfectStormRule
 from logic_layer.procurement_rule import ProcurementRule
+from logic_layer.reschedule_rule import RescheduleRule
 from logic_layer.route_history_rule import RouteHistoryRule
 from logic_layer.rule_config import RuleConfig
 from logic_layer.unregistered_location_rule import UnregisteredLocationRule
@@ -27,7 +28,7 @@ def manager(history=None, config=None):
 def test_rules_run_in_the_agreed_order():
     assert [type(r) for r in manager().rules] == [
         DataQualityRule, PerfectStormRule, AIInsightRule, InsuranceRule,
-        UnregisteredLocationRule, RouteHistoryRule, ProcurementRule]
+        UnregisteredLocationRule, RouteHistoryRule, RescheduleRule, ProcurementRule]
 
 
 def test_the_default_config_is_used_when_none_is_given():
@@ -122,7 +123,7 @@ def test_now_must_be_timezone_aware():
 
 
 def evaluate_and_save(logic, data, shipment_id, when):
-    """Evaluate a clean Low shipment at a given time and save it the way main.assess_shipments does."""
+    """Evaluate a clean Low shipment at a given time and save it the way AssessmentPipeline.run does."""
     a = assessment(fetched_at=when)
     d = logic.evaluate(shipment(shipment_id), a, when)
     data.save(ShipmentRecord(shipment(shipment_id), a, d, when))
@@ -167,3 +168,11 @@ def test_a_failing_early_rule_still_lets_later_rules_and_the_resolver_run():
     assert d.has_flag(Flag.PREMIUM_INCREASE)        # InsuranceRule ran
     assert d.outcome is Outcome.INSURE              # the resolver ran
     assert d.actions[-1] == "Route to human review queue"
+
+
+def test_high_risk_with_a_clear_window_is_delayed_with_new_dates():
+    a = assessment([factor(severity=RiskLevel.HIGH)], primary=RiskType.WEATHER, clear_departure=date(2026, 12, 4))
+    d = manager().evaluate(shipment(), a, NOW)
+    assert d.outcome is Outcome.DELAY
+    assert d.has_flag(Flag.RESCHEDULE_SUGGESTED)
+    assert "Reschedule: depart 04/12/2026, arrive 31/12/2026" in d.actions
