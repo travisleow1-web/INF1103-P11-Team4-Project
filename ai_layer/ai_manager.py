@@ -33,7 +33,7 @@ class AIManager:
                  listeners: Iterable[FetchListener] = ()):
         self.__client = client                                            # aggregation
         self.__providers = tuple(providers)                               # aggregation
-        self.__listeners = tuple(listeners)                               # aggregation                             # aggregation
+        self.__listeners = list(listeners)                                # aggregation
         self.__parser = ResponseParser(allowed_lists)                     # composition
         self.__cache = ResponseCache(cache_path, client.fingerprint())    # composition
 
@@ -64,11 +64,20 @@ class AIManager:
         self.__notify(shipment, FetchStage.SUCCEEDED)
         return assessment
 
+    def add_listener(self, listener: FetchListener) -> None:
+        """Start telling this listener how each fetch is going (for example one web page while it runs)."""
+        self.__listeners.append(listener)
+
+    def remove_listener(self, listener: FetchListener) -> None:
+        """Stop telling this listener. A listener that was never added is ignored."""
+        if listener in self.__listeners:
+            self.__listeners.remove(listener)
+
     def __notify(self, shipment: Shipment, stage: FetchStage, attempt: Optional[int] = None,
                  max_attempts: Optional[int] = None, detail: Optional[str] = None) -> None:
         """Tell every listener about this stage. A listener that fails is logged and skipped."""
         event = FetchEvent(shipment.shipment_id, stage, attempt, max_attempts, detail)
-        for listener in self.__listeners:
+        for listener in tuple(self.__listeners):        # a copy, so a listener may be added or removed meanwhile
             try:
                 listener.on_event(event)
             except Exception as error:     # deliberate: a broken display must never stop an assessment
