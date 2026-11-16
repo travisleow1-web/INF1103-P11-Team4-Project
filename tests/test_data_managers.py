@@ -169,7 +169,7 @@ def test_route_history_skips_fallback_assessments(data):
     data.save(saved_record("SHP-002", saved_at=at(6), risk="HIGH", outcome="DELAY"))
     history = data.find_route_history("SGSIN-NLRTM", at(1))
     assert ids(history) == ["SHP-002"]
-    assert history[0].is_flagged() and history[0].is_delayed()
+    assert history[0].is_delayed()
 
 
 def test_route_history_needs_a_timezone_aware_time(data):

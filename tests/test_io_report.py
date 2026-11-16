@@ -8,7 +8,6 @@ from model.risk_level import RiskLevel
 from model.risk_type import RiskType
 from model.shipment_record import ShipmentRecord
 
-SAVED = datetime(2026, 11, 1, 9, 0, tzinfo=timezone.utc)        # saved_record's default time
 NEW_DATES = (date(2026, 11, 8), date(2026, 11, 13), "Clear soon")
 
 

@@ -3,7 +3,6 @@ from typing import Optional
 from .ai_assessment import AIAssessment
 from .decision import Decision
 from .outcome import Outcome
-from .risk_level import RiskLevel
 from .shipment import Shipment
 
 
@@ -35,10 +34,6 @@ class ShipmentRecord:
     @property
     def saved_at(self) -> datetime:
         return self.__saved_at
-
-    def is_flagged(self) -> bool:
-        """True if the shipment needed a human or had any risk above Low."""
-        return self.__decision.needs_human or self.__decision.risk_level > RiskLevel.LOW
 
     def is_delayed(self) -> bool:
         """True if the rules decided to delay the shipment."""

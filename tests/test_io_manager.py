@@ -1,7 +1,6 @@
 from datetime import date
 import pytest
 from helpers import FakeData, make_io, record, row, saved_record
-from io_layer.io_manager import IOManager
 from io_layer.form_source import FormSource
 from model.search_criteria import SearchCriteria
 from model.storage_error import StorageError
