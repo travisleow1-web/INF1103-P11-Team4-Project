@@ -18,7 +18,7 @@ MARINE_URL = "https://marine-api.open-meteo.com/v1/marine"
 class WeatherProvider(ContextProvider):
     """Hourly wind, pressure, visibility and waves at the origin and destination ports (Open-Meteo).
 
-    Future shipments get the 16-day forecast. Shipments that departed within the last
+    Future shipments get the FORECAST_DAYS-day forecast (enough for the AI to find a clear window). Shipments that departed within the last
     `history_days` days get historical data for their own dates instead.
     A port whose weather cannot be fetched gets None, and the other port keeps its data.
     """
@@ -28,14 +28,9 @@ class WeatherProvider(ContextProvider):
         self.__history_days = history_days
 
     def _request(self, shipment: Shipment) -> Dict[str, Any]:
-        params = {
-            "latitude": shipment.origin.lat,
-            "longitude": shipment.origin.lon,
-            "timezone": "auto",
-            "forecast_days": FORECAST_DAYS,
-            "daily": "precipitation_sum, windgusts_10m_max, windspeed_10m_max, pressure_msl_min, pressure_msl_max, visibility_min, weathercode_max",
-        }
-        return self._get_json(FORECAST_URL, params)
+        window = self.__history_window(shipment, datetime.now(timezone.utc).date())
+        return {"origin": self.__port_weather_or_none(shipment, shipment.origin, window),
+                "destination": self.__port_weather_or_none(shipment, shipment.destination, window)}
 
     def __port_weather_or_none(self, shipment: Shipment, port: Port,
                                window: Optional[Tuple[str, str]]) -> Optional[Dict[str, Any]]:
@@ -58,7 +53,7 @@ class WeatherProvider(ContextProvider):
         if window:
             common.update(start_date=window[0], end_date=window[1])
         else:
-            common["forecast_days"] = 16
+            common["forecast_days"] = FORECAST_DAYS
         weather_params = {**common, "hourly": "wind_speed_10m,wind_gusts_10m,pressure_msl,visibility",
                           "cell_selection": "sea"}
         marine_params = {**common, "hourly": "wave_height,swell_wave_height,wave_period"}

@@ -8,7 +8,7 @@ from model.risk_type import RiskType
 
 DEFAULT_MODEL = "gemini-3.5-flash-lite"
 HISTORY_DAYS = 90          # shipments that departed this recently get historical weather
-FORECAST_DAYS = 14         # outlook used to find a clear departure window
+FORECAST_DAYS = 16         # days of hourly forecast; covers the 14-day window the AI scans for a clear departure
 HTTP_TIMEOUT = 20          # seconds, for the weather and news feeds
 GEMINI_TIMEOUT = 40        # seconds, for one model call
 MAX_RETRIES = 3            # attempts per model call (only retryable errors are tried again)
