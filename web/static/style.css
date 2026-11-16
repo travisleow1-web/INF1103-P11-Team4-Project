@@ -217,7 +217,7 @@ tr.row-errors td { color: var(--error-ink); font-size: 0.9rem; padding-top: 0; }
 
 /* The run report. On the streamed results page it is the last thing sent but is shown first. */
 main.stream { display: flex; flex-direction: column; }
-main.stream > h1, main.stream > .lede { order: -3; }
+main.stream > h1, main.stream > .lede, main.stream > .status { order: -3; }
 main.stream > .report { order: -2; }
 .report { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 1rem 1.25rem; margin: 1rem 0; }
 .report h2 { font-size: 1.1rem; margin: 0 0 0.15rem; }
@@ -268,3 +268,12 @@ form.rerun-small button { padding: 0.1rem 0.6rem; font-size: 0.85rem; }
 @media (max-width: 640px) {
   .plan { grid-template-columns: 1fr; }
 }
+
+/* What the AI is doing right now, shown above the results while they are assessed. */
+.status { color: var(--muted); margin: 0.25rem 0 0.75rem; }
+.status:empty { display: none; }
+.status:not(:empty)::before { content: ""; display: inline-block; width: 0.8em; height: 0.8em; margin-right: 0.5em;
+  border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; vertical-align: -0.1em;
+  animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .status:not(:empty)::before { animation: none; } }

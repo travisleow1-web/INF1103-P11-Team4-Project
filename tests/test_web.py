@@ -13,6 +13,8 @@ from helpers import PORTS, make_io, saved_record
 from fakes import FakeAI, FakeLogic
 from data_layer.json_data_manager import JsonDataManager
 from data_layer.unavailable_data_manager import UnavailableDataManager
+from model.fetch_event import FetchEvent
+from model.fetch_stage import FetchStage
 from model.search_criteria import SearchCriteria
 from model.storage_error import StorageError
 from web.app import MAX_UPLOAD_BYTES, create_web_app
@@ -292,7 +294,7 @@ def test_a_row_whose_save_failed_says_not_saved(tmp_path):
     assert "Done: 2 of 2 shipments assessed." in text
 
 
-class BrokenAI:
+class BrokenAI(FakeAI):
     def assess(self, shipment):
         raise RuntimeError("boom")
 
@@ -817,3 +819,100 @@ def test_a_high_risk_shipment_with_no_new_date_shows_none_and_the_reason(data):
     cells = plan_cells(client_for(data).get("/search").text)
     assert cells[1] == ("Suggested", "None")
     assert cells[2][1].startswith("No new date suggested:")
+
+
+# loading messages: what the AI is doing while shipments are assessed
+
+class OneStepAI(FakeAI):
+    """FakeAI that also tells its listeners one message with HTML in it, and counts its listeners."""
+
+    def __init__(self, detail="<b>x</b>"):
+        super().__init__()
+        self.listeners = []
+        self.__detail = detail
+
+    def add_listener(self, listener):
+        self.listeners.append(listener)
+        super().add_listener(listener)
+
+    def remove_listener(self, listener):
+        self.listeners.remove(listener)
+        super().remove_listener(listener)
+
+    def assess(self, shipment):
+        for listener in self.listeners:
+            listener.on_event(FetchEvent(shipment.shipment_id, FetchStage.RETRYING, 1, 3, self.__detail))
+        return super().assess(shipment)
+
+
+def status_texts(page):
+    """The text of each status update on the page, in order (the ones that are scripts)."""
+    return [json.loads(text) for text in re.findall(r'getElementById\("status"\)\.textContent = (".*?");</script>', page)]
+
+
+def test_the_results_page_shows_what_the_ai_is_doing_for_each_shipment(data):
+    page = client_for(data, FakeAI(), FakeLogic()).post("/submit", data=good_rows(2)).text
+    assert 'id="status"' in page and 'role="status"' in page
+    assert status_texts(page) == ["Assessing SHP-001 (1 of 2) - AI: fetching in progress...",
+                                  "Assessing SHP-001 (1 of 2) - AI: fetching complete",
+                                  "Assessing SHP-002 (2 of 2) - AI: fetching in progress...",
+                                  "Assessing SHP-002 (2 of 2) - AI: fetching complete",
+                                  ""]                                    # cleared when everything is done
+
+
+def test_a_status_line_comes_before_the_row_it_is_about(data):
+    page = client_for(data, FakeAI(), FakeLogic()).post("/submit", data=good_rows(1)).text
+    assert page.index("fetching in progress") < page.index('<th scope="row">SHP-001')
+    assert page.index('<th scope="row">SHP-001') < page.index("Done: 1 of 1")
+
+
+def test_a_failed_fetch_is_shown_with_its_reason(data):
+    client = client_for(data, FakeAI(), FakeLogic())
+    page = client.post("/submit", data=good_rows(9)).text               # the ninth shipment fails the first time
+    assert "Assessing SHP-009 (9 of 9) - AI: fetching failed (the demo AI did not answer), using fallback assessment" in status_texts(page)
+
+
+def test_a_rerun_shows_the_loading_messages_too(data):
+    client = client_for(data, FakeAI(), FakeLogic())
+    client.post("/submit", data=good_rows(9))
+    page = client.post("/rerun", data={"shipment_id": ["SHP-009"]}).text
+    assert status_texts(page) == ["Assessing SHP-009 (1 of 1) - AI: fetching in progress...",
+                                  "Assessing SHP-009 (1 of 1) - AI: fetching complete", ""]
+
+
+def test_status_text_from_the_ai_is_escaped_in_the_page(data):
+    page = client_for(data, OneStepAI(), FakeLogic()).post("/submit", data=good_rows(1)).text
+    assert "<b>x</b>" not in page                                     # never raw in the HTML
+    assert "attempt 1/3 failed (\\u003cb\\u003ex\\u003c/b\\u003e), trying again..." in page
+    assert "attempt 1/3 failed (<b>x</b>), trying again..." in " ".join(status_texts(page))   # plain text in the browser
+
+
+def test_the_page_stops_listening_when_it_is_done(data):
+    ai = OneStepAI()
+    client_for(data, ai, FakeLogic()).post("/submit", data=good_rows(2))
+    assert ai.listeners == []
+
+
+def test_the_page_stops_listening_when_the_assessment_fails(data):
+    class Failing(OneStepAI):
+        def assess(self, shipment):
+            raise RuntimeError("boom")
+    ai = Failing()
+    page = client_for(data, ai, FakeLogic()).post("/submit", data=good_rows(2)).text
+    assert "Assessment stopped after 0 of 2 shipments" in page and ai.listeners == []
+
+
+def test_a_page_only_shows_the_messages_of_its_own_shipments():
+    from queue import Queue
+    from web.status_feed import StatusFeed
+    out = Queue()
+    feed = StatusFeed(["SHP-001"], out)
+    feed.on_event(FetchEvent("SHP-001", FetchStage.STARTED))
+    feed.on_event(FetchEvent("SHP-777", FetchStage.STARTED))          # another visitor's shipment
+    assert out.qsize() == 1 and out.get()[1].shipment_id == "SHP-001"
+
+
+def test_demo_mode_shows_the_loading_messages_too(env):
+    env.setenv("DEMO_MODE", "1")
+    page = TestClient(main.create_app()).post("/submit", data=good_rows(1)).text
+    assert "Assessing SHP-001 (1 of 1) - AI: fetching in progress..." in status_texts(page)

@@ -116,7 +116,7 @@ def create_app() -> FastAPI:
     if demo:
         from tests.fakes import FakeAI, FakeLogic
         data = JsonDataManager(os.getenv("DEMO_DATA_FILE") or "demo_records.json", ports)
-        ai, logic = FakeAI(), FakeLogic()
+        ai, logic = FakeAI(delay=0.4), FakeLogic()          # the pause lets the page show its loading messages
     else:
         data = build_data(ports)
         ai, logic = build_ai(), build_logic(data, ports)

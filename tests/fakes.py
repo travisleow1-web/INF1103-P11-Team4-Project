@@ -1,9 +1,12 @@
 """Dev-only stand-ins for the AI and Logic managers, used by the tests and by the web app's demo mode.
 They run only when DEMO_MODE=1 (see main.create_app), never in normal use."""
+import time
 from datetime import datetime, timedelta, timezone
 from model.ai_assessment import AIAssessment
 from model.ai_status import AIStatus
 from model.decision import Decision
+from model.fetch_event import FetchEvent
+from model.fetch_stage import FetchStage
 from model.outcome import Outcome
 from model.risk_factor import RiskFactor
 from model.risk_level import RiskLevel
@@ -22,19 +25,42 @@ class FakeAI:
     had found the weather clearing then. That is what lets the demo show the reschedule suggestion.
 
     Every ninth shipment (SHP-009, SHP-018, ...) is unavailable the first time it is assessed and works
-    when assessed again, so the demo can show the re-run.
+    when assessed again, so the demo can show the re-run. Like the real AI manager it tells its listeners
+    when it starts and how it ends; delay is how many seconds that takes, so the demo can show the page's
+    loading messages.
     """
 
-    def __init__(self):
+    def __init__(self, delay: float = 0.0):
         self.__tried = set()
+        self.__listeners = []
+        self.__delay = delay
+
+    def add_listener(self, listener):
+        """Tell this listener what the AI is doing."""
+        self.__listeners.append(listener)
+
+    def remove_listener(self, listener):
+        """Stop telling this listener."""
+        if listener in self.__listeners:
+            self.__listeners.remove(listener)
+
+    def __tell(self, shipment, stage, detail=None):
+        event = FetchEvent(shipment.shipment_id, stage, detail=detail)
+        for listener in tuple(self.__listeners):
+            listener.on_event(event)
 
     def assess(self, shipment):
         """Return a LIVE assessment whose severity depends only on the shipment number."""
         number = int(shipment.shipment_id.split("-")[1])
         first_try = shipment.shipment_id not in self.__tried
         self.__tried.add(shipment.shipment_id)
+        self.__tell(shipment, FetchStage.STARTED)
+        if self.__delay:
+            time.sleep(self.__delay)
         if number % 9 == 0 and first_try:
+            self.__tell(shipment, FetchStage.FAILED, "the demo AI did not answer")
             return AIAssessment.fallback()
+        self.__tell(shipment, FetchStage.SUCCEEDED)
         level = LEVELS[number % 3]
         factor = RiskFactor(RiskType.WEATHER, level, shipment.origin.code, "open_meteo_weather",
                             f"Fake {level.label.lower()} weather")

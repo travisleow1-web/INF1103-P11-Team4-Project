@@ -1,8 +1,10 @@
 """The web layer: thin FastAPI routes that pass raw form fields to IOManager and render what it returns."""
 import logging
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from queue import Queue
 from typing import Callable, Iterable, Iterator, List, Optional, Tuple
 import jinja2
 from fastapi import FastAPI, File, Form, Request, UploadFile
@@ -15,6 +17,7 @@ from io_layer.io_manager import IOManager
 from io_layer.source_error import SourceError
 from model.shipment_record import ShipmentRecord
 from model.storage_error import StorageError
+from web.status_feed import StatusFeed
 
 WEB_DIR = Path(__file__).resolve().parent
 MAX_UPLOAD_BYTES = 1024 * 1024
@@ -100,23 +103,53 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
         replace=True is a re-run: each result overwrites the saved record. skipped are IDs that were not re-run.
         """
         total = len(shipments)
+        position = {shipment.shipment_id: number for number, shipment in enumerate(shipments, 1)}
         done = 0
         finished = []
         not_saved = 0
         started = time.monotonic()
+        updates: Queue = Queue()                # finished rows and AI status lines, in the order they happen
+        feed = StatusFeed(position, updates)
+        stop = threading.Event()
+
+        def assess() -> None:
+            """Assess in another thread, so the page can show what the AI is doing while it works."""
+            try:
+                for item in run(shipments, ai, logic, data, replace=replace):
+                    updates.put(("row", item))
+                    if stop.is_set():           # the browser went away: start no more shipments
+                        break
+            except Exception as error:
+                updates.put(("error", error))
+            updates.put(("end", None))
+
         yield render("results_start.html", total=total, rerun=replace, skipped=skipped or [])
+        ai.add_listener(feed)
+        threading.Thread(target=assess, daemon=True).start()
         try:
-            for record, save_error in run(shipments, ai, logic, data, replace=replace):
-                done += 1
-                finished.append(record)
-                not_saved += 1 if save_error else 0
-                suggestion = io.show_reschedule([record])
-                yield render("result_row.html", row=io.show_summary([record])[0], result=io.show_result(record),
-                             number=done, total=total, save_error=save_error,
-                             reschedule=suggestion[0] if suggestion else None)
-        except Exception:                       # the page has already started, so say so in the table
-            logger.exception("Assessment stopped after %d of %d shipments", done, total)
-            yield render("result_stopped.html", done=done, total=total)
+            while True:
+                kind, payload = updates.get()
+                if kind == "status":
+                    text = f"Assessing {payload.shipment_id} ({position[payload.shipment_id]} of {total}) - AI: {payload.describe()}"
+                    yield render("status.html", text=text)
+                elif kind == "row":
+                    record, save_error = payload
+                    done += 1
+                    finished.append(record)
+                    not_saved += 1 if save_error else 0
+                    suggestion = io.show_reschedule([record])
+                    yield render("result_row.html", row=io.show_summary([record])[0], result=io.show_result(record),
+                                 number=done, total=total, save_error=save_error,
+                                 reschedule=suggestion[0] if suggestion else None)
+                elif kind == "error":           # the page has already started, so say so in the table
+                    logger.error("Assessment stopped after %d of %d shipments", done, total, exc_info=payload)
+                    yield render("result_stopped.html", done=done, total=total)
+                else:
+                    break
+        finally:
+            stop.set()
+            ai.remove_listener(feed)
+        yield render("status.html", text="")
         report = io.show_report(finished, not_saved=not_saved, planned=total, seconds=time.monotonic() - started,
                                 finished_at=datetime.now(timezone.utc))
         yield render("results_end.html", done=done, total=total, report=report)
