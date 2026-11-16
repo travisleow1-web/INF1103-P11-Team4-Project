@@ -67,7 +67,7 @@ class AIAssessment:
     @property
     def fetched_at(self) -> datetime:
         return self.__fetched_at
-    
+
     @property
     def earliest_clear_departure(self) -> Optional[date]:
         return self.__earliest_clear_departure
@@ -88,10 +88,8 @@ class AIAssessment:
             "conflicting_sources": self.__conflicting_sources,
             "ai_status": self.__status.value,
             "fetched_at": self.__fetched_at.isoformat(),
-            "earliest_clear_departure": (
-                self.__earliest_clear_departure.isoformat()
-                if self.__earliest_clear_departure else None
-            ),
+            "earliest_clear_departure": (self.__earliest_clear_departure.isoformat()
+                                         if self.__earliest_clear_departure else None),
         }
 
     @classmethod
@@ -103,10 +101,7 @@ class AIAssessment:
         fetched_at = datetime.fromisoformat(text)
         if fetched_at.tzinfo is None:
             fetched_at = fetched_at.replace(tzinfo=timezone.utc)
-            
         raw_clear = data.get("earliest_clear_departure")
-        earliest_clear = date.fromisoformat(str(raw_clear)) if raw_clear else None
-        
         return cls(
             [RiskFactor.from_dict(f) for f in data["risk_factors"]],
             [Insight.from_dict(i) for i in data["insights"]],
@@ -117,5 +112,5 @@ class AIAssessment:
             data["conflicting_sources"],
             AIStatus(data["ai_status"]),
             fetched_at,
-            earliest_clear, 
+            date.fromisoformat(str(raw_clear)) if raw_clear else None,
         )

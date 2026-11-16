@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Mapping, Optional
 from data_layer.data_manager import DataManager
@@ -70,7 +71,6 @@ class LogicManager:
         config = RuleConfig.from_text(fields)
         self.update_config(config)
         return config
-
 
     def evaluate(self, shipment: Shipment, assessment: AIAssessment, now: datetime) -> Decision:
         """Run every rule on the shipment, then pick the outcome. now must be timezone-aware."""
