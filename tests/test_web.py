@@ -50,6 +50,8 @@ def test_static_files_are_served(data):
     client = client_for(data)
     assert client.get("/static/style.css").status_code == 200
     assert "add-row" in client.get("/static/add_row.js").text
+    counter = client.get("/static/pp_counter.js")
+    assert counter.status_code == 200 and "document.addEventListener" in counter.text
     crate = client.get("/static/crate.js").text
     assert "crate-strip" in crate
     assert "AudioContext" in crate and "playReveal(winner.rarity)" in crate
@@ -85,10 +87,22 @@ def test_rules_page_has_no_paywall(data):
 @pytest.mark.parametrize("path", ["/", "/search", "/rules"])
 def test_every_page_ends_with_the_crate_reel(data, path):
     page = client_for(data).get(path).text
+    assert 'class="pp-counter"' in page
+    assert '<span id="pp-value">0</span>' in page
+    assert 'id="pp-hits">0</span><span class="sr-only"> 300</span>' in page
+    assert '<p class="pp-hundreds"><span>0</span><span class="sr-only"> 100</span>' in page
+    assert '<p class="pp-fifties"><span>0</span><span class="sr-only"> 50</span>' in page
+    assert 'id="pp-misses">0</span><span class="sr-only"> Miss</span>' in page
+    assert 'class="pp-dot pp-dot-hit" aria-hidden="true"' in page
+    assert 'class="pp-dot pp-dot-100" aria-hidden="true"' in page
+    assert 'class="pp-dot pp-dot-50" aria-hidden="true"' in page
+    assert 'class="pp-dot pp-dot-miss" aria-hidden="true"' in page
+    assert '<script src="/static/pp_counter.js"></script>' in page
     assert 'id="crate-open"' in page
     assert '<script src="/static/crate.js"></script>' in page
     assert '<script src="/static/ads.js"></script>' in page
     assert 'id="music-toggle"' in page and '<script src="/static/music.js"></script>' in page
+    assert 'id="music-audio" class="music-player" loop' in page
     assert 'preload="none"' in page and "Gymnopedie_No._1..ogg" in page   # nothing downloads until it plays
     assert "youtube" not in page
 

@@ -252,7 +252,33 @@ tr.row-errors td { color: var(--error-ink); font-size: 0.9rem; padding-top: 0; }
   border-radius: 6px;
   background: var(--paper);
 }
-.music-player { display: block; width: 100%; max-width: 24rem; margin-top: 0.75rem; }
+.music-player { display: none; }
+
+/* Floating osu-style click and pp counter. */
+.pp-counter {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 60;
+  min-width: 8.5rem;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid #5b6876;
+  background: #1b2129;
+  color: #e8edf2;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+  pointer-events: none;
+}
+.pp-counter p { margin: 0; }
+.pp-counter .pp-total {margin-bottom: 0.2rem; color: #f0a500; font-size: 2rem; line-height: 1.2; font-weight: 700; }
+.pp-stats { display: flex; align-items: center; gap: 0.9rem; font-size: 0.8rem; font-weight: 600; }
+.pp-hits, .pp-hundreds, .pp-fifties, .pp-misses { display: flex; align-items: center; gap: 0.35rem; }
+.pp-dot { display: inline-block; width: 0.55rem; height: 0.55rem; border-radius: 50%; }
+.pp-dot-hit { background: #3bf6f3; }
+.pp-dot-100 { background: #4ade80; }
+.pp-dot-50 { background: #facc15; }
+.pp-dot-miss { background: #ff6b6b; }
 
 /* Prank pop-up ads: loud on purpose. */
 .ad {

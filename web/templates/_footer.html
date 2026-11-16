@@ -16,15 +16,30 @@
     Erik Satie, Gymnop&eacute;die No. 1, from
     <a href="https://commons.wikimedia.org/wiki/File:Gymnopedie_No._1..ogg">Wikimedia Commons</a> (CC0, public domain).</p>
   <button type="button" id="music-toggle" class="secondary" aria-pressed="true">Music: on</button>
-  <audio id="music-audio" class="music-player" controls loop preload="none"
+  <audio id="music-audio" class="music-player" loop preload="none"
          src="https://commons.wikimedia.org/wiki/Special:FilePath/Gymnopedie_No._1..ogg"></audio>
 </section>
 <video id="pirate-overlay" class="pirate-overlay" src="/assets/Pirate.webm"
        data-fallback-src="/assets/Pirate-fallback.mp4"
        playsinline preload="none" aria-hidden="true" hidden></video>
+<aside class="pp-counter" role="status" aria-live="polite" aria-atomic="true"
+       aria-label="Osu performance counter">
+  <p class="pp-total"><span id="pp-value">0</span>PP (SS 1582PP)</p>
+  <div class="pp-stats">
+    <p class="pp-hits"><span id="pp-hits">0</span><span class="sr-only"> 300</span>
+      <span class="pp-dot pp-dot-hit" aria-hidden="true"></span></p>
+    <p class="pp-hundreds"><span>0</span><span class="sr-only"> 100</span>
+      <span class="pp-dot pp-dot-100" aria-hidden="true"></span></p>
+    <p class="pp-fifties"><span>0</span><span class="sr-only"> 50</span>
+      <span class="pp-dot pp-dot-50" aria-hidden="true"></span></p>
+    <p class="pp-misses"><span id="pp-misses">0</span><span class="sr-only"> Miss</span>
+      <span class="pp-dot pp-dot-miss" aria-hidden="true"></span></p>
+  </div>
+</aside>
 <script src="/static/crate.js"></script>
 <script src="/static/pirate.js"></script>
 <script src="/static/music.js"></script>
 <script src="/static/ads.js"></script>
+<script src="/static/pp_counter.js"></script>
 </body>
 </html>
