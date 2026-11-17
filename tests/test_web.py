@@ -16,6 +16,7 @@ from model.fetch_event import FetchEvent
 from model.fetch_stage import FetchStage
 from model.search_criteria import SearchCriteria
 from model.storage_error import StorageError
+from assessment_pipeline import AssessmentPipeline
 from web.app import MAX_UPLOAD_BYTES, create_web_app
 import main
 
@@ -33,7 +34,8 @@ def data(tmp_path):
 
 
 def client_for(data, ai=None, logic=None, demo=False, notices=None):
-    return TestClient(create_web_app(make_io(data), ai, logic, data, demo, notices, run=main.assess_shipments))
+    return TestClient(create_web_app(make_io(data), ai, logic, demo, notices,
+                                      pipeline=AssessmentPipeline(ai, logic, data)))
 
 
 # input page
@@ -582,10 +584,11 @@ def test_the_web_layer_does_not_import_main():
 def test_the_runner_passed_in_is_the_one_used(data):
     calls = []
 
-    def runner(shipments, ai, logic, data_manager, replace=False):
-        calls.append([s.shipment_id for s in shipments])
-        return iter(())
-    client = TestClient(create_web_app(make_io(data), FakeAI(), FakeLogic(), data, run=runner))
+    class Recorder:
+        def run(self, shipments, replace=False):
+            calls.append([s.shipment_id for s in shipments])
+            return iter(())
+    client = TestClient(create_web_app(make_io(data), FakeAI(), FakeLogic(), pipeline=Recorder()))
     assert "Done: 0 of 2" in client.post("/submit", data=good_rows(2)).text
     assert calls == [["SHP-001", "SHP-002"]]
 
@@ -614,7 +617,8 @@ class SlowFirstAI(FakeAI):
 
 
 def test_overlapping_submissions_get_distinct_ids_and_every_row_saves(data):
-    app = create_web_app(make_io(data), SlowFirstAI(), FakeLogic(), data, run=main.assess_shipments)
+    ai, logic = SlowFirstAI(), FakeLogic()
+    app = create_web_app(make_io(data), ai, logic, pipeline=AssessmentPipeline(ai, logic, data))
     pages = []
 
     def submit():

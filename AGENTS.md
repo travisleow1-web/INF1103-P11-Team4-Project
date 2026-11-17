@@ -12,7 +12,8 @@ Read `docs/io-design.md` before touching the IO layer and `docs/handoff.md` for 
 | `ai_layer/` | `AIManager`, `GeminiClient`, `ContextProvider` with `WeatherProvider` and `NewsProvider`, `ResponseParser`, `ResponseCache`, errors, `ai_settings.py` |
 | `logic_layer/` | `LogicManager`, `RuleConfig`, `BusinessRule` (ABC) and its rules, `OutcomeResolver` |
 | `web/` | `app.py` (`create_web_app`, the FastAPI routes), `templates/`, `static/` |
-| `main.py` | Composition root: `assess_shipments`, `build_data`, `build_ai`, `build_logic`, `create_app` |
+| `main.py` | Composition root: `build_data`, `build_ai`, `build_logic`, `create_app` |
+| `assessment_pipeline.py` | `AssessmentPipeline(ai, logic, data).run(shipments, replace=False)`: AI, then Logic, then Data for each shipment |
 | `tests/` | pytest tests, `helpers.py`, `fakes.py` (FakeAI and FakeLogic, used by tests and demo mode) |
 
 There are no old function-based modules any more: all code lives in the packages above and `main.py`. Do not add module-level functions with global state.

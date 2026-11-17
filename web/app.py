@@ -4,7 +4,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from queue import Queue
-from typing import Callable, Iterable, Iterator, List, Optional, Tuple
+from typing import Iterator, List, Optional
 import jinja2
 from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, StreamingResponse
@@ -14,7 +14,6 @@ from io_layer.csv_source import CsvSource
 from io_layer.form_source import FormSource
 from io_layer.io_manager import IOManager
 from io_layer.source_error import SourceError
-from model.shipment_record import ShipmentRecord
 from model.storage_error import StorageError
 from web.status_feed import StatusFeed
 
@@ -39,10 +38,6 @@ SEARCH_FIELDS = ("shipment_id", "origin", "destination", "departure_from", "depa
 
 logger = logging.getLogger(__name__)
 
-# main.assess_shipments: (shipments, ai, logic, data) -> (record, save_error) pairs, one per shipment
-Runner = Callable[..., Iterable[Tuple[ShipmentRecord, Optional[str]]]]
-
-
 def static_url(name: str) -> str:
     return f"/static/{name}?v={int((WEB_DIR / 'static' / name).stat().st_mtime)}"
 
@@ -57,8 +52,8 @@ def not_connected_message(ai, logic) -> Optional[str]:
     return None
 
 
-def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
-                   notices: Optional[List[str]] = None, *, run: Runner) -> FastAPI:
+def create_web_app(io: IOManager, ai, logic, demo: bool = False,
+                   notices: Optional[List[str]] = None, *, pipeline) -> FastAPI:
     notices = list(notices or [])
     not_connected = not_connected_message(ai, logic)
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(WEB_DIR / "templates")), autoescape=True)
@@ -101,7 +96,7 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
 
         def assess() -> None:
             try:
-                for item in run(shipments, ai, logic, data, replace=replace):
+                for item in pipeline.run(shipments, replace=replace):
                     updates.put(("row", item))
                     if stop.is_set():           # the browser went away: start no more shipments
                         break

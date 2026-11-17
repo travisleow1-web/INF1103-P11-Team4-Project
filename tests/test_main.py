@@ -5,7 +5,11 @@ from data_layer.unavailable_data_manager import UnavailableDataManager
 from io_layer.form_source import FormSource
 from model.search_criteria import SearchCriteria
 from model.shipment_record import ShipmentRecord
-from main import assess_shipments
+from assessment_pipeline import AssessmentPipeline
+
+
+def assess_shipments(shipments, ai, logic, data, replace=False):
+    return AssessmentPipeline(ai, logic, data).run(shipments, replace=replace)
 
 
 def shipments(io, count):

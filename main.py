@@ -1,9 +1,9 @@
 import logging
 import os
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Iterable, Iterator, Optional, Tuple
+from typing import TYPE_CHECKING, Optional
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from assessment_pipeline import AssessmentPipeline
 from data_layer.data_manager import DataManager
 from data_layer.json_data_manager import JsonDataManager
 from data_layer.mongo_data_manager import MongoDataManager
@@ -11,8 +11,6 @@ from data_layer.unavailable_data_manager import UnavailableDataManager
 from io_layer.io_manager import IOManager
 from io_layer.shipment_validator import ShipmentValidator
 from model.port_registry import PortRegistry
-from model.shipment import Shipment
-from model.shipment_record import ShipmentRecord
 from model.storage_error import StorageError
 from web.app import create_web_app
 
@@ -21,22 +19,6 @@ if TYPE_CHECKING:       # for type hints only; the layers are imported inside bu
     from logic_layer.logic_manager import LogicManager
 
 logger = logging.getLogger(__name__)
-
-
-def assess_shipments(shipments: Iterable[Shipment], ai: "AIManager", logic: "LogicManager",
-                     data: DataManager, replace: bool = False) -> Iterator[Tuple[ShipmentRecord, Optional[str]]]:
-    store = data.replace if replace else data.save
-    for shipment in shipments:
-        assessment = ai.assess(shipment)
-        decision = logic.evaluate(shipment, assessment, datetime.now(timezone.utc))
-        record = ShipmentRecord(shipment, assessment, decision)
-        save_error = None
-        try:
-            store(record)
-        except StorageError as error:
-            save_error = str(error)
-            logger.warning("%s was not saved: %s", shipment.shipment_id, error)
-        yield record, save_error
 
 
 def build_ai() -> Optional["AIManager"]:
@@ -98,7 +80,8 @@ def create_app() -> FastAPI:
     from ai_layer.ai_settings import FORECAST_DAYS      # only a number; the AI layer is not started here
     io = IOManager(ShipmentValidator(ports), data, ports, FORECAST_DAYS)
     notices = [data.message] if isinstance(data, UnavailableDataManager) else []
-    return create_web_app(io, ai, logic, data, demo, notices, run=assess_shipments)
+    pipeline = AssessmentPipeline(ai, logic, data)
+    return create_web_app(io, ai, logic, demo, notices, pipeline=pipeline)
 
 
 if __name__ == "__main__":
