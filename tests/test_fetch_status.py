@@ -1,4 +1,3 @@
-"""Tests for the live fetch status feature. No live API: the model is a stub HTTP session."""
 import io
 import json
 import tempfile
@@ -37,8 +36,6 @@ def ok_reply(payload=VALID_REPLY):
 
 
 class StubSession:
-    """Stands in for requests.Session: hands out the queued replies one per post()."""
-
     def __init__(self, *replies):
         self.__replies = list(replies)
 

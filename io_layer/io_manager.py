@@ -22,12 +22,6 @@ SGT = timezone(timedelta(hours=8), "SGT")
 
 
 class IOManager:
-    """Everything between the user and the app: input, validation, search and the data pages display.
-
-    It takes raw strings in and returns plain dicts out. It never prints, never calls the AI or Logic,
-    and only reads saved records (through DataManager.find).
-    """
-
     def __init__(self, validator: ShipmentValidator, data: DataManager, ports: PortRegistry,
                  forecast_days: int = 16):
         self.__forecast_days = forecast_days    # how far ahead the AI can see the weather (for the report)
@@ -38,13 +32,6 @@ class IOManager:
         self.__numbering = threading.Lock()   # one IOManager serves every request thread
 
     def preview(self, *sources: ShipmentSource) -> Preview:
-        """Read every source, validate each row, and number the valid ones SHP-001, SHP-002, ...
-
-        Numbers continue from the highest saved ID or the highest ID already handed out, whichever is
-        larger, so two submissions running at the same time never share an ID (records are saved only
-        as each shipment finishes). Only a preview without problems uses up numbers. If the saved
-        records cannot be read, this raises StorageError instead of guessing.
-        """
         rows = []
         for source in sources:
             rows.extend(source.read())
@@ -63,11 +50,6 @@ class IOManager:
         return preview
 
     def shipments_to_rerun(self, shipment_ids: List[str]) -> "tuple[List[Shipment], List[str]]":
-        """The saved shipments to assess again, for IDs whose record has no AI assessment (AI unavailable).
-
-        Returns (shipments, skipped): skipped are IDs that are not saved or already have an AI assessment.
-        If the saved records cannot be read, this raises StorageError.
-        """
         shipments, skipped = [], []
         for shipment_id in dict.fromkeys(text.strip().upper() for text in shipment_ids if text.strip()):
             found = self.__data.find(SearchCriteria(shipment_id=shipment_id))
@@ -79,7 +61,6 @@ class IOManager:
         return shipments, skipped
 
     def search(self, fields: dict) -> dict:
-        """fields is the raw search form: strings in, a display dict out."""
         criteria, errors = self.__to_criteria(fields)
         if errors:
             return self.show_error("; ".join(errors))
@@ -96,13 +77,11 @@ class IOManager:
 
     # The show_* methods return the data a web template needs. They do not print.
     def show_input_form(self) -> dict:
-        """Choices for the input and search forms: port labels, risk labels and outcome values."""
         return {"ports": self.__ports.labels(),
                 "risk_levels": [level.label for level in RiskLevel],
                 "outcomes": [outcome.value for outcome in Outcome]}
 
     def show_result(self, record: ShipmentRecord) -> dict:
-        """Everything about one record, ready to display: DD/MM/YYYY dates, port labels, full details."""
         s = record.shipment
         return {
             "shipment_id": s.shipment_id,
@@ -118,7 +97,6 @@ class IOManager:
         }
 
     def show_summary(self, records: List[ShipmentRecord]) -> List[dict]:
-        """One short row per record for the results table."""
         rows = []
         for r in records:
             a = r.assessment.to_dict()
@@ -144,10 +122,6 @@ class IOManager:
         return rows
 
     def show_reschedule(self, records: List[ShipmentRecord]) -> List[dict]:
-        """One row per High or Extreme risk shipment: its planned dates, the suggested dates and why.
-
-        A shipment with no suggestion says why; suggested is then None.
-        """
         rows = []
         for r in records:
             if r.decision.risk_level < RiskLevel.HIGH:
@@ -167,11 +141,6 @@ class IOManager:
 
     def show_report(self, records: List[ShipmentRecord], not_saved: int = 0, planned: Optional[int] = None,
                     seconds: Optional[float] = None, finished_at: Optional[datetime] = None) -> dict:
-        """The summary at the top of the results and search pages: counts, and what needs attention.
-
-        not_saved is how many of these records could not be stored, planned how many shipments the run
-        meant to assess (the report says so when it stopped early), seconds how long the run took.
-        """
         total = len(records)
         high = [r for r in records if r.decision.risk_level >= RiskLevel.HIGH]
         failed = [r.shipment.shipment_id for r in records if r.assessment.is_fallback()]
@@ -197,11 +166,9 @@ class IOManager:
         }
 
     def show_no_records(self) -> dict:
-        """The search result when nothing matches."""
         return {"kind": "empty", "message": "No records match."}
 
     def show_error(self, message: str) -> dict:
-        """A search result that shows a message instead of records."""
         return {"kind": "error", "message": message}
 
     def __to_criteria(self, fields):
@@ -240,7 +207,6 @@ class IOManager:
         return port
 
     def __read_choice(self, value, label, errors, read, allowed):
-        """A dropdown value: blank means any; anything not in the list is an error, not a silent no-match."""
         text = str(value or "").strip()
         if not text:
             return None
@@ -260,18 +226,15 @@ class IOManager:
         return result
 
     def __local_time(self, moment):
-        """DD/MM/YYYY HH:MM in Singapore time, for display."""
         return moment.astimezone(SGT).strftime("%d/%m/%Y %H:%M SGT")
 
     @staticmethod
     def __counts(values, order, text=str):
-        """[{"label", "count", "share"}] for each name in order, share being the percent of all values."""
         total = len(values) or 1
         return [{"label": text(name), "count": values.count(name), "share": round(100 * values.count(name) / total, 1)}
                 for name in order]
 
     def __no_date_text(self, records) -> Optional[str]:
-        """One sentence on why high-risk shipments got no new date, or None when every one got a date."""
         if not records:
             return None
         codes = [self.__no_date_code(r) for r in records]
@@ -294,7 +257,6 @@ class IOManager:
         return "no_window"
 
     def __reason_text(self, code: str, count: int) -> str:
-        """The reason in words, for one shipment or several."""
         one = count == 1
         days = self.__forecast_days
         return {"left": "it had already left" if one else "they had already left",
@@ -311,7 +273,6 @@ class IOManager:
         return f"{whole // 60} min {whole % 60} s" if whole >= 60 else f"{whole} s"
 
     def __risk_text(self, risk_type, severity):
-        """'port_congestion', 'MEDIUM' -> 'Port congestion (Medium)'; no severity -> just the name."""
         name = str(risk_type or "none").replace("_", " ").capitalize()
         return name if severity == "-" else f"{name} ({str(severity).capitalize()})"
 

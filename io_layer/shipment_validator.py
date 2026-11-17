@@ -7,12 +7,6 @@ from .validation_result import ValidationResult
 
 
 class ShipmentValidator:
-    """Checks one raw row: required fields, known ports, DD/MM/YYYY dates, arrival after departure.
-
-    Every field that is present is checked even when another is missing, so the user sees all the
-    problems in a row at once. Messages use plain field names ("Arrival date is missing").
-    """
-
     REQUIRED = ["origin_port", "destination_port", "departure_time", "arrival_time"]
     DATE_FORMAT = "%d/%m/%Y"
 
@@ -20,7 +14,6 @@ class ShipmentValidator:
         self.__ports = ports
 
     def check(self, row: dict, shipment_id: str) -> ValidationResult:
-        """Collect every error in the row. A valid row becomes a Shipment with the given ID."""
         errors: List[str] = []
         origin = self.__check_port(row.get("origin_port"), "Origin", errors)
         destination = self.__check_port(row.get("destination_port"), "Destination", errors)
@@ -38,7 +31,6 @@ class ShipmentValidator:
         return ValidationResult(Shipment(shipment_id, origin, destination, departure, arrival), [])
 
     def read_date(self, value: str) -> Optional[date]:
-        """Return a date for a DD/MM/YYYY string, or None. Also used by IOManager for search dates."""
         try:
             return datetime.strptime(str(value).strip(), self.DATE_FORMAT).date()
         except ValueError:

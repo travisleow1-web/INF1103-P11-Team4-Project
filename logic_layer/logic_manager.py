@@ -23,21 +23,13 @@ logger = logging.getLogger(__name__)
 
 
 class LogicManager:
-    """Turns one shipment's AI assessment into a Decision by running every business rule, then the resolver.
-
-    Based on Jun Jie's LogicManager (Logic_ManagerPart2). Each rule runs on its own: a rule that fails
-    leaves a "Rule error" note for a human instead of stopping the shipment.
-    """
-
     def __init__(self, data: DataManager, ports: PortRegistry, config: Optional[RuleConfig] = None):
-        """Build the rules with the given thresholds, or the defaults when config is None."""
-        self.__data = data      # association: used for route history, not owned
+        self.__data = data
         self.__ports = ports
         self.__resolver = OutcomeResolver()
         self.__build(config or RuleConfig())
 
     def __build(self, config: RuleConfig) -> None:
-        # Composition: the rules are created here and live only inside this LogicManager.
         self.__config = config
         self.__rules = (
             DataQualityRule(config),
@@ -45,42 +37,37 @@ class LogicManager:
             AIInsightRule(config),
             InsuranceRule(),
             UnregisteredLocationRule(self.__ports),
-            RouteHistoryRule(config, self.__data),  # after the risk-raising rules
+            RouteHistoryRule(config, self.__data),
             ProcurementRule(),
             RescheduleRule(),
         )
 
     @property
     def config(self) -> RuleConfig:
-        """The thresholds the rules use now."""
         return self.__config
 
     @property
     def rules(self) -> tuple:
-        """The business rules, in the order they run."""
         return self.__rules
 
     def update_config(self, config: RuleConfig) -> None:
-        """Apply new user-chosen thresholds (new feature); rebuilds the rules with them."""
         if not isinstance(config, RuleConfig):
             raise TypeError("config must be a RuleConfig")
         self.__build(config)
 
     def configure(self, fields: Mapping[str, str]) -> RuleConfig:
-        """Apply thresholds typed by a user. Bad values raise ValueError and leave the rules unchanged."""
         config = RuleConfig.from_text(fields)
         self.update_config(config)
         return config
 
     def evaluate(self, shipment: Shipment, assessment: AIAssessment, now: datetime) -> Decision:
-        """Run every rule on the shipment, then pick the outcome. now must be timezone-aware."""
         if now.tzinfo is None:
             raise ValueError("now must be timezone-aware")
         decision = Decision(shipment.shipment_id)
-        for rule in self.__rules:  # polymorphism: the same call for every rule type
+        for rule in self.__rules:
             try:
                 rule.apply(shipment, assessment, decision, now)
-            except Exception as error:  # one broken rule must not stop the others
+            except Exception as error:
                 logger.exception("%s failed on %s", rule.name, shipment.shipment_id)
                 decision.add_note(f"{rule.name} could not run ({error}), needs human", Flag.RULE_ERROR, human=True)
         self.__resolver.resolve(decision)

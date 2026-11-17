@@ -14,23 +14,11 @@ if TYPE_CHECKING:
 
 
 class RouteHistoryRule(BusinessRule):
-    """Rule 3: a Low-risk route that had risk above Low or a delay recently needs dispatcher sign-off.
-
-    Based on Jun Jie's RouteHistoryRule (Logic_ManagerPart2). It reads the history through
-    DataManager.find_route_history in place of his RouteHistorySource. Past records that only
-    needed a human (such as an earlier Cautionary Override) do not count, so an override cannot
-    feed itself.
-    """
-
     def __init__(self, config: "RuleConfig", data: DataManager):
         self.__config = config
-        self.__data = data  # association: used, not owned
+        self.__data = data
 
     def apply(self, shipment: Shipment, assessment: AIAssessment, decision: Decision, now: datetime) -> None:
-        """Double-check shipments that are still Low against the route's recent records.
-
-        FALLBACK assessments are skipped: DataQualityRule already sends them to a human.
-        """
         if decision.risk_level != RiskLevel.LOW or assessment.is_fallback():
             return
         window = self.__config.history_window_days

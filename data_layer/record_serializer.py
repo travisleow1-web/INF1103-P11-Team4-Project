@@ -13,13 +13,10 @@ logger = logging.getLogger(__name__)
 
 
 class RecordSerializer:
-    """Turns a ShipmentRecord into a plain document and back. Dates are ISO strings in the document."""
-
     def __init__(self, ports: PortRegistry):
         self.__ports = ports            # stored documents keep only the port code
 
     def to_document(self, record: ShipmentRecord) -> dict:
-        """A plain dict for storage: port codes, ISO dates, and the assessment and decision as dicts."""
         s = record.shipment
         return {
             "shipment_id": s.shipment_id,
@@ -33,8 +30,6 @@ class RecordSerializer:
         }
 
     def from_documents(self, docs: Iterable[dict]) -> List[ShipmentRecord]:
-        """Every record that can be read. A damaged document is skipped and logged, so one bad
-        record does not hide all the others."""
         records = []
         for index, doc in enumerate(docs):
             try:
@@ -45,7 +40,6 @@ class RecordSerializer:
         return records
 
     def from_document(self, doc: dict) -> ShipmentRecord:
-        """Accepts ISO strings (JSON) or datetimes (MongoDB). A damaged document raises StorageError."""
         try:
             shipment = Shipment(
                 doc["shipment_id"],
@@ -78,7 +72,6 @@ class RecordSerializer:
         return date.fromisoformat(value)
 
     def __time(self, value):
-        """A datetime from MongoDB (naive UTC) or ISO text, always returned timezone-aware."""
         if isinstance(value, datetime):
             moment = value
         else:

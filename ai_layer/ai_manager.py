@@ -21,13 +21,6 @@ log = logging.getLogger(__name__)
 
 
 class AIManager:
-    """Gives every shipment an AIAssessment: LIVE from the model, CACHED, or FALLBACK when the AI fails.
-
-    It checks the cache, gathers context from the providers, calls the model and parses the reply.
-    It only reports facts; the Logic manager decides what to do with them. It also tells its
-    listeners how each fetch is going (FetchEvent), but never prints anything itself.
-    """
-
     def __init__(self, client: GeminiClient, providers: Iterable[ContextProvider],
                  cache_path: Union[str, Path], allowed_lists: Dict[str, Iterable[str]],
                  listeners: Iterable[FetchListener] = ()):
@@ -38,7 +31,6 @@ class AIManager:
         self.__cache = ResponseCache(cache_path, client.fingerprint())    # composition
 
     def assess(self, shipment: Shipment) -> AIAssessment:
-        """Assess one shipment. Any AIError gives the fallback assessment, which is never cached."""
         today = datetime.now(timezone.utc).date()
         key = self.__cache.make_key(shipment, today)
         cached = self.__from_cache(key)
@@ -65,17 +57,14 @@ class AIManager:
         return assessment
 
     def add_listener(self, listener: FetchListener) -> None:
-        """Start telling this listener how each fetch is going (for example one web page while it runs)."""
         self.__listeners.append(listener)
 
     def remove_listener(self, listener: FetchListener) -> None:
-        """Stop telling this listener. A listener that was never added is ignored."""
         if listener in self.__listeners:
             self.__listeners.remove(listener)
 
     def __notify(self, shipment: Shipment, stage: FetchStage, attempt: Optional[int] = None,
                  max_attempts: Optional[int] = None, detail: Optional[str] = None) -> None:
-        """Tell every listener about this stage. A listener that fails is logged and skipped."""
         event = FetchEvent(shipment.shipment_id, stage, attempt, max_attempts, detail)
         for listener in tuple(self.__listeners):        # a copy, so a listener may be added or removed meanwhile
             try:

@@ -82,8 +82,6 @@ def test_failing_destination_keeps_the_origin_data(caplog):
 
 
 class BrokenProvider(ContextProvider):
-    """A feed whose request always fails."""
-
     def _request(self, shipment):
         raise RuntimeError("feed down")
 
@@ -158,8 +156,6 @@ def test_failed_call_still_counts_for_the_gap():
 
 
 class TimedSession(FakeSession):
-    """Records when each GET starts (real clock), thread-safe enough for list appends."""
-
     def __init__(self, count):
         super().__init__(*[gdelt() for _ in range(count)])
         self.starts = []

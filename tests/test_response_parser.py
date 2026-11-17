@@ -58,7 +58,6 @@ def test_no_risks_reply():
 
 
 def bad(path, value):
-    """valid_raw() with one value replaced; path is a key or (list key, index, key)."""
     raw = copy.deepcopy(valid_raw())
     if isinstance(path, tuple):
         raw[path[0]][path[1]][path[2]] = value

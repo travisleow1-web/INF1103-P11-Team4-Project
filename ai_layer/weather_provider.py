@@ -16,13 +16,6 @@ MARINE_URL = "https://marine-api.open-meteo.com/v1/marine"
 
 
 class WeatherProvider(ContextProvider):
-    """Hourly wind, pressure, visibility and waves at the origin and destination ports (Open-Meteo).
-
-    Future shipments get the hourly forecast for the next FORECAST_DAYS days. Shipments that departed within the last
-    `history_days` days get historical data for their own dates instead.
-    A port whose weather cannot be fetched gets None, and the other port keeps its data.
-    """
-
     def __init__(self, http: Optional[requests.Session] = None, history_days: int = HISTORY_DAYS):
         super().__init__("weather", http)
         self.__history_days = history_days
@@ -41,7 +34,6 @@ class WeatherProvider(ContextProvider):
             return None
 
     def __history_window(self, shipment: Shipment, today: date) -> Optional[Tuple[str, str]]:
-        """(start, end) ISO dates when the shipment departed recently, else None."""
         if today - timedelta(days=self.__history_days) <= shipment.departure < today:
             # The archive API's latest allowed end date is yesterday.
             end = min(shipment.arrival, today - timedelta(days=1))

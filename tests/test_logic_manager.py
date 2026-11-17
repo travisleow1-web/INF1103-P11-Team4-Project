@@ -123,7 +123,6 @@ def test_now_must_be_timezone_aware():
 
 
 def evaluate_and_save(logic, data, shipment_id, when):
-    """Evaluate a clean Low shipment at a given time and save it the way main.assess_shipments does."""
     a = assessment(fetched_at=when)
     d = logic.evaluate(shipment(shipment_id), a, when)
     data.save(ShipmentRecord(shipment(shipment_id), a, d, when))
@@ -152,8 +151,6 @@ def test_two_clean_low_shipments_in_a_row_both_proceed(tmp_path):
 
 
 class BrokenStormConfig(RuleConfig):
-    """A config whose storm threshold cannot be read, so PerfectStormRule fails."""
-
     @property
     def perfect_storm_min_mediums(self):
         raise RuntimeError("storm setting broken")

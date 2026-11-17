@@ -13,10 +13,6 @@ if TYPE_CHECKING:
 
 
 class AIInsightRule(BusinessRule):
-    """Rule 1b: data-quality codes need a human; long delays and High or Extreme MULTIPLE_RISKS raise risk.
-
-    Based on Jun Jie's AIInsightRule (Logic_ManagerPart2).
-    """
 
     DATA_QUALITY_CODES = frozenset({"CONFLICTING_DATA", "OUTDATED_DATA", "MISSING_DATA", "NEEDS_HUMAN_REVIEW"})
 
@@ -24,7 +20,6 @@ class AIInsightRule(BusinessRule):
         self.__config = config
 
     def apply(self, shipment: Shipment, assessment: AIAssessment, decision: Decision, now: datetime) -> None:
-        """Act on the AI's coded insights."""
         insights = assessment.insights
         for insight in insights:
             if insight.code in self.DATA_QUALITY_CODES:
@@ -46,6 +41,5 @@ class AIInsightRule(BusinessRule):
 
     @staticmethod
     def describe(insight: Insight) -> str:
-        """Short text for the rationale, for example 'POTENTIAL_DELAY weather/High @CNSHA +8d'."""
         days = f" +{insight.estimated_delay_days}d" if insight.estimated_delay_days else ""
         return f"{insight.code} {insight.risk_type.value}/{insight.severity.label} @{insight.location}{days}"

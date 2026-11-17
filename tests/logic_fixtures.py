@@ -1,4 +1,3 @@
-"""Small typed stand-ins shared by the Logic tests. No network, no AI, no database."""
 from datetime import date, datetime, timezone
 from model.ai_assessment import AIAssessment
 from model.ai_status import AIStatus
@@ -20,7 +19,6 @@ NOW = datetime(2026, 11, 13, 9, 0, tzinfo=timezone.utc)
 
 
 def shipment(shipment_id="SHP-001"):
-    """SGSIN to NLRTM, 01/12/2026 to 28/12/2026."""
     return Shipment(shipment_id, SINGAPORE, ROTTERDAM, date(2026, 12, 1), date(2026, 12, 28))
 
 
@@ -35,7 +33,6 @@ def insight(code="POTENTIAL_DELAY", severity=RiskLevel.MEDIUM, days=0, location=
 
 def assessment(factors=(), insights=(), primary=RiskType.NONE, location="SGSIN", impact="None",
                confidence=0.9, conflicting=False, status=AIStatus.LIVE, fetched_at=NOW):
-    """A real AIAssessment. By default it is clean: no factors, high confidence, fresh data."""
     return AIAssessment(factors, insights, primary, location, impact, confidence, conflicting, status, fetched_at)
 
 
@@ -44,8 +41,6 @@ def decision(shipment_id="SHP-001"):
 
 
 class FakeHistory:
-    """A data manager stand-in for route history: returns fixed records or raises the error it was given."""
-
     def __init__(self, records=(), error=None):
         self.records = list(records)
         self.error = error

@@ -10,17 +10,10 @@ from .invalid_response_error import InvalidResponseError
 
 
 class ResponseParser:
-    """Turns the model's JSON reply into an AIAssessment, or rejects the whole reply.
-
-    Closed values (risk type, severity, impact, source, insight code) must be in their list;
-    locations are open text. Any invalid value raises InvalidResponseError.
-    """
-
     def __init__(self, allowed_lists: Dict[str, Iterable[str]]):
         self.__lists = {kind: tuple(values) for kind, values in allowed_lists.items()}
 
     def parse(self, raw: Dict[str, Any], status: AIStatus, fetched_at: datetime) -> AIAssessment:
-        """Build an AIAssessment with the given status and fetch time (a cached reply keeps its own)."""
         try:
             score = raw["confidence_score"]
             if isinstance(score, bool) or not isinstance(score, (int, float)):
@@ -43,7 +36,6 @@ class ResponseParser:
 
     @staticmethod
     def __clear_date(value: Any) -> Optional[date]:
-        """The suggested clear departure date; missing or "" means there is none. Anything else must be YYYY-MM-DD."""
         if value is None or value == "":
             return None
         if not isinstance(value, str):

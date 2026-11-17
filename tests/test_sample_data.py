@@ -1,4 +1,3 @@
-"""The sample CSV files in sample_data/ must stay valid, or the README's "try it" steps break."""
 from pathlib import Path
 import pytest
 from io_layer.csv_source import CsvSource

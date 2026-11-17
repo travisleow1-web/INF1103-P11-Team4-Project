@@ -1,4 +1,3 @@
-"""IOManager.show_report: the counts and sentences behind the summary at the top of the results page."""
 from datetime import date, datetime, timezone
 from helpers import FETCHED_AT, FakeData, make_io, saved_record
 from model.ai_assessment import AIAssessment
@@ -12,7 +11,6 @@ NEW_DATES = (date(2026, 11, 8), date(2026, 11, 13), "Clear soon")
 
 
 def high_weather(record: ShipmentRecord) -> ShipmentRecord:
-    """The same record, but its AI assessment has a High weather risk (so only the dates can explain no suggestion)."""
     factor = RiskFactor(RiskType.WEATHER, RiskLevel.HIGH, "NLRTM", "open_meteo_weather", "wind_gusts_10m=80")
     assessment = AIAssessment([factor], [], RiskType.WEATHER, "NLRTM", "Delay", 0.9, False, AIStatus.LIVE, FETCHED_AT)
     return ShipmentRecord(record.shipment, assessment, record.decision, record.saved_at)

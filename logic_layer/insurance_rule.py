@@ -9,15 +9,9 @@ from .business_rule import BusinessRule
 
 
 class InsuranceRule(BusinessRule):
-    """Rule 4: piracy or severe civil unrest -> hold until extended insurance is confirmed.
-
-    Based on Jun Jie's InsuranceRule (Logic_ManagerPart2).
-    """
-
     TRIGGERS = frozenset({RiskType.PIRACY_THREAT, RiskType.SEVERE_CIVIL_UNREST})
 
     def apply(self, shipment: Shipment, assessment: AIAssessment, decision: Decision, now: datetime) -> None:
-        """Hold the shipment when a trigger is a factor type or the primary risk."""
         present = {f.type for f in assessment.risk_factors} | {assessment.primary_risk_factor}
         triggered = sorted(t.value for t in self.TRIGGERS & present)
         if triggered:

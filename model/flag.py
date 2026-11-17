@@ -2,8 +2,6 @@ from enum import Enum
 
 
 class Flag(str, Enum):
-    """Flags a rule can put on a decision. The values are the wording shown to users."""
-
     PERFECT_STORM = "Perfect Storm"
     SIGNIFICANT_DELAY = "Significant Delay Expected"
     COMPOUND_RISK = "Compound Risk"

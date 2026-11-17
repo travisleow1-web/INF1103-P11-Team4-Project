@@ -1,4 +1,3 @@
-"""The web layer: thin FastAPI routes that pass raw form fields to IOManager and render what it returns."""
 import logging
 import threading
 import time
@@ -45,12 +44,10 @@ Runner = Callable[..., Iterable[Tuple[ShipmentRecord, Optional[str]]]]
 
 
 def static_url(name: str) -> str:
-    """Link to a file in web/static with its change time, so a browser never shows an old copy after an update."""
     return f"/static/{name}?v={int((WEB_DIR / 'static' / name).stat().st_mtime)}"
 
 
 def not_connected_message(ai, logic) -> Optional[str]:
-    """What to tell users when the AI or Logic layer is missing, or None when both are connected."""
     if ai is None and logic is None:
         return NO_AI_OR_LOGIC
     if ai is None:
@@ -62,11 +59,6 @@ def not_connected_message(ai, logic) -> Optional[str]:
 
 def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
                    notices: Optional[List[str]] = None, *, run: Runner) -> FastAPI:
-    """Build the FastAPI app. ai and logic may be None while those layers are not connected.
-
-    notices are problems found at startup, such as an unreachable database; every page shows them in red.
-    run is the assessment flow (main.assess_shipments), passed in so the web layer never imports main.
-    """
     notices = list(notices or [])
     not_connected = not_connected_message(ai, logic)
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(WEB_DIR / "templates")), autoescape=True)
@@ -88,7 +80,6 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
 
     @app.middleware("http")
     async def reject_large_uploads(request: Request, call_next):
-        """Refuse an oversized submission from its Content-Length, before the form is read."""
         if request.method == "POST" and request.url.path == "/submit":
             length = request.headers.get("content-length", "")
             if length.isdigit() and int(length) > MAX_REQUEST_BYTES:
@@ -98,10 +89,6 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
         return await call_next(request)
 
     def stream_results(shipments: list, replace: bool = False, skipped: Optional[List[str]] = None) -> Iterator[str]:
-        """The results page in pieces: the table head, then one row as each shipment finishes, then the end.
-
-        replace=True is a re-run: each result overwrites the saved record. skipped are IDs that were not re-run.
-        """
         total = len(shipments)
         position = {shipment.shipment_id: number for number, shipment in enumerate(shipments, 1)}
         done = 0
@@ -113,7 +100,6 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
         stop = threading.Event()
 
         def assess() -> None:
-            """Assess in another thread, so the page can show what the AI is doing while it works."""
             try:
                 for item in run(shipments, ai, logic, data, replace=replace):
                     updates.put(("row", item))
@@ -156,7 +142,6 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
 
     @app.get("/", response_class=HTMLResponse)
     def index(request: Request) -> HTMLResponse:
-        """The input page: a table of typed rows and a CSV upload."""
         return input_page(request, [])
 
     @app.post("/submit", response_class=HTMLResponse)
@@ -166,7 +151,6 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
                departure_time: List[str] = Form(default=[]),
                arrival_time: List[str] = Form(default=[]),
                csv_file: Optional[UploadFile] = File(default=None)) -> HTMLResponse:
-        """Validate every row. If all are valid, assess them; otherwise show every error and run nothing."""
         typed = {"origin_port": origin_port, "destination_port": destination_port,
                  "departure_time": departure_time, "arrival_time": arrival_time}
         typed_sources = FormSource.many(typed)
@@ -203,7 +187,6 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
 
     @app.post("/rerun", response_class=HTMLResponse)
     def rerun(request: Request, shipment_id: List[str] = Form(default=[])) -> HTMLResponse:
-        """Assess again the saved shipments the AI could not assess; each new record replaces the old one."""
         if not_connected:
             return input_page(request, [], 503, error=f"{not_connected} Nothing was re-run.")
         if not any(text.strip() for text in shipment_id):
@@ -220,7 +203,6 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
 
     @app.get("/search", response_class=HTMLResponse)
     def search(request: Request) -> HTMLResponse:
-        """The search form and the saved records that match it (all records when no filter is set)."""
         fields = {name: request.query_params.get(name, "") for name in SEARCH_FIELDS}
         return page(request, "search.html", fields=fields, result=io.search(fields))
 
@@ -229,13 +211,11 @@ def create_web_app(io: IOManager, ai, logic, data, demo: bool = False,
 
     @app.get("/rules", response_class=HTMLResponse)
     def rules(request: Request) -> HTMLResponse:
-        """The rule thresholds the next assessment will use."""
         values = logic.config.to_dict() if logic is not None else {}
         return rules_page(request, values)
 
     @app.post("/rules", response_class=HTMLResponse)
     async def save_rules(request: Request) -> HTMLResponse:
-        """Apply the typed thresholds, or show why they were refused and keep what was typed."""
         if logic is None:
             return rules_page(request, {}, 503, error=NO_LOGIC)
         form = await request.form()

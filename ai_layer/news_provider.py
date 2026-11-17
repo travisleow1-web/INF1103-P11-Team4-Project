@@ -13,14 +13,6 @@ log = logging.getLogger(__name__)
 
 
 class NewsProvider(ContextProvider):
-    """Recent English headlines about piracy, congestion, strikes or unrest at the two ports (GDELT).
-
-    GDELT allows one call every few seconds, so the provider remembers when it last called and
-    waits only for the rest of the gap. GDELT is slow and sometimes down, so a call waits up to
-    `timeout` seconds, and after `pause_after` failures in a row the provider skips GDELT for
-    `pause_for` seconds (the shipments are then assessed without news) instead of waiting for every one.
-    """
-
     def __init__(self, http: Optional[requests.Session] = None, min_gap: float = NEWS_MIN_GAP,
                  timeout: float = NEWS_TIMEOUT, pause_after: int = NEWS_FAILURES_BEFORE_PAUSE,
                  pause_for: float = NEWS_PAUSE):

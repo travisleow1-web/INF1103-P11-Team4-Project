@@ -1,7 +1,3 @@
-"""The whole app through main.create_app: real IO, AI, Logic and JSON storage; only Gemini and the feeds are mocked.
-
-No network: the Gemini client is Mock(spec=GeminiClient) and the context providers are stubs.
-"""
 from datetime import date, timedelta
 from unittest.mock import Mock, patch
 import pytest
@@ -17,7 +13,6 @@ import main
 
 
 def reply(factors=(), primary="none", location="Route", impact="None", insights=()):
-    """A Gemini reply that fits the response schema. By default nothing is wrong on the route."""
     return {"risk_factors": list(factors), "primary_risk_factor": primary, "affected_location": location,
             "expected_impact": impact, "confidence_score": 0.9, "conflicting_sources": False,
             "insights": list(insights)}
@@ -38,12 +33,10 @@ DESTRUCTION = reply([risk("weather", "Medium")], primary="weather", location="SG
 
 
 def clear_window(raw, start):
-    """The same Gemini reply, with a clear departure date added."""
     return {**raw, "earliest_clear_departure": start}
 
 
 def rows(*dates):
-    """Typed SGSIN -> NLRTM rows, one per (departure, arrival) pair."""
     return {"origin_port": ["SGSIN"] * len(dates), "destination_port": ["NLRTM"] * len(dates),
             "departure_time": [d for d, _ in dates], "arrival_time": [a for _, a in dates]}
 
@@ -64,10 +57,6 @@ def gemini():
 
 @pytest.fixture(params=["json", "mongo"])
 def app(request, monkeypatch, tmp_path, gemini):
-    """main.create_app with a clean environment and a real AIManager around the mock.
-
-    Every test runs twice: on a temp JSON file and on MongoDB through mongomock.
-    """
     monkeypatch.setattr(main, "load_dotenv", lambda *args, **kwargs: False)
     for name in ("DEMO_MODE", "DATA_BACKEND", "DATA_FILE", "DEMO_DATA_FILE", "MONGO_URI", "DB_NAME",
                  "GEMINI_API_KEY", "GEMINI_MODEL", "AI_CACHE_FILE"):
@@ -91,12 +80,10 @@ def app(request, monkeypatch, tmp_path, gemini):
 
 
 def outcome(name):
-    """The outcome cell of a summary row (the details row shows the badge again)."""
     return f'<td data-label="Outcome"><span class="badge outcome-{name.lower()}">{name}</span></td>'
 
 
 def row_for(shipment_id):
-    """The start of a summary row in the results or search table."""
     return f'<th scope="row">{shipment_id}'
 
 
@@ -213,7 +200,6 @@ DEFAULTS = {"confidence_min": "0.6", "history_window_days": "21", "perfect_storm
 
 
 def saved_values(app):
-    """The numbers the rules page currently shows, by field name."""
     import re
     found = re.findall(r'name="(\w+)" value="([^"]*)"', app.get("/rules").text)
     return {name: value for name, value in found if name != "reset"}

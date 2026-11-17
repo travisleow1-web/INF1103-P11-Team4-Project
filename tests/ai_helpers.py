@@ -1,4 +1,3 @@
-"""Stand-ins for the AI layer tests. No network, no live Gemini."""
 import json
 from datetime import date
 from helpers import ROTTERDAM, SINGAPORE
@@ -6,8 +5,6 @@ from model.shipment import Shipment
 
 
 class FakeResponse:
-    """A requests.Response look-alike with a status code and a JSON body (or a JSON error)."""
-
     def __init__(self, status_code=200, body=None, bad_json=False):
         self.status_code = status_code
         self.__body = body
@@ -20,8 +17,6 @@ class FakeResponse:
 
 
 class FakeSession:
-    """Hands out queued replies (FakeResponse or an exception to raise) and records each call."""
-
     def __init__(self, *replies):
         self.replies = list(replies)
         self.calls = []
@@ -41,12 +36,10 @@ class FakeSession:
 
 
 def gemini_reply(raw):
-    """A Gemini HTTP reply whose text part holds `raw` as JSON text."""
     return FakeResponse(200, {"candidates": [{"content": {"parts": [{"text": json.dumps(raw)}]}}]})
 
 
 def valid_raw(**changes):
-    """A model reply that fits the schema: a high weather risk at Singapore and one delay insight."""
     raw = {
         "risk_factors": [
             {"type": "weather", "severity": "High", "location": "SGSIN",
@@ -69,6 +62,5 @@ def valid_raw(**changes):
 
 
 def make_shipment(shipment_id="SHP-001", departure=None, arrival=None):
-    """Singapore to Rotterdam, departing 01/12/2026 and arriving 20/12/2026 unless given."""
     return Shipment(shipment_id, SINGAPORE, ROTTERDAM, departure or date(2026, 12, 1),
                     arrival or date(2026, 12, 20))

@@ -3,8 +3,6 @@ from model.ai_assessment import AIAssessment
 
 
 class ReschedulePlan:
-    """A suggested later departure for one shipment, with the same journey length."""
-
     def __init__(self, shipment_id: str, original_departure: date, original_arrival: date,
                  new_departure: date, new_arrival: date, reason: str, assessment: AIAssessment):
         self.__shipment_id = shipment_id
@@ -37,7 +35,6 @@ class ReschedulePlan:
 
     @property
     def days_later(self) -> int:
-        """How many days after the planned departure the new one is."""
         return (self.__new_departure - self.__original_departure).days
 
     @property

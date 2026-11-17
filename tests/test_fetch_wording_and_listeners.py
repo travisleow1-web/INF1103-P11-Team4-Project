@@ -1,4 +1,3 @@
-"""FetchEvent.describe (the wording shared by the console and the web page) and adding or removing listeners."""
 import pytest
 from ai_helpers import make_shipment
 from test_ai_manager import make_manager, mock_client

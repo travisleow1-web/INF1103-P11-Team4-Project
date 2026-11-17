@@ -1,4 +1,3 @@
-"""One set of tests run against every backend: they must behave the same (LSP)."""
 import threading
 from datetime import date, datetime, timezone
 import pytest
@@ -111,7 +110,6 @@ def test_saving_the_same_shipment_id_twice_is_an_error(data):
 # Damaged records
 
 def store_with_a_damaged_record(kind, tmp_path):
-    """A manager whose store holds SHP-001 (fine), a damaged SHP-002 and a non-object."""
     from data_layer.record_serializer import RecordSerializer
     good = RecordSerializer(PORTS).to_document(saved_record("SHP-001"))
     damaged = {**RecordSerializer(PORTS).to_document(saved_record("SHP-002")), "origin": "ZZZZZ"}
@@ -231,7 +229,6 @@ def test_replacing_from_many_threads_keeps_every_record_whole(tmp_path):
 
 
 def run_in_threads(count, work):
-    """Start count threads at once and return the errors they raised."""
     errors = []
     start = threading.Barrier(count)
 

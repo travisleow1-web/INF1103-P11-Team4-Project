@@ -16,15 +16,9 @@ logger = logging.getLogger(__name__)
 
 
 class MongoDataManager(DataManager):
-    """Keeps records in a MongoDB collection. Departure, arrival and saved_at are stored as real dates.
-
-    Driver errors are logged in full; users only see the short UNAVAILABLE message.
-    """
-
     UNAVAILABLE = "Database unavailable. Results will not be saved."
 
     def __init__(self, collection: Collection, ports: PortRegistry):
-        """Use an open collection (mongomock in tests). Makes shipment_id unique."""
         self.__collection = collection
         self.__serializer = RecordSerializer(ports)
         try:
@@ -34,10 +28,6 @@ class MongoDataManager(DataManager):
 
     @classmethod
     def connect(cls, uri: str, db_name: str, ports: PortRegistry, collection_name: str = "shipment_records") -> "MongoDataManager":
-        """Open a collection from a connection string. Nothing is read from the environment here.
-
-        Raises StorageError if the address or database name is invalid or the server cannot be reached.
-        """
         from pymongo import MongoClient
         try:
             client = MongoClient(uri, serverSelectionTimeoutMS=3000)
@@ -47,7 +37,6 @@ class MongoDataManager(DataManager):
         return cls(collection, ports)
 
     def save(self, record: ShipmentRecord) -> None:
-        """Insert the record. A shipment_id that is already saved is a StorageError."""
         document = self.__with_real_dates(self.__serializer.to_document(record))
         try:
             self.__collection.insert_one(document)
@@ -57,7 +46,6 @@ class MongoDataManager(DataManager):
             raise self.__unavailable(f"Cannot save {record.shipment.shipment_id}", error) from error
 
     def replace(self, record: ShipmentRecord) -> None:
-        """Overwrite the saved record with the same shipment_id. One that is not saved is a StorageError."""
         shipment_id = record.shipment.shipment_id
         document = self.__with_real_dates(self.__serializer.to_document(record))
         try:
@@ -68,11 +56,9 @@ class MongoDataManager(DataManager):
             raise StorageError(f"{shipment_id} is not saved, so it cannot be replaced")
 
     def find(self, criteria: SearchCriteria) -> List[ShipmentRecord]:
-        """The records that match, newest first. Damaged records are skipped and logged."""
         return self.__find_newest_first(criteria.to_query())
 
     def find_route_history(self, route_id: str, since: datetime) -> List[ShipmentRecord]:
-        """Records on the route saved at or after since, skipping FALLBACK assessments, newest first."""
         if since.tzinfo is None:
             raise ValueError("since must be timezone-aware")      # MongoDB would read it as UTC silently
         origin, _, destination = route_id.partition("-")
@@ -93,12 +79,10 @@ class MongoDataManager(DataManager):
 
     @classmethod
     def __unavailable(cls, what: str, error: Exception) -> StorageError:
-        """Log the driver's detail and return the short error users see."""
         logger.error("%s: %s", what, error)
         return StorageError(cls.UNAVAILABLE)
 
     def __with_real_dates(self, document):
-        """MongoDB cannot store a bare date, so days become midnight UTC datetimes."""
         for key in ("departure", "arrival"):
             day = date.fromisoformat(document[key])
             document[key] = datetime(day.year, day.month, day.day, tzinfo=timezone.utc)

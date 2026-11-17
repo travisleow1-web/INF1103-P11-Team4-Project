@@ -9,11 +9,6 @@ from .shipment_record import ShipmentRecord
 
 @dataclass
 class SearchCriteria:
-    """The search filters. Unset (None) filters match everything.
-
-    matches() filters records in Python (JSON backend); to_query() builds the same filter for MongoDB.
-    """
-
     shipment_id: Optional[str] = None
     origin: Optional[str] = None                                # port code
     destination: Optional[str] = None                           # port code
@@ -24,18 +19,15 @@ class SearchCriteria:
     departure_to: Optional[date] = None                         # inclusive
 
     def __post_init__(self):
-        """Accept RiskLevel and Outcome members as well as text, stored as the text saved records hold."""
         if isinstance(self.overall_risk, RiskLevel):
             self.overall_risk = self.overall_risk.label
         if isinstance(self.outcome, Outcome):
             self.outcome = self.outcome.value
 
     def to_dict(self) -> dict:
-        """Only the filters the user filled in (False for needs_human still counts)."""
         return {k: v for k, v in vars(self).items() if v not in (None, "")}
 
     def matches(self, record: ShipmentRecord) -> bool:
-        """True if a saved record passes every filter that is set. Text is compared ignoring case."""
         f = self.to_dict()
         shipment, decision = record.shipment, record.decision.to_dict()
 
@@ -54,7 +46,6 @@ class SearchCriteria:
         ])
 
     def to_query(self) -> dict:
-        """The same filters as a MongoDB query. Risk and outcome live under 'decision.'."""
         f = self.to_dict()
         query = {}
         for key in ("shipment_id", "origin", "destination"):

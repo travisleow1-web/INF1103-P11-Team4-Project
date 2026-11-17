@@ -5,8 +5,6 @@ from .fetch_stage import FetchStage
 
 @dataclass(frozen=True)
 class FetchEvent:
-    """One status report about fetching an AI assessment for one shipment."""
-
     shipment_id: str
     stage: FetchStage
     attempt: Optional[int] = None           # RETRYING: the attempt that just failed
@@ -22,6 +20,5 @@ class FetchEvent:
     }
 
     def describe(self) -> str:
-        """The event in words, for example 'fetching in progress...'. Used by the console and the web page."""
         return self.__MESSAGES[self.stage].format(
             attempt=self.attempt, max_attempts=self.max_attempts, detail=self.detail or "no details")

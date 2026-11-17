@@ -11,17 +11,10 @@ if TYPE_CHECKING:
 
 
 class DataQualityRule(BusinessRule):
-    """Sends a shipment to a human when the AI did not run or its answer cannot be trusted.
-
-    Takes over the soft checks of Jun Jie's RecordValidator (Logic_ManagerPart2): low confidence,
-    outdated external data and conflicting sources, plus the FALLBACK status.
-    """
-
     def __init__(self, config: "RuleConfig"):
         self.__config = config
 
     def apply(self, shipment: Shipment, assessment: AIAssessment, decision: Decision, now: datetime) -> None:
-        """Add a human-review note for each data-quality problem."""
         if assessment.is_fallback():
             decision.add_note("Data quality: the AI could not assess this shipment", Flag.AI_UNAVAILABLE, human=True)
             return

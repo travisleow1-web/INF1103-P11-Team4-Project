@@ -13,14 +13,6 @@ log = logging.getLogger(__name__)
 
 
 class ResponseCache:
-    """A JSON file of raw model replies, keyed by route, dates, the UTC day and the client fingerprint.
-
-    Each entry records the UTC day it was made for; entries from other days are dropped when the
-    file is loaded and when a new entry is added, so the file holds one day at most. An unreadable
-    file counts as empty and a failed write is logged, so the cache can never stop an assessment.
-    One lock guards the entries and the file, because web requests run in several threads.
-    """
-
     def __init__(self, path: Union[str, Path], version: str):
         self.__path = Path(path)
         self.__version = version          # GeminiClient.fingerprint()
@@ -28,22 +20,16 @@ class ResponseCache:
         self.__lock = threading.Lock()
 
     def make_key(self, shipment: Shipment, today: date) -> str:
-        """Key for this shipment's route and dates on `today`, the current UTC date.
-
-        The shipment ID is left out, so two shipments on the same route and dates share a reply.
-        """
         details = {"origin": shipment.origin.code, "destination": shipment.destination.code,
                    "departure": shipment.departure.isoformat(), "arrival": shipment.arrival.isoformat()}
         payload = json.dumps(details, sort_keys=True) + f"|{today.isoformat()}|{self.__version}"
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
     def get(self, key: str) -> Optional[Any]:
-        """The stored entry ({"day", "result": raw reply, "fetched_at": ISO text}) or None."""
         with self.__lock:
             return self.__load().get(key)
 
     def set(self, key: str, raw: Dict[str, Any], fetched_at: str, day: date) -> None:
-        """Store a raw reply made for UTC `day`, drop other days' entries, and write the file."""
         with self.__lock:
             entries = self.__keep_day(self.__load(), day)
             entries[key] = {"day": day.isoformat(), "result": raw, "fetched_at": fetched_at}

@@ -7,8 +7,6 @@ from .risk_type import RiskType
 
 
 class AIAssessment:
-    """What the AI found for one shipment. It holds facts only; the Logic manager decides what to do."""
-
     def __init__(self, risk_factors: Iterable[RiskFactor], insights: Iterable[Insight],
                  primary_risk_factor: RiskType, affected_location: str, expected_impact: str,
                  confidence_score: float, conflicting_sources: bool, status: AIStatus,
@@ -28,7 +26,6 @@ class AIAssessment:
 
     @classmethod
     def fallback(cls, now: Optional[datetime] = None) -> "AIAssessment":
-        """The empty assessment used when the AI could not run. It is never cached."""
         return cls([], [], RiskType.NONE, "Unknown", "None", 0.0, False, AIStatus.FALLBACK,
                    now or datetime.now(timezone.utc))
 
@@ -73,11 +70,9 @@ class AIAssessment:
         return self.__earliest_clear_departure
 
     def is_fallback(self) -> bool:
-        """True when the AI did not run for this shipment."""
         return self.__status is AIStatus.FALLBACK
 
     def to_dict(self) -> dict:
-        """Plain dict for saving and display. Enums become their values, the time ISO text."""
         return {
             "risk_factors": [f.to_dict() for f in self.__risk_factors],
             "insights": [i.to_dict() for i in self.__insights],
@@ -94,7 +89,6 @@ class AIAssessment:
 
     @classmethod
     def from_dict(cls, data: dict) -> "AIAssessment":
-        """Rebuild from to_dict() output. A missing key is a KeyError, a bad value a ValueError."""
         text = str(data["fetched_at"])
         if text.endswith("Z"):                     # Python 3.10 fromisoformat does not read "Z"
             text = text[:-1] + "+00:00"

@@ -10,15 +10,7 @@ from .reschedule_plan import ReschedulePlan
 
 
 class RescheduleRule(BusinessRule):
-    """New feature: a High or Extreme weather risk on a shipment that has not left, plus a clear weather window
-    found by the AI, becomes a suggested later departure with the same journey length.
-
-    The AI only supplies the date (earliest_clear_departure). This rule decides whether to use it and
-    writes the reasoning from the assessment's own facts. It never changes the outcome or the risk.
-    """
-
     def apply(self, shipment: Shipment, assessment: AIAssessment, decision: Decision, now: datetime) -> None:
-        """Put the suggestion, with its reasoning, on the decision when a plan exists."""
         plan = self.plan_for(shipment, assessment, now.date())
         if plan is None:
             return
@@ -29,8 +21,6 @@ class RescheduleRule(BusinessRule):
                                  f"{plan.new_arrival:%d/%m/%Y} instead of {plan.original_departure:%d/%m/%Y}")
 
     def plan_for(self, shipment: Shipment, assessment: AIAssessment, today: date) -> Optional[ReschedulePlan]:
-        """A plan, or None when the shipment already left, the AI found no later clear date,
-        or no weather risk factor is High or Extreme."""
         clear = assessment.earliest_clear_departure
         if clear is None or shipment.departure < today or clear <= shipment.departure:
             return None
@@ -46,7 +36,6 @@ class RescheduleRule(BusinessRule):
         return [f for f in assessment.risk_factors if f.type is RiskType.WEATHER and f.severity >= RiskLevel.HIGH]
 
     def __reasoning(self, plan: ReschedulePlan, assessment: AIAssessment) -> str:
-        """Why the planned dates are poor and why the new ones are better, from the assessment's facts."""
         problems = "; ".join(f"{f.severity.label} weather risk at {f.location} ({f.detail})"
                              for f in self.__weather_problems(assessment))
         days = plan.days_later

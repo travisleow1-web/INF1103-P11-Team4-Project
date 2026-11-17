@@ -13,18 +13,12 @@ if TYPE_CHECKING:
 
 
 class PerfectStormRule(BusinessRule):
-    """Rule 1: a High or Extreme factor raises the risk to it; enough Medium storm factors make it High.
-
-    Based on Jun Jie's PerfectStormRule (Logic_ManagerPart2).
-    """
-
     STORM_FACTORS = frozenset({RiskType.WEATHER, RiskType.PORT_CONGESTION, RiskType.LABOR_SHORTAGE})
 
     def __init__(self, config: "RuleConfig"):
         self.__config = config
 
     def apply(self, shipment: Shipment, assessment: AIAssessment, decision: Decision, now: datetime) -> None:
-        """Raise the risk from the factor severities (the worst severity of each type counts)."""
         levels = {}
         for factor in assessment.risk_factors:
             levels[factor.type] = max(levels.get(factor.type, RiskLevel.LOW), factor.severity)

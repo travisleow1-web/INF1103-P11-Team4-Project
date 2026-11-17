@@ -1,4 +1,3 @@
-"""Web pages through FastAPI's TestClient, with a temp-file JSON data manager. No network."""
 import json
 import logging
 import re
@@ -280,8 +279,6 @@ def test_ids_continue_after_earlier_submissions(data):
 
 
 class SaveFails(JsonDataManager):
-    """Reads work, every save fails: the database went away after the IDs were given out."""
-
     def save(self, record):
         raise StorageError("Database is down")
 
@@ -406,7 +403,6 @@ def test_search_without_a_database_shows_the_message():
 
 @pytest.fixture
 def env(monkeypatch, tmp_path):
-    """A clean environment: a developer's own .env and shell settings must not change the tests."""
     monkeypatch.setattr(main, "load_dotenv", lambda *args, **kwargs: False)
     for name in ("DEMO_MODE", "DATA_BACKEND", "DATA_FILE", "DEMO_DATA_FILE", "MONGO_URI", "DB_NAME",
                  "GEMINI_API_KEY", "GEMINI_MODEL", "AI_CACHE_FILE"):
@@ -436,8 +432,6 @@ def test_ai_is_built_from_the_key_and_model(env, tmp_path):
 
 
 class RecordingSession:
-    """Stands in for requests.Session: Gemini posts get a valid reply, feed requests fail. Remembers the URLs."""
-
     def __init__(self):
         self.posted = []
 
@@ -604,8 +598,6 @@ def test_create_app_reads_env_through_the_name_the_fixture_replaces(env):
 
 
 class SlowFirstAI(FakeAI):
-    """FakeAI whose first two calls wait for each other, so two submissions overlap before either saves."""
-
     def __init__(self):
         super().__init__()
         self.__barrier = threading.Barrier(2, timeout=10)
@@ -681,12 +673,10 @@ def test_search_shows_the_summary_and_hidden_date_lines(data):
 # re-running shipments the AI could not assess
 
 def has_rerun_form(text, shipment_id):
-    """True if the page has a Re-run form for that shipment."""
     return re.search(rf'action="/rerun"[^>]*>\s*<input type="hidden" name="shipment_id" value="{shipment_id}">', text) is not None
 
 
 def failed_run(data, count=9):
-    """Submit count shipments with the demo AI: the ninth fails the first time. Returns the client."""
     client = client_for(data, FakeAI(), FakeLogic(), demo=True)
     client.post("/submit", data=good_rows(count))
     return client
@@ -767,7 +757,6 @@ def test_the_ids_in_a_rerun_form_are_escaped(data):
 # sorting rows when the suggested dates are shown
 
 def ranks_by_id(text):
-    """{shipment id: data-rank} for each summary row on the page."""
     return {i: r for r, i in re.findall(r'<tr class="summary" data-rank="(\d)">\s*<th scope="row">(SHP-\d+)', text)}
 
 
@@ -798,7 +787,6 @@ def test_the_results_and_search_pages_load_the_sorting_script(data):
 # the date line: planned and suggested side by side, then why
 
 def plan_cells(text):
-    """(label, text) of each cell in the first date line on the page."""
     line = text[text.index('class="plan"'):text.index("</tr>", text.index('class="plan"'))]
     cells = re.findall(r'<span class="plan-label">(\w+)</span>(.*?)</div>', line, flags=re.S)
     return [(label, " ".join(re.sub(r"<[^>]+>", " ", body).split())) for label, body in cells]
@@ -824,8 +812,6 @@ def test_a_high_risk_shipment_with_no_new_date_shows_none_and_the_reason(data):
 # loading messages: what the AI is doing while shipments are assessed
 
 class OneStepAI(FakeAI):
-    """FakeAI that also tells its listeners one message with HTML in it, and counts its listeners."""
-
     def __init__(self, detail="<b>x</b>"):
         super().__init__()
         self.listeners = []
@@ -846,7 +832,6 @@ class OneStepAI(FakeAI):
 
 
 def status_texts(page):
-    """The text of each status update on the page, in order (the ones that are scripts)."""
     return [json.loads(text) for text in re.findall(r'getElementById\("status"\)\.textContent = (".*?");</script>', page)]
 
 

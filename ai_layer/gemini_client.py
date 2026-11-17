@@ -17,12 +17,6 @@ REASON_LIMIT = 200      # longest part of Google's error message kept in an AISe
 
 
 class GeminiClient:
-    """Sends one prompt to Gemini and returns the JSON reply as a dict.
-
-    The system prompt and response schema belong to the client. Timeouts, connection errors,
-    429 and 5xx are retried with backoff; a missing key and other 4xx errors are not.
-    """
-
     def __init__(self, api_key: Optional[str], model: str, system_prompt: str, response_schema: dict,
                  max_retries: int = MAX_RETRIES, timeout: float = GEMINI_TIMEOUT,
                  http: Optional[requests.Session] = None):
@@ -40,12 +34,6 @@ class GeminiClient:
 
     def complete(self, prompt: str,
                  on_retry: Optional[Callable[[int, int, AIServiceError], None]] = None) -> dict:
-        """Return the model's JSON reply. Raises AIServiceError or InvalidResponseError.
-
-        on_retry(attempt, max_attempts, error), if given, is called each time an attempt failed and
-        another will follow, just before the wait. The client itself reports nothing else.
-        The last attempt always returns or raises, so the loop never ends without a result.
-        """
         delay = 1.0
         for attempt in range(1, self.__max_retries + 1):
             try:
@@ -60,13 +48,11 @@ class GeminiClient:
                 delay *= 2
 
     def fingerprint(self) -> str:
-        """Hash of the model, system prompt and schema. The cache uses it as its version."""
         text = self.__model + self.__system_prompt + json.dumps(self.__response_schema, sort_keys=True)
         return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
     @staticmethod
     def __clean_key(api_key: Optional[str]) -> Optional[str]:
-        """The key without surrounding spaces, or None if it is empty or not plain printable ASCII."""
         key = (api_key or "").strip()
         if not key or not key.isascii() or not key.isprintable():
             return None
@@ -103,10 +89,6 @@ class GeminiClient:
             raise InvalidResponseError(f"unreadable model reply: {error}") from error
 
     def __reason(self, reply: requests.Response) -> str:
-        """Google's error status and message from an error reply, e.g. ' (INVALID_ARGUMENT: API key not valid)'.
-
-        Empty if the body has none. Shortened to REASON_LIMIT characters, and the key is masked just in case.
-        """
         try:
             error = reply.json()["error"]
             parts = [str(error.get(name) or "").strip() for name in ("status", "message")]

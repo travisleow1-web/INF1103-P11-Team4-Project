@@ -233,8 +233,6 @@ def test_api_key_never_reaches_logs_or_errors(tmp_path, caplog, key, error):
 
 
 class LateEveningUTC(datetime):
-    """20:00 UTC on 13 Nov 2026, which is already 14 Nov in Singapore."""
-
     @classmethod
     def now(cls, tz=None):
         moment = cls(2026, 11, 13, 20, 0, tzinfo=timezone.utc)

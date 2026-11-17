@@ -1,8 +1,3 @@
-"""Constants for the AI layer: model name, prompt, response schema and the closed value lists.
-
-Ported from the old config.py. Risk types and severities come from the shared enums, so the
-schema and the parser always agree with the model classes.
-"""
 from model.risk_level import RiskLevel
 from model.risk_type import RiskType
 

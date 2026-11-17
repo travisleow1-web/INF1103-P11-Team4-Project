@@ -1,5 +1,3 @@
-"""Dev-only stand-ins for the AI and Logic managers, used by the tests and by the web app's demo mode.
-They run only when DEMO_MODE=1 (see main.create_app), never in normal use."""
 import time
 from datetime import datetime, timedelta, timezone
 from model.ai_assessment import AIAssessment
@@ -19,28 +17,15 @@ OUTCOMES = {RiskLevel.LOW: Outcome.PROCEED, RiskLevel.MEDIUM: Outcome.INSURE, Ri
 
 
 class FakeAI:
-    """Gives SHP-001 a medium weather risk, SHP-002 high, SHP-003 low, and so on.
-
-    A high risk also gets a clear departure date 4 days after the planned one, as if the forecast scan
-    had found the weather clearing then. That is what lets the demo show the reschedule suggestion.
-
-    Every ninth shipment (SHP-009, SHP-018, ...) is unavailable the first time it is assessed and works
-    when assessed again, so the demo can show the re-run. Like the real AI manager it tells its listeners
-    when it starts and how it ends; delay is how many seconds that takes, so the demo can show the page's
-    loading messages.
-    """
-
     def __init__(self, delay: float = 0.0):
         self.__tried = set()
         self.__listeners = []
         self.__delay = delay
 
     def add_listener(self, listener):
-        """Tell this listener what the AI is doing."""
         self.__listeners.append(listener)
 
     def remove_listener(self, listener):
-        """Stop telling this listener."""
         if listener in self.__listeners:
             self.__listeners.remove(listener)
 
@@ -50,7 +35,6 @@ class FakeAI:
             listener.on_event(event)
 
     def assess(self, shipment):
-        """Return a LIVE assessment whose severity depends only on the shipment number."""
         number = int(shipment.shipment_id.split("-")[1])
         first_try = shipment.shipment_id not in self.__tried
         self.__tried.add(shipment.shipment_id)
@@ -71,13 +55,7 @@ class FakeAI:
 
 
 class FakeLogic:
-    """Copies the first risk factor's severity into the decision. High risk needs a human.
-
-    It also runs the real RescheduleRule, so the demo shows the real reschedule suggestion.
-    """
-
     def evaluate(self, shipment, assessment, now):
-        """Return a Decision with the risk and outcome taken from the fake assessment."""
         decision = Decision(shipment.shipment_id)
         if assessment.is_fallback():            # no AI answer: low risk, but a person must look
             decision.raise_risk(RiskLevel.LOW)
@@ -99,10 +77,8 @@ class FakeLogic:
 
     @property
     def config(self):
-        """The thresholds (shown on the rules page; the fake rule ignores them)."""
         return self.__config
 
     def configure(self, fields):
-        """Accept typed thresholds like the real LogicManager."""
         self.__config = RuleConfig.from_text(fields)
         return self.__config
